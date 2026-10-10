@@ -1,6 +1,6 @@
 # OpenNPC - C++ Cognitive Middleware for AI Agents
 
-[![CI](https://github.com/your-org/OpenNPC/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/OpenNPC/actions/workflows/ci.yml)
+[![CI](https://github.com/losadgm/OpenNPC/actions/workflows/ci.yml/badge.svg)](https://github.com/losadgm/OpenNPC/actions/workflows/ci.yml)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](#requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
