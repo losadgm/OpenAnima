@@ -1,0 +1,11 @@
+# Code owners are requested for review on pull requests touching these paths.
+# The file is read from the base branch of the pull request.
+#
+# Patterns use gitignore syntax and the last matching pattern wins, so the
+# catch-all entry stays first.
+
+*                     @losadgm
+
+# The file itself is owned as well, otherwise a pull request could rewrite it
+# and drop the ownership requirement.
+/.github/CODEOWNERS   @losadgm
