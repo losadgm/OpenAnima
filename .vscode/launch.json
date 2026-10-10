@@ -1,0 +1,58 @@
+{
+    // Debug configurations powered by CodeLLDB (vadimcn.vscode-lldb).
+    // The debugger is LLDB itself: no system GDB is required.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug: open_npc_cli (example)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/examples/open_npc_cli",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "terminal": "integrated",
+            "sourceLanguages": [
+                "cpp"
+            ],
+            "stopOnEntry": false,
+            "preLaunchTask": "CMake: build (clang)"
+        },
+        {
+            "name": "Debug: tests (all, Catch2)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/open_npc_tests",
+            "args": [],
+            "cwd": "${workspaceFolder}",
+            "terminal": "integrated",
+            "sourceLanguages": [
+                "cpp"
+            ],
+            "stopOnEntry": false,
+            "preLaunchTask": "CMake: build (clang)"
+        },
+        {
+            "name": "Debug: single test (Catch2)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/tests/open_npc_tests",
+            "args": [
+                "${input:catch2TestName}"
+            ],
+            "cwd": "${workspaceFolder}",
+            "terminal": "integrated",
+            "sourceLanguages": [
+                "cpp"
+            ],
+            "stopOnEntry": false,
+            "preLaunchTask": "CMake: build (clang)"
+        }
+    ],
+    "inputs": [
+        {
+            "id": "catch2TestName",
+            "type": "promptString",
+            "description": "Catch2 test to run (e.g. 'NPCBrain::ping*'; leave empty to run all)"
+        }
+    ]
+}

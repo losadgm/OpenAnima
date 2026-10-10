@@ -1,0 +1,64 @@
+# Build directories
+build/
+build-*/
+cmake-build-*/
+out/
+_install/
+
+# CMake artefacts
+CMakeCache.txt
+CMakeFiles/
+CMakeUserPresets.json
+compile_commands.json
+CTestTestfile.cmake
+Testing/
+install_manifest.txt
+*.cmake.stamp
+
+# FetchContent dependencies
+_deps/
+.cache/
+
+# Compiled objects and binaries
+*.o
+*.obj
+*.lo
+*.a
+*.lib
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+*.out
+*.app
+*.mod
+bin/
+lib/
+
+# Debug / profiling artefacts
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
+core
+vgcore.*
+
+# IDE and editor files
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Doxygen output
+docs/html/
+docs/xml/
+.vscode/v-tree.local.*.json

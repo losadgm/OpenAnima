@@ -1,0 +1,11 @@
+{
+    // Recommended extensions for contributors (clang/LLVM toolchain).
+    "recommendations": [
+        "llvm-vs-code-extensions.vscode-clangd",
+        "vadimcn.vscode-lldb",
+        "ms-vscode.cmake-tools",
+        "twxs.cmake",
+        "usernamehw.errorlens",
+        "jeff-hykin.better-cpp-syntax"
+    ]
+}

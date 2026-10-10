@@ -1,0 +1,31 @@
+---
+# clangd configuration for the OpenNPC monorepo.
+# Reference: https://clangd.llvm.org/config
+CompileFlags:
+  # Reuse the flags emitted by CMake (build/compile_commands.json).
+  CompilationDatabase: build
+  Compiler: clang++
+  Add:
+    - -std=c++17
+    - -Wall
+    - -Wextra
+    - -Wpedantic
+
+Diagnostics:
+  ClangTidy:
+    Add:
+      - bugprone-*
+      - modernize-*
+      - performance-*
+      - readability-*
+    Remove:
+      - modernize-use-trailing-return-type
+      - readability-magic-numbers
+
+InlayHints:
+  Enabled: Yes
+  ParameterNames: Yes
+  DeducedTypes: Yes
+
+Hover:
+  ShowAKA: Yes

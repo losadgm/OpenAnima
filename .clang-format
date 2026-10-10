@@ -1,0 +1,40 @@
+---
+# OpenNPC code style. Kept in sync with the clangd / clang-format VS Code
+# fallback style: LLVM base, 4-space indent, no tabs.
+Language:        Cpp
+BasedOnStyle:    LLVM
+Standard:        c++17
+
+IndentWidth:     4
+TabWidth:        4
+UseTab:          Never
+ContinuationIndentWidth: 4
+AccessModifierOffset:    -4
+NamespaceIndentation:    None
+ColumnLimit:     100
+
+BreakBeforeBraces: Attach
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakTemplateDeclarations: Yes
+
+PointerAlignment: Left
+DerivePointerAlignment: false
+ReferenceAlignment: Pointer
+
+SortIncludes:    CaseSensitive
+IncludeBlocks:   Regroup
+IncludeCategories:
+  - Regex:    '^<.*>'          # system headers
+    Priority: 1
+  - Regex:    '^"OpenNPC/.*"'  # public project headers
+    Priority: 2
+  - Regex:    '^".*"'          # local headers
+    Priority: 3
+
+FixNamespaceComments: true
+SpacesBeforeTrailingComments: 2
+ReflowComments:   true
+IncludeIsMainRegex: '([_\-]test)?$'
+
