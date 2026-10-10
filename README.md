@@ -1,10 +1,10 @@
-# OpenNPC - C++ Cognitive Middleware for AI Agents
+# OpenAnima - C++ Cognitive Middleware for AI Agents
 
-[![CI](https://github.com/losadgm/OpenNPC/actions/workflows/ci.yml/badge.svg)](https://github.com/losadgm/OpenNPC/actions/workflows/ci.yml)
+[![CI](https://github.com/losadgm/OpenAnima/actions/workflows/ci.yml/badge.svg)](https://github.com/losadgm/OpenAnima/actions/workflows/ci.yml)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](#requirements)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-OpenNPC is a general-purpose **C++ middleware** for building agents and NPCs driven by
+OpenAnima is a general-purpose **C++ middleware** for building agents and NPCs driven by
 large language models. It targets *any* client application — simulations, user
 interfaces, games or robotics — and its core promise is that **reasoning never blocks the
 client's main thread**: inference runs on worker threads while the application keeps
@@ -28,7 +28,7 @@ rendering, simulating or responding.
 
 Integrating an LLM into real software is not just "call an API and print the answer".
 Production clients need non-blocking execution, persistent memory, structured output,
-multi-agent coordination and interchangeable inference backends. OpenNPC packages those
+multi-agent coordination and interchangeable inference backends. OpenAnima packages those
 concerns behind a small, dependency-light C++ library:
 
 - **Framework-agnostic** — plain C++17, no assumptions about your engine (Godot, Unreal,
@@ -66,8 +66,8 @@ Client app ──▶ Async NPCBrain ──▶ Context & Memory ──▶ Provide
 
 ```bash
 # 1. Clone
-git clone https://github.com/your-org/OpenNPC.git
-cd OpenNPC
+git clone https://github.com/losadgm/OpenAnima.git
+cd OpenAnima
 
 # 2. Configure (clang + Ninja; emits compile_commands.json for clangd)
 cmake -S . -B build -G Ninja \
@@ -83,17 +83,17 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 
 # 5. Run the example harness
-./build/examples/open_npc_cli   # -> "OpenNPC inicializado correctamente."
+./build/examples/open_anima_cli   # -> "OpenAnima inicializado correctamente."
 ```
 
 Consume it from another CMake project:
 
 ```cmake
-FetchContent_Declare(OpenNPC GIT_REPOSITORY https://github.com/your-org/OpenNPC.git)
-FetchContent_MakeAvailable(OpenNPC)
+FetchContent_Declare(OpenAnima GIT_REPOSITORY https://github.com/losadgm/OpenAnima.git)
+FetchContent_MakeAvailable(OpenAnima)
 
 add_executable(my_app main.cpp)
-target_link_libraries(my_app PRIVATE OpenNPC::OpenNPC)
+target_link_libraries(my_app PRIVATE OpenAnima::OpenAnima)
 ```
 
 ## Requirements
@@ -111,7 +111,7 @@ target_link_libraries(my_app PRIVATE OpenNPC::OpenNPC)
 ├── .github/workflows/ci.yml   # CI matrix (Ubuntu + Windows)
 ├── docs/Doxyfile.in           # Doxygen template
 ├── examples/                  # Runnable examples (cli_harness)
-├── include/OpenNPC/           # Public headers (Types.h, NPCBrain.h)
+├── include/OpenAnima/         # Public headers (Types.h, NPCBrain.h)
 ├── src/                       # Library implementation
 ├── tests/                     # Catch2 test suite
 ├── .clang-format              # Code style
@@ -125,13 +125,13 @@ target_link_libraries(my_app PRIVATE OpenNPC::OpenNPC)
 
 ```bash
 # Build with static analysis enabled (clang-tidy runs on every compile)
-cmake -S . -B build -G Ninja -DOPENNPC_ENABLE_CLANG_TIDY=ON
+cmake -S . -B build -G Ninja -DOPENANIMA_ENABLE_CLANG_TIDY=ON
 
 # Format the tree
 clang-format -i $(git ls-files '*.h' '*.hpp' '*.cpp')
 
 # Generate documentation (requires Doxygen)
-cmake -DOpenNPC_ENABLE_DOCS=ON -S . -B build && cmake --build build --target docs
+cmake -DOpenAnima_ENABLE_DOCS=ON -S . -B build && cmake --build build --target docs
 ```
 
 ## Contributing

@@ -4,10 +4,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug: open_npc_cli (example)",
+            "name": "Debug: open_anima_cli (example)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/examples/open_npc_cli",
+            "program": "${workspaceFolder}/build/examples/open_anima_cli",
             "args": [],
             "cwd": "${workspaceFolder}",
             "terminal": "integrated",
@@ -21,7 +21,7 @@
             "name": "Debug: tests (all, Catch2)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/tests/open_npc_tests",
+            "program": "${workspaceFolder}/build/tests/open_anima_tests",
             "args": [],
             "cwd": "${workspaceFolder}",
             "terminal": "integrated",
@@ -35,7 +35,7 @@
             "name": "Debug: single test (Catch2)",
             "type": "lldb",
             "request": "launch",
-            "program": "${workspaceFolder}/build/tests/open_npc_tests",
+            "program": "${workspaceFolder}/build/tests/open_anima_tests",
             "args": [
                 "${input:catch2TestName}"
             ],

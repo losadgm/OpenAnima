@@ -1,5 +1,5 @@
 ---
-# OpenNPC code style. Kept in sync with the clangd / clang-format VS Code
+# OpenAnima code style. Kept in sync with the clangd / clang-format VS Code
 # fallback style: LLVM base, 4-space indent, no tabs.
 Language:        Cpp
 BasedOnStyle:    LLVM
@@ -28,7 +28,7 @@ IncludeBlocks:   Regroup
 IncludeCategories:
   - Regex:    '^<.*>'          # system headers
     Priority: 1
-  - Regex:    '^"OpenNPC/.*"'  # public project headers
+  - Regex:    '^"OpenAnima/.*"'  # public project headers
     Priority: 2
   - Regex:    '^".*"'          # local headers
     Priority: 3

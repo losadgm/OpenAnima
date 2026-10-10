@@ -1,5 +1,5 @@
 ---
-# clangd configuration for the OpenNPC monorepo.
+# clangd configuration for the OpenAnima monorepo.
 # Reference: https://clangd.llvm.org/config
 CompileFlags:
   # Reuse the flags emitted by CMake (build/compile_commands.json).

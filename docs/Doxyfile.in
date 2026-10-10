@@ -1,5 +1,5 @@
 # =============================================================================
-#  Doxyfile template for OpenNPC.
+#  Doxyfile template for OpenAnima.
 #  Processed by CMake's configure_file(... @ONLY) so the @...@ tokens below are
 #  substituted with the real project metadata.
 # =============================================================================

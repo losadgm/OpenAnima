@@ -1,5 +1,5 @@
 ---
-# OpenNPC static-analysis rules. Applied by clang-tidy and by clangd
+# OpenAnima static-analysis rules. Applied by clang-tidy and by clangd
 # (the clangd extension runs these checks live in the editor).
 Checks: >
   bugprone-*,
@@ -16,7 +16,7 @@ Checks: >
   -readability-magic-numbers
 
 WarningsAsErrors: ''
-HeaderFilterRegex: '(include/OpenNPC|src|tests|examples)/.*\.(h|hpp|cpp)$'
+HeaderFilterRegex: '(include/OpenAnima|src|tests|examples)/.*\.(h|hpp|cpp)$'
 FormatStyle: file
 UseColor: true
 

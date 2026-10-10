@@ -1,13 +1,13 @@
 # =============================================================================
-#  OpenNPC - C++ Cognitive Middleware for AI Agents
+#  OpenAnima - C++ Cognitive Middleware for AI Agents
 #  Root build script (Modern CMake, target-based, C++17).
 # =============================================================================
 cmake_minimum_required(VERSION 3.20)
 
-project(OpenNPC
+project(OpenAnima
     VERSION 0.1.0
     DESCRIPTION "C++ cognitive middleware for LLM-driven agents and NPCs"
-    HOMEPAGE_URL "https://github.com/your-org/OpenNPC"
+    HOMEPAGE_URL "https://github.com/losadgm/OpenAnima"
     LANGUAGES CXX)
 
 # -----------------------------------------------------------------------------
@@ -28,19 +28,19 @@ endif()
 # -----------------------------------------------------------------------------
 #  Options
 # -----------------------------------------------------------------------------
-option(OPENNPC_BUILD_EXAMPLES "Build the OpenNPC example programs" ON)
-option(OPENNPC_ENABLE_CLANG_TIDY "Run clang-tidy while compiling (clang only)" OFF)
+option(OPENANIMA_BUILD_EXAMPLES "Build the OpenAnima example programs" ON)
+option(OPENANIMA_ENABLE_CLANG_TIDY "Run clang-tidy while compiling (clang only)" OFF)
 
 # -----------------------------------------------------------------------------
 #  Optional clang-tidy integration (works with the clang/LLVM toolchain only)
 # -----------------------------------------------------------------------------
-if(OPENNPC_ENABLE_CLANG_TIDY)
-    find_program(OPENNPC_CLANG_TIDY_EXE NAMES clang-tidy clang-tidy-19 clang-tidy-18)
-    if(NOT OPENNPC_CLANG_TIDY_EXE)
-        message(WARNING "OPENNPC_ENABLE_CLANG_TIDY=ON but clang-tidy was not found.")
+if(OPENANIMA_ENABLE_CLANG_TIDY)
+    find_program(OPENANIMA_CLANG_TIDY_EXE NAMES clang-tidy clang-tidy-19 clang-tidy-18)
+    if(NOT OPENANIMA_CLANG_TIDY_EXE)
+        message(WARNING "OPENANIMA_ENABLE_CLANG_TIDY=ON but clang-tidy was not found.")
     else()
-        set(CMAKE_CXX_CLANG_TIDY "${OPENNPC_CLANG_TIDY_EXE}")
-        message(STATUS "clang-tidy enabled: ${OPENNPC_CLANG_TIDY_EXE}")
+        set(CMAKE_CXX_CLANG_TIDY "${OPENANIMA_CLANG_TIDY_EXE}")
+        message(STATUS "clang-tidy enabled: ${OPENANIMA_CLANG_TIDY_EXE}")
     endif()
 endif()
 
@@ -74,7 +74,7 @@ endif()
 # -----------------------------------------------------------------------------
 add_subdirectory(src)
 
-if(OPENNPC_BUILD_EXAMPLES)
+if(OPENANIMA_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
 

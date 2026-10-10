@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-namespace OpenNPC {
+namespace OpenAnima {
 
 /// Identifies the author of a ChatMessage.
 enum class Role : std::uint8_t {
@@ -19,4 +19,4 @@ struct ChatMessage {
     std::string content;    ///< Raw text payload.
 };
 
-}  // namespace OpenNPC
+}  // namespace OpenAnima

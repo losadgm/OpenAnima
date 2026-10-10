@@ -1,10 +1,10 @@
-#include "OpenNPC/NPCBrain.h"
+#include "OpenAnima/NPCBrain.h"
 
-namespace OpenNPC {
+namespace OpenAnima {
 
 // Part of the public instance API; kept non-static on purpose.
 std::string NPCBrain::ping() {  // NOLINT(readability-convert-member-functions-to-static)
-    return "OpenNPC inicializado correctamente.";
+    return "OpenAnima inicializado correctamente.";
 }
 
-}  // namespace OpenNPC
+}  // namespace OpenAnima

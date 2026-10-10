@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "OpenNPC/Types.h"
+#include "OpenAnima/Types.h"
 
-namespace OpenNPC {
+namespace OpenAnima {
 
 /// Entry point of the cognitive middleware.
 /// Owns the reasoning state of a single agent and exposes it to the client application.
@@ -22,4 +22,4 @@ private:
     std::vector<ChatMessage> m_history;  ///< Conversation context owned by this brain.
 };
 
-}  // namespace OpenNPC
+}  // namespace OpenAnima
