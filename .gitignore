@@ -62,3 +62,6 @@ Thumbs.db
 docs/html/
 docs/xml/
 .vscode/v-tree.local.*.json
+
+# Local project notes
+LOCAL.md
