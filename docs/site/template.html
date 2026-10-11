@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="$if(lang)$$lang$$else$en$endif$">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>$title$</title>
+    $for(css)$
+    <link rel="stylesheet" href="$css$">
+    $endfor$
+    $if(highlighting-css)$
+    <style>
+        $highlighting-css$
+    </style>
+    $endif$
+</head>
+
+<body>
+    <a class="skip" href="#contenido">Skip to content</a>
+
+    <header class="site-header">
+        <div class="wrap">
+            <a class="brand" href="index.html">OpenAnima</a>
+            <!-- One entry per page rendered by docs/build-docs.sh. -->
+            <nav class="site-nav">
+                <a href="index.html">Home</a>
+                <a href="development.html">Development</a>
+                <a href="api/index.html">API reference</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="wrap$if(toc)$ with-toc$endif$" id="contenido">
+        $if(toc)$
+        <nav class="toc" aria-label="On this page">
+            $toc$
+        </nav>
+        $endif$
+        <article class="doc">
+            $body$
+        </article>
+    </main>
+
+    <footer class="site-footer">
+        <div class="wrap">
+            <p>OpenAnima. Built from the repository (<code>docs/</code> and the headers in
+                <code>include/</code>) with pandoc and Doxygen.
+            </p>
+        </div>
+    </footer>
+</body>
+
+</html>
