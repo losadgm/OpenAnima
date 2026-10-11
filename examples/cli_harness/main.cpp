@@ -82,7 +82,7 @@ int main(int argc, char** argv) {
     const std::string prompt = joinArguments(argc, argv);
     if (!prompt.empty()) {
         try {
-            std::cout << brain.ask(prompt) << '\n';
+            std::cout << brain.ask(prompt).text << '\n';
         } catch (const OpenAnima::OpenAnimaError& error) {
             std::cerr << "error: " << error.what() << '\n';
             return 1;
@@ -102,7 +102,7 @@ int main(int argc, char** argv) {
             continue;
         }
         try {
-            std::cout << brain.ask(line) << '\n';
+            std::cout << brain.ask(line).text << '\n';
         } catch (const OpenAnima::OpenAnimaError& error) {
             std::cerr << "error: " << error.what() << '\n';
         }

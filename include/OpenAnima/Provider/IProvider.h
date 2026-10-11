@@ -1,8 +1,8 @@
 #pragma once
 
-#include <string>
 #include <vector>
 
+#include "OpenAnima/Core/Completion.h"
 #include "OpenAnima/Core/Types.h"
 
 namespace OpenAnima::Provider {
@@ -20,11 +20,12 @@ public:
     IProvider(IProvider&&) = delete;
     IProvider& operator=(IProvider&&) = delete;
 
-    /// Sends a whole conversation and returns the assistant reply.
+    /// Sends a whole conversation and returns the answer.
     /// @param messages Conversation in chronological order; the last entry is the current turn.
-    /// @return The assistant text produced by the backend.
+    /// @return The assistant answer, its metadata, and why generation stopped.
     /// @throws OpenAnimaError subclasses when the call cannot be completed.
-    virtual std::string complete(const std::vector<OpenAnima::Core::ChatMessage>& messages) = 0;
+    virtual OpenAnima::Core::Completion
+    complete(const std::vector<OpenAnima::Core::ChatMessage>& messages) = 0;
 
 protected:
     /// Only derived classes build a provider.

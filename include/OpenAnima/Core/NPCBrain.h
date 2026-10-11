@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "OpenAnima/Core/Completion.h"
 #include "OpenAnima/Core/Types.h"
 #include "OpenAnima/Provider/IProvider.h"
 
@@ -29,12 +30,12 @@ public:
     /// @param prompt Instruction sent as the leading system message.
     void setSystemPrompt(std::string prompt);
 
-    /// Sends a prompt and returns the assistant reply.
-    /// The prompt and the reply join the history only when the call succeeds.
+    /// Sends a prompt and returns the answer, with what the call produced.
+    /// The prompt and the answer text join the history only when the call succeeds.
     /// @param prompt Text produced by the player or by the client application.
-    /// @return The assistant reply.
+    /// @return The assistant answer, and why generation stopped.
     /// @throws OpenAnimaError when no backend is attached or the call fails.
-    std::string ask(const std::string& prompt);
+    Completion ask(const std::string& prompt);
 
     /// @return The conversation so far, in chronological order.
     const std::vector<ChatMessage>& history() const noexcept {

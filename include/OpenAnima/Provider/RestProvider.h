@@ -1,9 +1,9 @@
 #pragma once
 
 #include <memory>
-#include <string>
 #include <vector>
 
+#include "OpenAnima/Core/Completion.h"
 #include "OpenAnima/Core/Types.h"
 #include "OpenAnima/Http/HttpTransport.h"
 #include "OpenAnima/Provider/IProvider.h"
@@ -21,7 +21,8 @@ public:
     RestProvider(ProviderConfig config, std::shared_ptr<OpenAnima::Http::HttpTransport> transport);
 
     /// @copydoc IProvider::complete
-    std::string complete(const std::vector<OpenAnima::Core::ChatMessage>& messages) override;
+    OpenAnima::Core::Completion
+    complete(const std::vector<OpenAnima::Core::ChatMessage>& messages) override;
 
     /// @return The configuration this provider was created with.
     const ProviderConfig& config() const noexcept {

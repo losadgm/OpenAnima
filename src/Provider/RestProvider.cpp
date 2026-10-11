@@ -2,11 +2,14 @@
 
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <nlohmann/json.hpp>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "OpenAnima/Core/Completion.h"
 #include "OpenAnima/Errors.h"
 
 namespace OpenAnima::Provider {
@@ -14,7 +17,10 @@ namespace OpenAnima::Provider {
 namespace {
 
 using OpenAnima::Core::ChatMessage;
+using OpenAnima::Core::Completion;
+using OpenAnima::Core::FinishReason;
 using OpenAnima::Core::Role;
+using OpenAnima::Core::TokenUsage;
 using OpenAnima::Http::HttpRequest;
 using OpenAnima::Http::HttpResponse;
 
@@ -68,10 +74,49 @@ std::string buildRequestBody(const ProviderConfig& config,
     return body.dump();
 }
 
-/// Extracts the assistant text from a chat-completions payload.
+/// Maps the finish_reason string of the contract onto the modelled values.
+FinishReason toFinishReason(const std::string& name) {
+    if (name == "stop") {
+        return FinishReason::Stop;
+    }
+    if (name == "length") {
+        return FinishReason::Length;
+    }
+    if (name == "tool_calls") {
+        return FinishReason::ToolCalls;
+    }
+    if (name == "content_filter") {
+        return FinishReason::ContentFilter;
+    }
+    return FinishReason::Unknown;
+}
+
+/// @return The count stored at name, or 0 when it is absent or not a number.
+std::int32_t readTokenCount(const nlohmann::json& usage, const char* name) {
+    if (!usage.contains(name) || !usage[name].is_number()) {
+        return 0;
+    }
+    return static_cast<std::int32_t>(usage[name].get<double>());
+}
+
+/// @return The reported token usage, empty when the payload carries none.
+std::optional<TokenUsage> parseUsage(const nlohmann::json& payload) {
+    if (!payload.contains("usage") || !payload["usage"].is_object()) {
+        return std::nullopt;
+    }
+
+    const nlohmann::json& usage = payload["usage"];
+    TokenUsage tokens;
+    tokens.promptTokens = readTokenCount(usage, "prompt_tokens");
+    tokens.completionTokens = readTokenCount(usage, "completion_tokens");
+    tokens.totalTokens = readTokenCount(usage, "total_tokens");
+    return tokens;
+}
+
+/// Extracts the assistant answer and its metadata from a chat-completions payload.
 /// @throws ProviderError when the payload carries an error object.
 /// @throws ParseError when the payload is not JSON or lacks the expected fields.
-std::string parseAssistantText(const std::string& payload) {
+Completion parseCompletion(const std::string& payload) {
     nlohmann::json parsed;
     try {
         parsed = nlohmann::json::parse(payload);
@@ -96,7 +141,17 @@ std::string parseAssistantText(const std::string& payload) {
                          snippet(payload));
     }
 
-    return choice["message"]["content"].get<std::string>();
+    Completion completion;
+    completion.text = choice["message"]["content"].get<std::string>();
+    if (parsed.contains("model") && parsed["model"].is_string()) {
+        completion.model = parsed["model"].get<std::string>();
+    }
+    // A streaming chunk can carry a null finish_reason, so the value is checked first.
+    if (choice.contains("finish_reason") && choice["finish_reason"].is_string()) {
+        completion.finishReason = toFinishReason(choice["finish_reason"].get<std::string>());
+    }
+    completion.usage = parseUsage(parsed);
+    return completion;
 }
 
 }  // namespace
@@ -109,7 +164,7 @@ RestProvider::RestProvider(ProviderConfig config,
     assert(m_transport != nullptr && "RestProvider requires a transport");
 }
 
-std::string RestProvider::complete(const std::vector<ChatMessage>& messages) {
+Completion RestProvider::complete(const std::vector<ChatMessage>& messages) {
     assert(!messages.empty() && "complete() requires at least one message");
 
     HttpRequest request;
@@ -128,7 +183,7 @@ std::string RestProvider::complete(const std::vector<ChatMessage>& messages) {
                                 ": " + snippet(response.body),
                             response.statusCode);
     }
-    return parseAssistantText(response.body);
+    return parseCompletion(response.body);
 }
 
 }  // namespace OpenAnima::Provider

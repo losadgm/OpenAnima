@@ -23,12 +23,12 @@ TEST_CASE("NPCBrain::ping reports a successful initialization", "[npcbrain]") {
     CHECK(brain.ping() == "OpenAnima core is linked and operational.");
 }
 
-TEST_CASE("NPCBrain::ask returns the reply and keeps the turn", "[npcbrain]") {
+TEST_CASE("NPCBrain::ask returns the answer and keeps the turn", "[npcbrain]") {
     auto provider = std::make_shared<FakeProvider>();
-    provider->reply = "hello, traveller";
+    provider->answer.text = "hello, traveller";
     NPCBrain brain{provider};
 
-    CHECK(brain.ask("hi") == "hello, traveller");
+    CHECK(brain.ask("hi").text == "hello, traveller");
 
     REQUIRE(brain.history().size() == 2);
     CHECK(brain.history()[0].role == Role::User);

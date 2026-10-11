@@ -15,6 +15,8 @@ using OpenAnima::ParseError;
 using OpenAnima::ProviderError;
 using OpenAnima::TransportError;
 using OpenAnima::Core::ChatMessage;
+using OpenAnima::Core::Completion;
+using OpenAnima::Core::FinishReason;
 using OpenAnima::Core::Role;
 using OpenAnima::Provider::ProviderConfig;
 using OpenAnima::Provider::RestProvider;
@@ -31,16 +33,18 @@ ProviderConfig localConfig(std::string apiKey = std::string{}) {
 }
 
 /// Builds the payload a chat-completions endpoint answers with.
-std::string completionBody(const std::string& content) {
+std::string completionBody(const std::string& content, const char* finishReason = "stop") {
     nlohmann::json message;
     message["role"] = "assistant";
     message["content"] = content;
 
     nlohmann::json choice;
     choice["message"] = message;
+    choice["finish_reason"] = finishReason;
 
     nlohmann::json payload;
     payload["choices"] = nlohmann::json::array({choice});
+    payload["model"] = "qwen2.5:7b";
     return payload.dump();
 }
 
@@ -59,10 +63,10 @@ TEST_CASE("RestProvider sends the chat-completions contract", "[provider]") {
     transport->response = {200, completionBody("hello there")};
     RestProvider provider{localConfig(), transport};
 
-    const std::string reply =
+    const Completion completion =
         provider.complete({ChatMessage{Role::System, "be brief"}, ChatMessage{Role::User, "hi"}});
 
-    CHECK(reply == "hello there");
+    CHECK(completion.text == "hello there");
     REQUIRE(transport->requests.size() == 1);
     CHECK(transport->requests[0].url == "http://localhost:11434/v1/chat/completions");
     CHECK(transport->lastHeader("Content-Type") == "application/json");
@@ -155,6 +159,77 @@ TEST_CASE("RestProvider keeps the configuration it was built with", "[provider]"
 
     CHECK(provider.config().model == "qwen2.5:7b");
     CHECK(provider.config().apiKey == "secret");
+}
+
+TEST_CASE("RestProvider reads the metadata of the answer", "[provider]") {
+    nlohmann::json message;
+    message["role"] = "assistant";
+    message["content"] = "hello";
+
+    nlohmann::json choice;
+    choice["message"] = message;
+    choice["finish_reason"] = "stop";
+
+    nlohmann::json usage;
+    usage["prompt_tokens"] = 11;
+    usage["completion_tokens"] = 7;
+    usage["total_tokens"] = 18;
+
+    nlohmann::json payload;
+    payload["choices"] = nlohmann::json::array({choice});
+    payload["model"] = "gpt-4o-2024-08-06";
+    payload["usage"] = usage;
+
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->response = {200, payload.dump()};
+    RestProvider provider{localConfig(), transport};
+
+    const Completion completion = provider.complete(oneTurn("hi"));
+
+    CHECK(completion.text == "hello");
+    CHECK(completion.model == "gpt-4o-2024-08-06");
+    CHECK(completion.finishReason == FinishReason::Stop);
+    REQUIRE(completion.usage.has_value());
+    CHECK(completion.usage->promptTokens == 11);
+    CHECK(completion.usage->completionTokens == 7);
+    CHECK(completion.usage->totalTokens == 18);
+}
+
+TEST_CASE("RestProvider tolerates an answer without metadata", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->response = {200, R"({"choices":[{"message":{"role":"assistant","content":"hi"}}]})"};
+    RestProvider provider{localConfig(), transport};
+
+    const Completion completion = provider.complete(oneTurn("hi"));
+
+    CHECK(completion.text == "hi");
+    CHECK(completion.model.empty());
+    CHECK(completion.finishReason == FinishReason::Unknown);
+    CHECK_FALSE(completion.usage.has_value());
+}
+
+TEST_CASE("RestProvider maps the finish reasons it knows", "[provider]") {
+    const auto reasonOf = [](const std::string& name) {
+        auto transport = std::make_shared<FakeHttpTransport>();
+        transport->response = {200, completionBody("hi", name.c_str())};
+        RestProvider provider{localConfig(), transport};
+        return provider.complete(oneTurn("hi")).finishReason;
+    };
+
+    CHECK(reasonOf("stop") == FinishReason::Stop);
+    CHECK(reasonOf("length") == FinishReason::Length);
+    CHECK(reasonOf("tool_calls") == FinishReason::ToolCalls);
+    CHECK(reasonOf("content_filter") == FinishReason::ContentFilter);
+    CHECK(reasonOf("something-the-model-invented") == FinishReason::Unknown);
+}
+
+TEST_CASE("RestProvider tolerates a null finish reason", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->response = {200,
+                           R"({"choices":[{"message":{"content":"hi"},"finish_reason":null}]})"};
+    RestProvider provider{localConfig(), transport};
+
+    CHECK(provider.complete(oneTurn("hi")).finishReason == FinishReason::Unknown);
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
