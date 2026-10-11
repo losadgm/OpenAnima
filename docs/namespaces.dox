@@ -1,0 +1,27 @@
+// Namespaces of the library. Kept out of the headers so that reading a header means
+// reading about a type, and nothing else.
+
+/// @namespace OpenAnima
+/// @brief Root of the library.
+///
+/// Holds the error taxonomy, which is the one thing every package raises and every
+/// caller catches.
+
+/// @namespace OpenAnima::Core
+/// @brief The agent and the vocabulary of a conversation.
+///
+/// Messages, roles, the answer a provider returns, and the brain that keeps the
+/// history and drives the exchange.
+
+/// @namespace OpenAnima::Http
+/// @brief The boundary with the network.
+///
+/// A provider depends on this interface and never on a client library, so the same
+/// provider runs against a hosted API, a local server, or a stand-in written for a
+/// test.
+
+/// @namespace OpenAnima::Provider
+/// @brief Inference backends and their settings.
+///
+/// One interface to implement, one configuration type to fill, and the REST
+/// implementation for the chat-completions contract.

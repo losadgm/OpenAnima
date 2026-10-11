@@ -1,3 +1,6 @@
+/// @file
+/// @brief Provider for the OpenAI chat-completions contract.
+
 #pragma once
 
 #include <memory>

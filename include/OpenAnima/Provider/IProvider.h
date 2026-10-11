@@ -1,3 +1,6 @@
+/// @file
+/// @brief The inference backend interface.
+
 #pragma once
 
 #include <vector>

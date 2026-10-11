@@ -1,3 +1,6 @@
+/// @file
+/// @brief The agent that owns a conversation and talks to a provider.
+
 #pragma once
 
 #include <memory>

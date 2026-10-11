@@ -1,3 +1,6 @@
+/// @file
+/// @brief Error types raised by the library.
+
 #pragma once
 
 #include <stdexcept>

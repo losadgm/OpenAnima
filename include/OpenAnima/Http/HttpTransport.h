@@ -1,3 +1,6 @@
+/// @file
+/// @brief The HTTP boundary, small enough to be replaced in a test.
+
 #pragma once
 
 #include <string>

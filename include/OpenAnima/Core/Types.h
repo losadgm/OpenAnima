@@ -1,3 +1,6 @@
+/// @file
+/// @brief Who wrote a message, and what it says.
+
 #pragma once
 
 #include <cstdint>

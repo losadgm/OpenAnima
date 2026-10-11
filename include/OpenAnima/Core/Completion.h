@@ -1,3 +1,6 @@
+/// @file
+/// @brief What a provider answered, why it stopped and what it cost.
+
 #pragma once
 
 #include <cstdint>

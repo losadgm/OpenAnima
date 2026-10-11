@@ -1,3 +1,6 @@
+/// @file
+/// @brief Provider settings, and how they are read from the environment.
+
 #pragma once
 
 #include <cstdint>

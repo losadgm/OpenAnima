@@ -1,3 +1,6 @@
+/// @file
+/// @brief HTTP transport built on libcurl.
+
 #pragma once
 
 #include <memory>
