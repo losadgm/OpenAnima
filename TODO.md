@@ -157,6 +157,10 @@ lists every change and the reason for it.
 - Provider configuration read from the environment, with validation and range checks.
 - Editor setup: clang-format, clang-tidy, clangd, launch configurations and tasks.
 - A `docs` target wired to the Doxygen template, which existed but was unused.
+- The reference itself: a page per file and per package, the source listings removed, and
+  a CI job that fails on Doxygen warnings.
+- The documentation site: `docs/` rendered with pandoc, the reference published next to it
+  under `/api/`, deployed to Pages on every push to the default branch.
 
 ## Notes
 
