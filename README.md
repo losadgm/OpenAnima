@@ -14,5 +14,5 @@ around them and talk to each other.
 
 ## Credits
 
-- Author: Marcos Losada García ([@losadgm](https://github.com/losadgm))
+- Author: Marcos Losada García ([losadgm](https://github.com/losadgm))
 - Nobody else so far.
