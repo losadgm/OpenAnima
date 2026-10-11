@@ -17,9 +17,10 @@ EXTRACT_PRIVATE        = NO
 EXTRACT_STATIC         = YES
 HIDE_UNDOC_MEMBERS     = NO
 INPUT                  = "@CMAKE_SOURCE_DIR@/include" \
+                         "@CMAKE_SOURCE_DIR@/docs/namespaces.dox" \
                          "@CMAKE_SOURCE_DIR@/README.md"
 RECURSIVE              = YES
-FILE_PATTERNS          = *.h *.hpp *.cpp *.md
+FILE_PATTERNS          = *.h *.hpp *.dox *.md
 EXCLUDE_PATTERNS       = */build/*
 
 # -- Warnings ------------------------------------------------------------------
@@ -39,13 +40,15 @@ XML_OUTPUT             = xml
 ENABLE_PREPROCESSING   = YES
 MACRO_EXPANSION        = YES
 EXPAND_ONLY_PREDEF     = NO
-PREDEFINED             =
 SEARCH_INCLUDES        = YES
 INCLUDE_PATH           = "@CMAKE_SOURCE_DIR@/include"
 
 # -- Source browser ------------------------------------------------------------
-SOURCE_BROWSER         = YES
+#  The reference documents the API, not the implementation: no source listings and
+#  no verbatim header copies. The cross references are still generated.
+SOURCE_BROWSER         = NO
 INLINE_SOURCES         = NO
+VERBATIM_HEADERS       = NO
 REFERENCED_BY_RELATION = YES
 REFERENCES_RELATION    = YES
 

@@ -1,9 +1,12 @@
+/// @file
+/// @brief Who wrote a message, and what it says.
+
 #pragma once
 
 #include <cstdint>
 #include <string>
 
-namespace OpenAnima {
+namespace OpenAnima::Core {
 
 /// Identifies the author of a ChatMessage.
 enum class Role : std::uint8_t {
@@ -19,4 +22,4 @@ struct ChatMessage {
     std::string content;    ///< Raw text payload.
 };
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Core

@@ -63,5 +63,9 @@ docs/html/
 docs/xml/
 .vscode/v-tree.local.*.json
 
+# Local environment for the cli harness. The tracked template is .env.example.
+.env
+.env.local
+
 # Local project notes
 LOCAL.md

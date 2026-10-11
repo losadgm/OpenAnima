@@ -86,6 +86,19 @@
             ]
         },
         {
+            "label": "Run: cli harness",
+            "type": "shell",
+            "command": "${workspaceFolder}/build/examples/open_anima_cli",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
             "label": "clang-format: current file",
             "type": "shell",
             "command": "clang-format",

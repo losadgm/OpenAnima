@@ -2,7 +2,17 @@
 #  Test suite (Catch2 v3). Registered with CTest via catch_discover_tests.
 # -----------------------------------------------------------------------------
 add_executable(open_anima_tests
-    test_npc_brain.cpp)
+    Core/test_npc_brain.cpp
+    Provider/test_rest_provider_config.cpp
+    Provider/test_rest_provider.cpp
+    test_facade.cpp
+    support/fake_http_transport.h
+    support/fake_provider.h)
+
+# The test sources include the shared fakes as "support/...".
+target_include_directories(open_anima_tests
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_link_libraries(open_anima_tests
     PRIVATE
