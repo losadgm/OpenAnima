@@ -4,7 +4,7 @@
 #include <functional>
 #include <string>
 
-namespace OpenAnima {
+namespace OpenAnima::Provider {
 
 /// Settings of a chat-completions provider.
 ///
@@ -41,4 +41,4 @@ struct ProviderConfig {
     std::string chatCompletionsUrl() const;
 };
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Provider

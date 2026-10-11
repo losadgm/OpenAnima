@@ -1,4 +1,4 @@
-#include "OpenAnima/ProviderConfig.h"
+#include "OpenAnima/Provider/ProviderConfig.h"
 
 #include <cassert>
 #include <cmath>
@@ -9,7 +9,7 @@
 
 #include "OpenAnima/Errors.h"
 
-namespace OpenAnima {
+namespace OpenAnima::Provider {
 
 namespace {
 
@@ -143,4 +143,4 @@ std::string ProviderConfig::chatCompletionsUrl() const {
     return url + "/chat/completions";
 }
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Provider

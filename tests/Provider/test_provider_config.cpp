@@ -5,10 +5,10 @@
 #include <vector>
 
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/ProviderConfig.h"
+#include "OpenAnima/Provider/ProviderConfig.h"
 
 using OpenAnima::ConfigError;
-using OpenAnima::ProviderConfig;
+using OpenAnima::Provider::ProviderConfig;
 
 namespace {
 

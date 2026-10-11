@@ -7,10 +7,10 @@
 #include <string>
 #include <utility>
 
-#include "OpenAnima/CurlHttpTransport.h"
 #include "OpenAnima/Errors.h"
+#include "OpenAnima/Http/CurlHttpTransport.h"
 
-namespace OpenAnima {
+namespace OpenAnima::Http {
 
 namespace {
 
@@ -100,4 +100,4 @@ std::shared_ptr<HttpTransport> CurlHttpTransport::create() {
     return std::make_shared<CurlHttpTransport>();
 }
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Http

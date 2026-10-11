@@ -3,11 +3,14 @@
 #include <string>
 #include <vector>
 
+#include "OpenAnima/Core/Types.h"
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/IProvider.h"
-#include "OpenAnima/Types.h"
+#include "OpenAnima/Provider/IProvider.h"
 
 namespace OpenAnima::TestSupport {
+
+using OpenAnima::Core::ChatMessage;
+using OpenAnima::Provider::IProvider;
 
 /// In-memory backend: records the conversations it received and replays a scripted
 /// reply, so NPCBrain can be tested without a network or a model.

@@ -1,4 +1,4 @@
-#include "OpenAnima/NPCBrain.h"
+#include "OpenAnima/Core/NPCBrain.h"
 
 #include <cassert>
 #include <memory>
@@ -7,10 +7,9 @@
 #include <vector>
 
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/IProvider.h"
-#include "OpenAnima/Types.h"
+#include "OpenAnima/Provider/IProvider.h"
 
-namespace OpenAnima {
+namespace OpenAnima::Core {
 
 namespace {
 
@@ -18,11 +17,12 @@ constexpr const char* PingMessage = "OpenAnima core is linked and operational.";
 
 }  // namespace
 
-NPCBrain::NPCBrain(std::shared_ptr<IProvider> provider) : m_provider(std::move(provider)) {
+NPCBrain::NPCBrain(std::shared_ptr<OpenAnima::Provider::IProvider> provider)
+    : m_provider(std::move(provider)) {
     assert(m_provider != nullptr && "NPCBrain requires a provider");
 }
 
-void NPCBrain::setProvider(std::shared_ptr<IProvider> provider) {
+void NPCBrain::setProvider(std::shared_ptr<OpenAnima::Provider::IProvider> provider) {
     assert(provider != nullptr && "setProvider requires a provider");
     m_provider = std::move(provider);
 }
@@ -64,4 +64,4 @@ std::string NPCBrain::ping() {  // NOLINT(readability-convert-member-functions-t
     return PingMessage;
 }
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Core

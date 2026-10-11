@@ -4,11 +4,10 @@
 #include <string>
 #include <vector>
 
-#include "OpenAnima/Types.h"
+#include "OpenAnima/Core/Types.h"
+#include "OpenAnima/Provider/IProvider.h"
 
-namespace OpenAnima {
-
-class IProvider;
+namespace OpenAnima::Core {
 
 /// Entry point of the cognitive middleware.
 /// Owns the conversation state of a single agent and exposes it to the client application.
@@ -19,11 +18,11 @@ public:
 
     /// Creates a brain bound to a backend.
     /// @param provider Backend used for every request.
-    explicit NPCBrain(std::shared_ptr<IProvider> provider);
+    explicit NPCBrain(std::shared_ptr<OpenAnima::Provider::IProvider> provider);
 
     /// Sets the backend used for later requests.
     /// @param provider Backend used for every request.
-    void setProvider(std::shared_ptr<IProvider> provider);
+    void setProvider(std::shared_ptr<OpenAnima::Provider::IProvider> provider);
 
     /// Sets the persona or instruction that leads every request.
     /// The prompt is resolved on each call and never becomes part of the stored history.
@@ -50,9 +49,9 @@ public:
     std::string ping();
 
 private:
-    std::vector<ChatMessage> m_history;     ///< Conversation context owned by this brain.
-    std::shared_ptr<IProvider> m_provider;  ///< Backend used for every request.
-    std::string m_systemPrompt;             ///< Instruction leading every request.
+    std::vector<ChatMessage> m_history;  ///< Conversation context owned by this brain.
+    std::shared_ptr<OpenAnima::Provider::IProvider> m_provider;  ///< Backend for every request.
+    std::string m_systemPrompt;  ///< Instruction leading every request.
 };
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Core

@@ -4,9 +4,14 @@
 #include <vector>
 
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/HttpTransport.h"
+#include "OpenAnima/Http/HttpTransport.h"
 
 namespace OpenAnima::TestSupport {
+
+using OpenAnima::Http::HttpHeader;
+using OpenAnima::Http::HttpRequest;
+using OpenAnima::Http::HttpResponse;
+using OpenAnima::Http::HttpTransport;
 
 /// In-memory transport: records every request and replays a scripted response, so
 /// provider behaviour can be tested without opening a socket.

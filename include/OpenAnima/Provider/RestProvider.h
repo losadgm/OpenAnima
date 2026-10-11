@@ -4,12 +4,12 @@
 #include <string>
 #include <vector>
 
-#include "OpenAnima/HttpTransport.h"
-#include "OpenAnima/IProvider.h"
-#include "OpenAnima/ProviderConfig.h"
-#include "OpenAnima/Types.h"
+#include "OpenAnima/Core/Types.h"
+#include "OpenAnima/Http/HttpTransport.h"
+#include "OpenAnima/Provider/IProvider.h"
+#include "OpenAnima/Provider/ProviderConfig.h"
 
-namespace OpenAnima {
+namespace OpenAnima::Provider {
 
 /// Provider for the OpenAI chat-completions contract, which is also spoken by local
 /// servers such as Ollama, llama.cpp and vLLM.
@@ -18,10 +18,10 @@ public:
     /// Creates a provider.
     /// @param config Endpoint, model and generation settings.
     /// @param transport HTTP boundary used for every call.
-    RestProvider(ProviderConfig config, std::shared_ptr<HttpTransport> transport);
+    RestProvider(ProviderConfig config, std::shared_ptr<OpenAnima::Http::HttpTransport> transport);
 
     /// @copydoc IProvider::complete
-    std::string complete(const std::vector<ChatMessage>& messages) override;
+    std::string complete(const std::vector<OpenAnima::Core::ChatMessage>& messages) override;
 
     /// @return The configuration this provider was created with.
     const ProviderConfig& config() const noexcept {
@@ -30,7 +30,7 @@ public:
 
 private:
     ProviderConfig m_config;
-    std::shared_ptr<HttpTransport> m_transport;
+    std::shared_ptr<OpenAnima::Http::HttpTransport> m_transport;
 };
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Provider

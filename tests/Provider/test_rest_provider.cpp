@@ -4,20 +4,20 @@
 #include <string>
 #include <vector>
 
+#include "OpenAnima/Core/Types.h"
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/ProviderConfig.h"
-#include "OpenAnima/RestProvider.h"
-#include "OpenAnima/Types.h"
+#include "OpenAnima/Provider/ProviderConfig.h"
+#include "OpenAnima/Provider/RestProvider.h"
 
-#include "fake_http_transport.h"
+#include "support/fake_http_transport.h"
 
-using OpenAnima::ChatMessage;
 using OpenAnima::ParseError;
-using OpenAnima::ProviderConfig;
 using OpenAnima::ProviderError;
-using OpenAnima::RestProvider;
-using OpenAnima::Role;
 using OpenAnima::TransportError;
+using OpenAnima::Core::ChatMessage;
+using OpenAnima::Core::Role;
+using OpenAnima::Provider::ProviderConfig;
+using OpenAnima::Provider::RestProvider;
 using OpenAnima::TestSupport::FakeHttpTransport;
 
 namespace {

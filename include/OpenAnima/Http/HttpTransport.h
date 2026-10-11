@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-namespace OpenAnima {
+namespace OpenAnima::Http {
 
 /// A single HTTP header. A vector of pairs is used so repeated names survive.
 using HttpHeader = std::pair<std::string, std::string>;
@@ -50,4 +50,4 @@ protected:
     HttpTransport() = default;
 };
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Http

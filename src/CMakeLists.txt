@@ -3,14 +3,14 @@
 #  Static or shared depending on BUILD_SHARED_LIBS (defaults to static).
 # -----------------------------------------------------------------------------
 add_library(OpenAnima
-    NPCBrain.cpp
-    ProviderConfig.cpp
-    RestProvider.cpp)
+    Core/NPCBrain.cpp
+    Provider/ProviderConfig.cpp
+    Provider/RestProvider.cpp)
 
 if(OPENANIMA_WITH_CURL)
     target_sources(OpenAnima
         PRIVATE
-            HttpTransportCurl.cpp)
+            Http/HttpTransportCurl.cpp)
 endif()
 
 add_library(OpenAnima::OpenAnima ALIAS OpenAnima)

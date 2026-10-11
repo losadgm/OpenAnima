@@ -1,4 +1,4 @@
-#include "OpenAnima/RestProvider.h"
+#include "OpenAnima/Provider/RestProvider.h"
 
 #include <cassert>
 #include <cstddef>
@@ -9,9 +9,14 @@
 
 #include "OpenAnima/Errors.h"
 
-namespace OpenAnima {
+namespace OpenAnima::Provider {
 
 namespace {
+
+using OpenAnima::Core::ChatMessage;
+using OpenAnima::Core::Role;
+using OpenAnima::Http::HttpRequest;
+using OpenAnima::Http::HttpResponse;
 
 /// Longest fragment of a foreign payload embedded in an error message.
 constexpr std::size_t BodySnippetLength = 200;
@@ -96,7 +101,8 @@ std::string parseAssistantText(const std::string& payload) {
 
 }  // namespace
 
-RestProvider::RestProvider(ProviderConfig config, std::shared_ptr<HttpTransport> transport)
+RestProvider::RestProvider(ProviderConfig config,
+                           std::shared_ptr<OpenAnima::Http::HttpTransport> transport)
     : m_config(std::move(config)), m_transport(std::move(transport)) {
     assert(!m_config.baseUrl.empty() && "RestProvider requires a base URL");
     assert(!m_config.model.empty() && "RestProvider requires a model");
@@ -125,4 +131,4 @@ std::string RestProvider::complete(const std::vector<ChatMessage>& messages) {
     return parseAssistantText(response.body);
 }
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Provider

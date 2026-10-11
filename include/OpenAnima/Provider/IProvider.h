@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "OpenAnima/Types.h"
+#include "OpenAnima/Core/Types.h"
 
-namespace OpenAnima {
+namespace OpenAnima::Provider {
 
 /// An interchangeable inference backend.
 /// The rest of the library talks to this interface, so replacing a hosted API with a
@@ -24,11 +24,11 @@ public:
     /// @param messages Conversation in chronological order; the last entry is the current turn.
     /// @return The assistant text produced by the backend.
     /// @throws OpenAnimaError subclasses when the call cannot be completed.
-    virtual std::string complete(const std::vector<ChatMessage>& messages) = 0;
+    virtual std::string complete(const std::vector<OpenAnima::Core::ChatMessage>& messages) = 0;
 
 protected:
     /// Only derived classes build a provider.
     IProvider() = default;
 };
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Provider

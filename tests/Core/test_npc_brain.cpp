@@ -3,15 +3,15 @@
 #include <string>
 #include <vector>
 
+#include "OpenAnima/Core/NPCBrain.h"
+#include "OpenAnima/Core/Types.h"
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/NPCBrain.h"
-#include "OpenAnima/Types.h"
 
-#include "fake_provider.h"
+#include "support/fake_provider.h"
 
-using OpenAnima::NPCBrain;
 using OpenAnima::OpenAnimaError;
-using OpenAnima::Role;
+using OpenAnima::Core::NPCBrain;
+using OpenAnima::Core::Role;
 using OpenAnima::TestSupport::FakeProvider;
 
 // Catch2 assertions expand into do-while blocks and test cases are long by design, so

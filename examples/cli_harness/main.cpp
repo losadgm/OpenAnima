@@ -3,15 +3,22 @@
 #include <memory>
 #include <string>
 
+#include "OpenAnima/Core/NPCBrain.h"
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/NPCBrain.h"
-#include "OpenAnima/ProviderConfig.h"
-#include "OpenAnima/RestProvider.h"
+#include "OpenAnima/Provider/ProviderConfig.h"
+#include "OpenAnima/Provider/RestProvider.h"
 
 #include "dotenv.h"
 
 #ifdef OPENANIMA_WITH_CURL
-#include "OpenAnima/CurlHttpTransport.h"
+#include "OpenAnima/Http/CurlHttpTransport.h"
+#endif
+
+using OpenAnima::Core::NPCBrain;
+using OpenAnima::Provider::ProviderConfig;
+using OpenAnima::Provider::RestProvider;
+#ifdef OPENANIMA_WITH_CURL
+using OpenAnima::Http::CurlHttpTransport;
 #endif
 
 namespace {
@@ -43,9 +50,9 @@ int main(int argc, char** argv) {
         std::cerr << "note: loaded " << dotEnvPath << '\n';
     }
 
-    OpenAnima::ProviderConfig config;
+    ProviderConfig config;
     try {
-        config = OpenAnima::ProviderConfig::fromEnvironment();
+        config = ProviderConfig::fromEnvironment();
     } catch (const OpenAnima::ConfigError& error) {
         std::cerr << "configuration error: " << error.what() << "\n\n"
                   << "usage: open_anima_cli [prompt words...]\n"
@@ -68,9 +75,8 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    auto provider =
-        std::make_shared<OpenAnima::RestProvider>(config, OpenAnima::CurlHttpTransport::create());
-    OpenAnima::NPCBrain brain{provider};
+    auto provider = std::make_shared<RestProvider>(config, CurlHttpTransport::create());
+    NPCBrain brain{provider};
 
     // An empty command line opens a session instead of sending an empty prompt.
     const std::string prompt = joinArguments(argc, argv);

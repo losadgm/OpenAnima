@@ -2,9 +2,9 @@
 
 #include <memory>
 
-#include "OpenAnima/HttpTransport.h"
+#include "OpenAnima/Http/HttpTransport.h"
 
-namespace OpenAnima {
+namespace OpenAnima::Http {
 
 /// HTTP transport built on libcurl, the one client library that offers TLS on both
 /// Windows and Linux without platform-specific code.
@@ -19,4 +19,4 @@ public:
     static std::shared_ptr<HttpTransport> create();
 };
 
-}  // namespace OpenAnima
+}  // namespace OpenAnima::Http
