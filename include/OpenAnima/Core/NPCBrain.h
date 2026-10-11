@@ -23,6 +23,18 @@ public:
     /// @param provider Backend used for every request.
     explicit NPCBrain(std::shared_ptr<OpenAnima::Provider::IProvider> provider);
 
+    /// A brain is moved, not copied: copying would fork the history while sharing the
+    /// backend with the copy.
+    NPCBrain(const NPCBrain&) = delete;
+    NPCBrain& operator=(const NPCBrain&) = delete;
+
+    /// Moves a brain: the history and the backend move with it.
+    NPCBrain(NPCBrain&&) noexcept = default;
+
+    /// Move assignment.
+    /// @return This brain.
+    NPCBrain& operator=(NPCBrain&&) noexcept = default;
+
     /// Sets the backend used for later requests.
     /// @param provider Backend used for every request.
     void setProvider(std::shared_ptr<OpenAnima::Provider::IProvider> provider);

@@ -9,8 +9,10 @@
 #include "OpenAnima/Core/NPCBrain.h"
 #include "OpenAnima/Core/Types.h"
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/Http/CurlHttpTransport.h"
 #include "OpenAnima/Http/HttpTransport.h"
+#if defined(OPENANIMA_HAS_CURL)
+#include "OpenAnima/Http/CurlHttpTransport.h"
+#endif
 #include "OpenAnima/Provider/IProvider.h"
 #include "OpenAnima/Provider/ProviderConfig.h"
 #include "OpenAnima/Provider/RestProvider.h"
