@@ -34,7 +34,7 @@ that reaches for a real endpoint is a test that fails on a plane.
 
 ```
 include/OpenAnima/     public headers, the only thing the library installs
-    Core/              the agent and the conversation types
+    Core/              the NPC and the conversation types
     Http/              the transport interface and the libcurl implementation
     Provider/          the backend interface, the settings, the REST provider
 src/                   the implementation, mirroring the header tree

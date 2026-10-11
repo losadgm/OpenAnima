@@ -1,12 +1,12 @@
 # =============================================================================
-#  OpenAnima - C++ Cognitive Middleware for AI Agents
+#  OpenAnima - middleware for conversational NPCs.
 #  Root build script (Modern CMake, target-based, C++17).
 # =============================================================================
 cmake_minimum_required(VERSION 3.20)
 
 project(OpenAnima
     VERSION 0.1.0
-    DESCRIPTION "C++ cognitive middleware for LLM-driven agents and NPCs"
+    DESCRIPTION "Middleware for conversational NPCs that interact with the player, the world and each other"
     HOMEPAGE_URL "https://github.com/losadgm/OpenAnima"
     LANGUAGES CXX)
 

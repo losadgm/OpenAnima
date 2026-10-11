@@ -13,8 +13,7 @@
 
 namespace OpenAnima::Core {
 
-/// Entry point of the cognitive middleware.
-/// Owns the conversation state of a single agent and exposes it to the client application.
+/// One NPC: its persona, its memory and the conversation it is having.
 class NPCBrain {
 public:
     /// Creates a brain without a backend. Attach one with setProvider().

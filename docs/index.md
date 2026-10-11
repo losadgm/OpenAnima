@@ -1,12 +1,21 @@
 # OpenAnima
 
-C++17 middleware that keeps the conversation state of a language-model driven agent and
-talks to whichever inference backend you point it at.
+C++17 middleware for conversational NPCs: agents that talk to the player, react to the world
+around them and talk to each other.
 
-The library is a thin layer on purpose. It owns the history of a conversation, builds the
-request, and hands back a typed answer with the model that produced it, why generation
-stopped, and what the call cost in tokens. Everything else (which provider, which transport,
-how the text is used) is decided by the application.
+An NPC is not a chat box. It plays a persona, remembers what happened, and has to stay coherent
+while the player, the environment and the other agents keep talking to it. The library holds
+that state, decides what the model needs to see next, and turns the answer into something the
+host application can act on. Which provider, which transport, and what to do with the text are
+decisions of the application, not of the library.
+
+The conversation is one of three channels an NPC uses:
+
+| Channel | What it carries | Where it stands |
+| --- | --- | --- |
+| The player | dialogue turns, with a persona and a history behind them | in place |
+| The world | events the agent perceives and reacts to | planned, v0.4.0 |
+| Other NPCs | shared rooms, and a ledger of who said what | planned, v0.6.0 |
 
 - [Development guide](development.html) - build it, test it, and how these pages are built.
 - [API reference](api/index.html) - the classes, in Doxygen form, generated from the headers.
