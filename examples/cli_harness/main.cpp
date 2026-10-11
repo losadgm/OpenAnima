@@ -59,9 +59,11 @@ int main(int argc, char** argv) {
         std::make_shared<OpenAnima::RestProvider>(config, OpenAnima::CurlHttpTransport::create());
     OpenAnima::NPCBrain brain{provider};
 
-    if (argc > 1) {
+    // An empty command line opens a session instead of sending an empty prompt.
+    const std::string prompt = joinArguments(argc, argv);
+    if (!prompt.empty()) {
         try {
-            std::cout << brain.ask(joinArguments(argc, argv)) << '\n';
+            std::cout << brain.ask(prompt) << '\n';
         } catch (const OpenAnima::OpenAnimaError& error) {
             std::cerr << "error: " << error.what() << '\n';
             return 1;

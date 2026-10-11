@@ -86,6 +86,25 @@
             ]
         },
         {
+            "label": "Run: cli harness (.env)",
+            "type": "shell",
+            "command": "set -a && . ./.env && set +a && ./build/examples/open_anima_cli",
+            "options": {
+                "cwd": "${workspaceFolder}",
+                "shell": {
+                    "executable": "bash",
+                    "args": [
+                        "-c"
+                    ]
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated"
+            }
+        },
+        {
             "label": "clang-format: current file",
             "type": "shell",
             "command": "clang-format",

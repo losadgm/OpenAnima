@@ -4,12 +4,32 @@
     "version": "0.2.0",
     "configurations": [
         {
+            // Loads OPENANIMA_* from .env, so the harness starts already configured.
             "name": "Debug: open_anima_cli (example)",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/examples/open_anima_cli",
             "args": [],
             "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "terminal": "integrated",
+            "sourceLanguages": [
+                "cpp"
+            ],
+            "stopOnEntry": false,
+            "preLaunchTask": "CMake: build (clang)"
+        },
+        {
+            // Sends a single prompt instead of opening a session.
+            "name": "Debug: open_anima_cli (one prompt)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/build/examples/open_anima_cli",
+            "args": [
+                "${input:promptText}"
+            ],
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
             "terminal": "integrated",
             "sourceLanguages": [
                 "cpp"
@@ -53,6 +73,11 @@
             "id": "catch2TestName",
             "type": "promptString",
             "description": "Catch2 test to run (e.g. 'NPCBrain::ping*'; leave empty to run all)"
+        },
+        {
+            "id": "promptText",
+            "type": "promptString",
+            "description": "Prompt to send to the model"
         }
     ]
 }
