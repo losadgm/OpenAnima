@@ -7,7 +7,7 @@ name: Deploy documentation to Pages
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   release:
     types: [ created ]
 
