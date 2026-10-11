@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/losadgm/OpenAnima/actions/workflows/ci.yml/badge.svg)](https://github.com/losadgm/OpenAnima/actions/workflows/ci.yml)
 [![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)](https://github.com/losadgm/OpenAnima)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/losadgm/OpenAnima/blob/main/LICENSE)
 
 C++17 middleware for conversational NPCs: agents that talk to the player, react to the world
 around them and talk to each other.
@@ -13,7 +13,7 @@ around them and talk to each other.
 
 ## License
 
-MIT. The full text is in [LICENSE](LICENSE).
+MIT. The full text is in [LICENSE](https://github.com/losadgm/OpenAnima/blob/main/LICENSE).
 
 ## Credits
 
