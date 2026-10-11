@@ -86,17 +86,11 @@
             ]
         },
         {
-            "label": "Run: cli harness (.env)",
+            "label": "Run: cli harness",
             "type": "shell",
-            "command": "set -a && . ./.env && set +a && ./build/examples/open_anima_cli",
+            "command": "${workspaceFolder}/build/examples/open_anima_cli",
             "options": {
-                "cwd": "${workspaceFolder}",
-                "shell": {
-                    "executable": "bash",
-                    "args": [
-                        "-c"
-                    ]
-                }
+                "cwd": "${workspaceFolder}"
             },
             "problemMatcher": [],
             "presentation": {

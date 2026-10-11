@@ -4,14 +4,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            // Loads OPENANIMA_* from .env, so the harness starts already configured.
             "name": "Debug: open_anima_cli (example)",
             "type": "lldb",
             "request": "launch",
             "program": "${workspaceFolder}/build/examples/open_anima_cli",
             "args": [],
             "cwd": "${workspaceFolder}",
-            "envFile": "${workspaceFolder}/.env",
             "terminal": "integrated",
             "sourceLanguages": [
                 "cpp"
@@ -29,7 +27,6 @@
                 "${input:promptText}"
             ],
             "cwd": "${workspaceFolder}",
-            "envFile": "${workspaceFolder}/.env",
             "terminal": "integrated",
             "sourceLanguages": [
                 "cpp"
