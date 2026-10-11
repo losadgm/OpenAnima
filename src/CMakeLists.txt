@@ -1,21 +1,15 @@
 # -----------------------------------------------------------------------------
 #  OpenAnima core library.
 #  Static or shared depending on BUILD_SHARED_LIBS (defaults to static).
+#  Sources mirror include/: a header in OpenAnima/x/y.h is implemented by
+#  OpenAnima/x/y.cpp here.
 # -----------------------------------------------------------------------------
 add_library(OpenAnima
-    Core/NPCBrain.cpp
-    Provider/ProviderConfig.cpp
-    Provider/RestProvider.cpp
-    OpenAnima.cpp)
-
-if(OPENANIMA_WITH_CURL)
-    target_sources(OpenAnima
-        PRIVATE
-            Http/HttpTransportCurl.cpp)
-    # The facade exposes makeNpc() overloads that build the default transport, so the
-    # umbrella header needs to know whether that transport was compiled in.
-    target_compile_definitions(OpenAnima PUBLIC OPENANIMA_HAS_CURL)
-endif()
+    OpenAnima/OpenAnima.cpp
+    OpenAnima/Core/NPCBrain.cpp
+    OpenAnima/Http/CurlHttpTransport.cpp
+    OpenAnima/Provider/RestProvider.cpp
+    OpenAnima/Provider/RestProviderConfig.cpp)
 
 add_library(OpenAnima::OpenAnima ALIAS OpenAnima)
 
@@ -32,11 +26,9 @@ target_link_libraries(OpenAnima
 
 # The HTTP client is an implementation detail: consumers see HttpTransport only,
 # so its headers and libraries never leak into their builds.
-if(OPENANIMA_WITH_CURL)
-    target_link_libraries(OpenAnima
-        PRIVATE
-            ${OPENANIMA_CURL_TARGET})
-endif()
+target_link_libraries(OpenAnima
+    PRIVATE
+        ${OPENANIMA_CURL_TARGET})
 
 if(MSVC)
     target_compile_options(OpenAnima PRIVATE /W4 /permissive-)

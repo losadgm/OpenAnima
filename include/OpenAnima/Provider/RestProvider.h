@@ -10,7 +10,7 @@
 #include "OpenAnima/Core/Types.h"
 #include "OpenAnima/Http/HttpTransport.h"
 #include "OpenAnima/Provider/IProvider.h"
-#include "OpenAnima/Provider/ProviderConfig.h"
+#include "OpenAnima/Provider/RestProviderConfig.h"
 
 namespace OpenAnima::Provider {
 
@@ -21,19 +21,20 @@ public:
     /// Creates a provider.
     /// @param config Endpoint, model and generation settings.
     /// @param transport HTTP boundary used for every call.
-    RestProvider(ProviderConfig config, std::shared_ptr<OpenAnima::Http::HttpTransport> transport);
+    RestProvider(RestProviderConfig config,
+                 std::shared_ptr<OpenAnima::Http::HttpTransport> transport);
 
     /// @copydoc IProvider::complete
     OpenAnima::Core::Completion
     complete(const std::vector<OpenAnima::Core::ChatMessage>& messages) override;
 
     /// @return The configuration this provider was created with.
-    const ProviderConfig& config() const noexcept {
+    const RestProviderConfig& config() const noexcept {
         return m_config;
     }
 
 private:
-    ProviderConfig m_config;
+    RestProviderConfig m_config;
     std::shared_ptr<OpenAnima::Http::HttpTransport> m_transport;
 };
 

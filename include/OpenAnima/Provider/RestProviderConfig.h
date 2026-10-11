@@ -14,7 +14,7 @@ namespace OpenAnima::Provider {
 /// The base URL points at the API root, with or without a trailing slash:
 /// "http://localhost:11434/v1" for a local Ollama server, "https://api.openai.com/v1"
 /// for a hosted service. Anything speaking the same contract works unchanged.
-struct ProviderConfig {
+struct RestProviderConfig {
     /// Resolves an environment variable name to its value.
     /// Implementations must return an empty string when the variable is not set.
     using EnvironmentLookup = std::function<std::string(const char*)>;
@@ -32,13 +32,13 @@ struct ProviderConfig {
     /// OPENANIMA_MAX_TOKENS.
     /// @return A configuration with every field resolved.
     /// @throws ConfigError when a required variable is missing or a value is malformed.
-    static ProviderConfig fromEnvironment();
+    static RestProviderConfig fromEnvironment();
 
     /// Reads the configuration from a caller-supplied source of values.
     /// @param lookup Resolves a variable name to its value, empty when unset.
     /// @return A configuration with every field resolved.
     /// @throws ConfigError when a required variable is missing or a value is malformed.
-    static ProviderConfig fromEnvironment(const EnvironmentLookup& lookup);
+    static RestProviderConfig fromEnvironment(const EnvironmentLookup& lookup);
 
     /// @return The chat-completions endpoint built from baseUrl, without a doubled slash.
     std::string chatCompletionsUrl() const;

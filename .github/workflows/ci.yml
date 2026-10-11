@@ -69,15 +69,14 @@ jobs:
       - name: Install Doxygen and pandoc
         run: |
           sudo apt-get update -qq
-          sudo apt-get install --no-install-recommends -y doxygen ninja-build pandoc
+          sudo apt-get install --no-install-recommends -y doxygen libcurl4-openssl-dev ninja-build pandoc
 
-      # curl and the tests have nothing to do with reading the headers, and skipping
-      # them keeps the job from fetching the dependencies.
+      # The reference is generated from the headers, so the tests are off. libcurl is
+      # installed above to save the job from building curl from source.
       - name: Configure
         run: >
           cmake -S . -B build -G Ninja
           -DBUILD_TESTING=OFF
-          -DOPENANIMA_WITH_CURL=OFF
           -DOPENANIMA_ENABLE_DOCS=ON
 
       # A missing @param or an undocumented type fails the job here instead of quietly
@@ -89,4 +88,4 @@ jobs:
         run: cmake --build build --target docs
 
       - name: Build the site
-        run: bash docs/build-docs.sh
+        run: python3 .github/scripts/build_docs.py

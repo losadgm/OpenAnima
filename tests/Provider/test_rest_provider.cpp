@@ -6,8 +6,8 @@
 
 #include "OpenAnima/Core/Types.h"
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/Provider/ProviderConfig.h"
 #include "OpenAnima/Provider/RestProvider.h"
+#include "OpenAnima/Provider/RestProviderConfig.h"
 
 #include "support/fake_http_transport.h"
 
@@ -18,14 +18,14 @@ using OpenAnima::Core::ChatMessage;
 using OpenAnima::Core::Completion;
 using OpenAnima::Core::FinishReason;
 using OpenAnima::Core::Role;
-using OpenAnima::Provider::ProviderConfig;
 using OpenAnima::Provider::RestProvider;
+using OpenAnima::Provider::RestProviderConfig;
 using OpenAnima::TestSupport::FakeHttpTransport;
 
 namespace {
 
-ProviderConfig localConfig(std::string apiKey = std::string{}) {
-    ProviderConfig config;
+RestProviderConfig localConfig(std::string apiKey = std::string{}) {
+    RestProviderConfig config;
     config.baseUrl = "http://localhost:11434/v1";
     config.model = "qwen2.5:7b";
     config.apiKey = std::move(apiKey);

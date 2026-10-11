@@ -5,21 +5,16 @@
 
 #include "OpenAnima/Core/NPCBrain.h"
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/Provider/ProviderConfig.h"
+#include "OpenAnima/Http/CurlHttpTransport.h"
 #include "OpenAnima/Provider/RestProvider.h"
+#include "OpenAnima/Provider/RestProviderConfig.h"
 
 #include "dotenv.h"
 
-#ifdef OPENANIMA_WITH_CURL
-#include "OpenAnima/Http/CurlHttpTransport.h"
-#endif
-
 using OpenAnima::Core::NPCBrain;
-using OpenAnima::Provider::ProviderConfig;
-using OpenAnima::Provider::RestProvider;
-#ifdef OPENANIMA_WITH_CURL
 using OpenAnima::Http::CurlHttpTransport;
-#endif
+using OpenAnima::Provider::RestProvider;
+using OpenAnima::Provider::RestProviderConfig;
 
 namespace {
 
@@ -39,9 +34,8 @@ std::string joinArguments(int argc, char** argv) {
 
 /// Minimal harness: sends prompts to a chat-completions endpoint and prints the replies.
 /// @return EXIT_SUCCESS on a completed session, 1 when a request failed, 2 when the
-/// environment is not configured, 3 when the build has no HTTP transport.
+/// environment is not configured.
 int main(int argc, char** argv) {
-#ifdef OPENANIMA_WITH_CURL
     // The CMake Tools run and debug buttons pass no environment of their own, so the
     // file is loaded here. Real variables win: the file only fills in what is missing.
     const std::string dotEnvPath = OpenAnimaExample::findDotEnv();
@@ -50,9 +44,9 @@ int main(int argc, char** argv) {
         std::cerr << "note: loaded " << dotEnvPath << '\n';
     }
 
-    ProviderConfig config;
+    RestProviderConfig config;
     try {
-        config = ProviderConfig::fromEnvironment();
+        config = RestProviderConfig::fromEnvironment();
     } catch (const OpenAnima::ConfigError& error) {
         std::cerr << "configuration error: " << error.what() << "\n\n"
                   << "usage: open_anima_cli [prompt words...]\n"
@@ -108,10 +102,4 @@ int main(int argc, char** argv) {
         }
     }
     return EXIT_SUCCESS;
-#else
-    (void)argc;
-    (void)argv;
-    std::cerr << "this build has no HTTP transport: reconfigure with -DOPENANIMA_WITH_CURL=ON\n";
-    return 3;
-#endif
 }

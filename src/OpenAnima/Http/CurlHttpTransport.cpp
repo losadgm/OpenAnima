@@ -1,3 +1,5 @@
+#include "OpenAnima/Http/CurlHttpTransport.h"
+
 #include <cassert>
 #include <cstddef>
 #include <cstdlib>
@@ -8,7 +10,6 @@
 #include <utility>
 
 #include "OpenAnima/Errors.h"
-#include "OpenAnima/Http/CurlHttpTransport.h"
 
 namespace OpenAnima::Http {
 

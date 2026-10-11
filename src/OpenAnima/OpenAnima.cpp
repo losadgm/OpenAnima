@@ -4,21 +4,19 @@
 
 namespace OpenAnima {
 
-Core::NPCBrain makeNpc(Provider::ProviderConfig config,
+Core::NPCBrain makeNpc(Provider::RestProviderConfig config,
                        std::shared_ptr<Http::HttpTransport> transport) {
     auto provider =
         std::make_shared<Provider::RestProvider>(std::move(config), std::move(transport));
     return Core::NPCBrain{std::move(provider)};
 }
 
-#if defined(OPENANIMA_HAS_CURL)
 Core::NPCBrain makeNpc() {
-    return makeNpc(Provider::ProviderConfig::fromEnvironment());
+    return makeNpc(Provider::RestProviderConfig::fromEnvironment());
 }
 
-Core::NPCBrain makeNpc(Provider::ProviderConfig config) {
+Core::NPCBrain makeNpc(Provider::RestProviderConfig config) {
     return makeNpc(std::move(config), Http::CurlHttpTransport::create());
 }
-#endif
 
 }  // namespace OpenAnima

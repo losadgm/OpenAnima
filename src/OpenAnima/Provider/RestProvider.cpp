@@ -57,7 +57,7 @@ std::string snippet(const std::string& payload) {
 }
 
 /// Marshals the conversation into the chat-completions request body.
-std::string buildRequestBody(const ProviderConfig& config,
+std::string buildRequestBody(const RestProviderConfig& config,
                              const std::vector<ChatMessage>& messages) {
     nlohmann::json conversation = nlohmann::json::array();
     for (const ChatMessage& message : messages) {
@@ -156,7 +156,7 @@ Completion parseCompletion(const std::string& payload) {
 
 }  // namespace
 
-RestProvider::RestProvider(ProviderConfig config,
+RestProvider::RestProvider(RestProviderConfig config,
                            std::shared_ptr<OpenAnima::Http::HttpTransport> transport)
     : m_config(std::move(config)), m_transport(std::move(transport)) {
     assert(!m_config.baseUrl.empty() && "RestProvider requires a base URL");

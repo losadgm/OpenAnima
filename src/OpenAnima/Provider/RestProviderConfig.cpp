@@ -1,4 +1,4 @@
-#include "OpenAnima/Provider/ProviderConfig.h"
+#include "OpenAnima/Provider/RestProviderConfig.h"
 
 #include <cassert>
 #include <cmath>
@@ -48,7 +48,7 @@ std::string formatBound(double value) {
 
 /// @return The value of a mandatory variable.
 /// @throws ConfigError when the variable is not set or blank.
-std::string requireValue(const ProviderConfig::EnvironmentLookup& lookup, const char* name) {
+std::string requireValue(const RestProviderConfig::EnvironmentLookup& lookup, const char* name) {
     const std::string value = lookup(name);
     if (value.empty()) {
         throw ConfigError(std::string(name) + " is not set");
@@ -58,7 +58,7 @@ std::string requireValue(const ProviderConfig::EnvironmentLookup& lookup, const 
 
 /// @return The value of a numeric variable, or the fallback when it is not set.
 /// @throws ConfigError when the value is not an integer inside the accepted range.
-long parseLongValue(const ProviderConfig::EnvironmentLookup& lookup, const char* name,
+long parseLongValue(const RestProviderConfig::EnvironmentLookup& lookup, const char* name,
                     long fallback, Bounds<long> bounds) {
     const std::string raw = lookup(name);
     if (raw.empty()) {
@@ -83,7 +83,7 @@ long parseLongValue(const ProviderConfig::EnvironmentLookup& lookup, const char*
 
 /// @return The value of a floating-point variable, or the fallback when it is not set.
 /// @throws ConfigError when the value is not finite or falls outside the accepted range.
-double parseDoubleValue(const ProviderConfig::EnvironmentLookup& lookup, const char* name,
+double parseDoubleValue(const RestProviderConfig::EnvironmentLookup& lookup, const char* name,
                         double fallback, Bounds<double> bounds) {
     const std::string raw = lookup(name);
     if (raw.empty()) {
@@ -109,18 +109,18 @@ double parseDoubleValue(const ProviderConfig::EnvironmentLookup& lookup, const c
 
 }  // namespace
 
-ProviderConfig ProviderConfig::fromEnvironment() {
+RestProviderConfig RestProviderConfig::fromEnvironment() {
     return fromEnvironment([](const char* name) -> std::string {
         const char* value = std::getenv(name);
         return value == nullptr ? std::string{} : std::string{value};
     });
 }
 
-ProviderConfig ProviderConfig::fromEnvironment(const EnvironmentLookup& lookup) {
+RestProviderConfig RestProviderConfig::fromEnvironment(const EnvironmentLookup& lookup) {
     // A missing lookup is a programming error, not a configuration problem.
     assert(lookup != nullptr);
 
-    ProviderConfig config;
+    RestProviderConfig config;
     config.baseUrl = requireValue(lookup, BaseUrlVariable);
     config.model = requireValue(lookup, ModelVariable);
     config.apiKey = lookup(ApiKeyVariable);
@@ -133,7 +133,7 @@ ProviderConfig ProviderConfig::fromEnvironment(const EnvironmentLookup& lookup) 
     return config;
 }
 
-std::string ProviderConfig::chatCompletionsUrl() const {
+std::string RestProviderConfig::chatCompletionsUrl() const {
     assert(!baseUrl.empty());
 
     std::string url = baseUrl;

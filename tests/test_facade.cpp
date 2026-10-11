@@ -7,7 +7,7 @@
 #include "support/fake_http_transport.h"
 
 using OpenAnima::Core::NPCBrain;
-using OpenAnima::Provider::ProviderConfig;
+using OpenAnima::Provider::RestProviderConfig;
 using OpenAnima::TestSupport::FakeHttpTransport;
 
 // Catch2 assertions expand into do-while blocks and test cases are long by design, so
@@ -18,7 +18,7 @@ TEST_CASE("OpenAnima::makeNpc wires the config and transport into an NPC", "[fac
     auto transport = std::make_shared<FakeHttpTransport>();
     transport->response = {200, R"({"choices":[{"message":{"content":"hi"}}]})"};
 
-    ProviderConfig config;
+    RestProviderConfig config;
     config.baseUrl = "http://localhost:11434/v1";
     config.model = "test-model";
 
