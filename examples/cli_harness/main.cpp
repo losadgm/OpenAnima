@@ -8,6 +8,8 @@
 #include "OpenAnima/ProviderConfig.h"
 #include "OpenAnima/RestProvider.h"
 
+#include "dotenv.h"
+
 #ifdef OPENANIMA_WITH_CURL
 #include "OpenAnima/CurlHttpTransport.h"
 #endif
@@ -33,6 +35,14 @@ std::string joinArguments(int argc, char** argv) {
 /// environment is not configured, 3 when the build has no HTTP transport.
 int main(int argc, char** argv) {
 #ifdef OPENANIMA_WITH_CURL
+    // The CMake Tools run and debug buttons pass no environment of their own, so the
+    // file is loaded here. Real variables win: the file only fills in what is missing.
+    const std::string dotEnvPath = OpenAnimaExample::findDotEnv();
+    OpenAnimaExample::applyDotEnv(dotEnvPath);
+    if (!dotEnvPath.empty()) {
+        std::cerr << "note: loaded " << dotEnvPath << '\n';
+    }
+
     OpenAnima::ProviderConfig config;
     try {
         config = OpenAnima::ProviderConfig::fromEnvironment();
@@ -51,7 +61,10 @@ int main(int argc, char** argv) {
                   << "  OPENANIMA_API_KEY            bearer token, empty for local servers\n"
                   << "  OPENANIMA_TIMEOUT_SECONDS    per-request budget, default 60\n"
                   << "  OPENANIMA_TEMPERATURE        sampling temperature, default 0.7\n"
-                  << "  OPENANIMA_MAX_TOKENS         reply length bound, default 512\n";
+                  << "  OPENANIMA_MAX_TOKENS         reply length bound, default 512\n"
+                  << "\n"
+                  << "A .env file in the working directory or in any parent directory is\n"
+                  << "loaded before the environment is read.\n";
         return 2;
     }
 
