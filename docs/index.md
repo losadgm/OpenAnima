@@ -29,6 +29,8 @@ The conversation is one of three channels an NPC uses:
 - One HTTP boundary, `OpenAnima::Http::HttpTransport`, so providers can be tested without a
   network and the socket code lives in exactly one place.
 - Configuration read from the environment, validated, with the ranges checked.
+- An umbrella header, `OpenAnima/OpenAnima.h`, and a `makeNpc()` entry point that wires the
+  default stack in one call.
 
 Asynchronous calls, streaming, and a context strategy for long conversations are not here
 yet. The plan is in `TODO.md`, next to the code.
@@ -37,20 +39,13 @@ yet. The plan is in `TODO.md`, next to the code.
 
 ```cpp
 #include <iostream>
-#include <memory>
 
-#include "OpenAnima/Core/NPCBrain.h"
-#include "OpenAnima/Http/CurlHttpTransport.h"
-#include "OpenAnima/Provider/ProviderConfig.h"
-#include "OpenAnima/Provider/RestProvider.h"
+#include "OpenAnima/OpenAnima.h"
 
 int main() {
     using namespace OpenAnima;
 
-    const Provider::ProviderConfig config = Provider::ProviderConfig::fromEnvironment();
-    auto provider = std::make_shared<Provider::RestProvider>(config, Http::CurlHttpTransport::create());
-
-    Core::NPCBrain brain{provider};
+    Core::NPCBrain brain = makeNpc();
     brain.setSystemPrompt("You are a blacksmith in a small village.");
 
     const Core::Completion answer = brain.ask("Do you have any iron daggers?");
@@ -61,6 +56,10 @@ int main() {
     }
 }
 ```
+
+One include, one line of setup. When the pieces have to be told apart (a test, a local model,
+a custom transport), they are still there, one per header; `makeNpc()` just wires the default
+stack.
 
 The configuration comes from four environment variables, of which two are required:
 

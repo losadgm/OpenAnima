@@ -5,6 +5,7 @@ add_executable(open_anima_tests
     Core/test_npc_brain.cpp
     Provider/test_provider_config.cpp
     Provider/test_rest_provider.cpp
+    test_facade.cpp
     support/fake_http_transport.h
     support/fake_provider.h)
 

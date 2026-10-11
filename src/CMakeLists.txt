@@ -5,12 +5,16 @@
 add_library(OpenAnima
     Core/NPCBrain.cpp
     Provider/ProviderConfig.cpp
-    Provider/RestProvider.cpp)
+    Provider/RestProvider.cpp
+    OpenAnima.cpp)
 
 if(OPENANIMA_WITH_CURL)
     target_sources(OpenAnima
         PRIVATE
             Http/HttpTransportCurl.cpp)
+    # The facade exposes makeNpc() overloads that build the default transport, so the
+    # umbrella header needs to know whether that transport was compiled in.
+    target_compile_definitions(OpenAnima PUBLIC OPENANIMA_HAS_CURL)
 endif()
 
 add_library(OpenAnima::OpenAnima ALIAS OpenAnima)
