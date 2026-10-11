@@ -33,7 +33,7 @@ The conversation is one of three channels an NPC uses:
   default stack in one call.
 
 Asynchronous calls, streaming, and a context strategy for long conversations are not here
-yet. The plan is in `TODO.md`, next to the code.
+yet. [The roadmap](roadmap.html) is what comes next.
 
 ## A request, end to end
 

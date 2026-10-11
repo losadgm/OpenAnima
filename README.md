@@ -9,7 +9,7 @@ around them and talk to each other.
 
 - Documentation: https://losadgm.github.io/OpenAnima/
 - API reference: https://losadgm.github.io/OpenAnima/api/
-- Roadmap: https://github.com/losadgm/OpenAnima/blob/main/TODO.md
+- Roadmap: https://losadgm.github.io/OpenAnima/roadmap.html
 - License: [MIT](LICENSE)
 
 ## Credits
