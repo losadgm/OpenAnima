@@ -23,6 +23,9 @@ public:
     /// @param provider Backend used for every request.
     explicit NPCBrain(std::shared_ptr<OpenAnima::Provider::IProvider> provider);
 
+    /// Destroys the brain and the history it holds.
+    ~NPCBrain() = default;
+
     /// A brain is moved, not copied: copying would fork the history while sharing the
     /// backend with the copy.
     NPCBrain(const NPCBrain&) = delete;

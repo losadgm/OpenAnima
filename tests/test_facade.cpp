@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <memory>
+#include <utility>
 
 #include "OpenAnima/OpenAnima.h"
 
@@ -17,8 +18,11 @@ TEST_CASE("OpenAnima::makeNpc wires the config and transport into an NPC", "[fac
     auto transport = std::make_shared<FakeHttpTransport>();
     transport->response = {200, R"({"choices":[{"message":{"content":"hi"}}]})"};
 
-    NPCBrain npc =
-        OpenAnima::makeNpc(ProviderConfig{"http://localhost:11434/v1", "test-model"}, transport);
+    ProviderConfig config;
+    config.baseUrl = "http://localhost:11434/v1";
+    config.model = "test-model";
+
+    NPCBrain npc = OpenAnima::makeNpc(std::move(config), transport);
 
     const auto answer = npc.ask("hello");
 

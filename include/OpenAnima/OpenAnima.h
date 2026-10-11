@@ -5,17 +5,19 @@
 
 #include <memory>
 
-#include "OpenAnima/Core/Completion.h"
+// This header is the umbrella: it re-exports the pieces so that one include is enough.
+// The marked includes are intentional even where nothing in this file names the type.
+#include "OpenAnima/Core/Completion.h"  // IWYU pragma: keep
 #include "OpenAnima/Core/NPCBrain.h"
-#include "OpenAnima/Core/Types.h"
-#include "OpenAnima/Errors.h"
+#include "OpenAnima/Core/Types.h"  // IWYU pragma: keep
+#include "OpenAnima/Errors.h"      // IWYU pragma: keep
 #include "OpenAnima/Http/HttpTransport.h"
 #if defined(OPENANIMA_HAS_CURL)
-#include "OpenAnima/Http/CurlHttpTransport.h"
+#include "OpenAnima/Http/CurlHttpTransport.h"  // IWYU pragma: keep
 #endif
-#include "OpenAnima/Provider/IProvider.h"
+#include "OpenAnima/Provider/IProvider.h"  // IWYU pragma: keep
 #include "OpenAnima/Provider/ProviderConfig.h"
-#include "OpenAnima/Provider/RestProvider.h"
+#include "OpenAnima/Provider/RestProvider.h"  // IWYU pragma: keep
 
 namespace OpenAnima {
 
