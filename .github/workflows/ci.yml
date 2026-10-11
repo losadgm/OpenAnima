@@ -55,3 +55,38 @@ jobs:
 
       - name: Test (CTest)
         run: ctest --test-dir build --build-config ${{ matrix.build_type }} --output-on-failure
+
+  # The reference is part of the product, so it is built on every change and not only
+  # when the site is published.
+  docs:
+    name: ubuntu-latest / docs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install Doxygen and pandoc
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install --no-install-recommends -y doxygen ninja-build pandoc
+
+      # curl and the tests have nothing to do with reading the headers, and skipping
+      # them keeps the job from fetching the dependencies.
+      - name: Configure
+        run: >
+          cmake -S . -B build -G Ninja
+          -DBUILD_TESTING=OFF
+          -DOPENANIMA_WITH_CURL=OFF
+          -DOPENANIMA_ENABLE_DOCS=ON
+
+      # A missing @param or an undocumented type fails the job here instead of quietly
+      # shipping a reference with holes in it.
+      - name: Treat Doxygen warnings as errors
+        run: sed -i 's/^WARN_AS_ERROR * = .*/WARN_AS_ERROR = YES/' build/Doxyfile
+
+      - name: Build the API reference
+        run: cmake --build build --target docs
+
+      - name: Build the site
+        run: bash docs/build-docs.sh
