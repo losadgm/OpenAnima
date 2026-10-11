@@ -1,19 +1,13 @@
 #include <cstdlib>
 #include <iostream>
-#include <memory>
 #include <string>
 
-#include "OpenAnima/Core/NPCBrain.h"
-#include "OpenAnima/Errors.h"
-#include "OpenAnima/Http/CurlHttpTransport.h"
-#include "OpenAnima/Provider/RestProvider.h"
-#include "OpenAnima/Provider/RestProviderConfig.h"
+// One include: the umbrella re-exports the whole public API.
+#include "OpenAnima/OpenAnima.h"
 
 #include "dotenv.h"
 
 using OpenAnima::Core::NPCBrain;
-using OpenAnima::Http::CurlHttpTransport;
-using OpenAnima::Provider::RestProvider;
 using OpenAnima::Provider::RestProviderConfig;
 
 namespace {
@@ -69,8 +63,7 @@ int main(int argc, char** argv) {
         return 2;
     }
 
-    auto provider = std::make_shared<RestProvider>(config, CurlHttpTransport::create());
-    NPCBrain brain{provider};
+    NPCBrain brain = OpenAnima::makeNpc(config);
 
     // An empty command line opens a session instead of sending an empty prompt.
     const std::string prompt = joinArguments(argc, argv);
