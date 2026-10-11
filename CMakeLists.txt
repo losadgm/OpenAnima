@@ -84,7 +84,16 @@ if(OPENANIMA_WITH_CURL)
         set(HTTP_ONLY ON CACHE BOOL "" FORCE)
         set(CURL_DISABLE_LDAP ON CACHE BOOL "" FORCE)
         set(CURL_DISABLE_LDAPS ON CACHE BOOL "" FORCE)
+        # Every optional dependency is switched off. curl treats libpsl as REQUIRED
+        # and fails the whole configure when its header is missing, which is exactly
+        # the situation on a clean runner. HTTPS plus JSON is all the provider needs.
+        set(CURL_USE_LIBPSL OFF CACHE BOOL "" FORCE)
+        set(CURL_USE_LIBSSH2 OFF CACHE BOOL "" FORCE)
         set(CURL_ZLIB OFF CACHE BOOL "" FORCE)
+        set(CURL_BROTLI OFF CACHE BOOL "" FORCE)
+        set(CURL_ZSTD OFF CACHE BOOL "" FORCE)
+        set(USE_LIBIDN2 OFF CACHE BOOL "" FORCE)
+        set(USE_NGHTTP2 OFF CACHE BOOL "" FORCE)
         if(WIN32)
             set(CURL_USE_SCHANNEL ON CACHE BOOL "" FORCE)
         else()
