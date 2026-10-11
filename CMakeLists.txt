@@ -30,6 +30,7 @@ endif()
 # -----------------------------------------------------------------------------
 option(OPENANIMA_BUILD_EXAMPLES "Build the OpenAnima example programs" ON)
 option(OPENANIMA_ENABLE_CLANG_TIDY "Run clang-tidy while compiling (clang only)" OFF)
+option(OPENANIMA_WITH_CURL "Build the libcurl-backed HTTP transport" ON)
 
 # -----------------------------------------------------------------------------
 #  Optional clang-tidy integration (works with the clang/LLVM toolchain only)
@@ -49,6 +50,10 @@ endif()
 # -----------------------------------------------------------------------------
 include(FetchContent)
 
+# CTest is included before the dependencies so that BUILD_TESTING already exists
+# when curl is configured from source below.
+include(CTest)
+
 FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
@@ -57,8 +62,66 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+# -----------------------------------------------------------------------------
+#  HTTP transport backend.
+#  The system libcurl is used when present; otherwise curl is built from source
+#  with Schannel on Windows and OpenSSL elsewhere, so that nothing has to be
+#  installed by hand on either platform. Configure with -DOPENANIMA_WITH_CURL=OFF
+#  to build the core library alone.
+# -----------------------------------------------------------------------------
+if(OPENANIMA_WITH_CURL)
+    find_package(CURL QUIET)
+    if(CURL_FOUND)
+        message(STATUS "HTTP transport: system libcurl ${CURL_VERSION_STRING}")
+    else()
+        message(STATUS "HTTP transport: libcurl not found, building curl from source")
+        # Only the library, and only the protocols a chat-completions call needs.
+        set(BUILD_CURL_EXE OFF CACHE BOOL "" FORCE)
+        set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(BUILD_LIBCURL_DOCS OFF CACHE BOOL "" FORCE)
+        set(BUILD_MISC_DOCS OFF CACHE BOOL "" FORCE)
+        set(ENABLE_CURL_MANUAL OFF CACHE BOOL "" FORCE)
+        set(HTTP_ONLY ON CACHE BOOL "" FORCE)
+        set(CURL_DISABLE_LDAP ON CACHE BOOL "" FORCE)
+        set(CURL_DISABLE_LDAPS ON CACHE BOOL "" FORCE)
+        set(CURL_ZLIB OFF CACHE BOOL "" FORCE)
+        if(WIN32)
+            set(CURL_USE_SCHANNEL ON CACHE BOOL "" FORCE)
+        else()
+            set(CURL_USE_OPENSSL ON CACHE BOOL "" FORCE)
+        endif()
+        # curl registers its own test suite through BUILD_TESTING and flips
+        # BUILD_SHARED_LIBS in the cache, both of which would leak into this project.
+        # Build curl static and hand our own settings back afterwards.
+        set(OPENANIMA_BUILD_TESTING_BACKUP ${BUILD_TESTING})
+        set(OPENANIMA_BUILD_SHARED_LIBS_BACKUP "${BUILD_SHARED_LIBS}")
+        set(BUILD_TESTING OFF)
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+        set(BUILD_STATIC_LIBS ON CACHE BOOL "" FORCE)
+        FetchContent_Declare(
+            curl
+            GIT_REPOSITORY https://github.com/curl/curl.git
+            GIT_TAG        curl-8_14_1
+            GIT_SHALLOW    TRUE
+        )
+        FetchContent_MakeAvailable(curl)
+        set(BUILD_TESTING ${OPENANIMA_BUILD_TESTING_BACKUP})
+        if(OPENANIMA_BUILD_SHARED_LIBS_BACKUP)
+            set(BUILD_SHARED_LIBS "${OPENANIMA_BUILD_SHARED_LIBS_BACKUP}" CACHE BOOL
+                "Build shared libraries" FORCE)
+        else()
+            unset(BUILD_SHARED_LIBS CACHE)
+        endif()
+    endif()
+
+    if(TARGET CURL::libcurl)
+        set(OPENANIMA_CURL_TARGET CURL::libcurl)
+    else()
+        set(OPENANIMA_CURL_TARGET libcurl)
+    endif()
+endif()
+
 # Catch2 v3 is only required when building the test suite.
-include(CTest)
 if(BUILD_TESTING)
     FetchContent_Declare(
         Catch2

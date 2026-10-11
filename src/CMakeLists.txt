@@ -3,7 +3,15 @@
 #  Static or shared depending on BUILD_SHARED_LIBS (defaults to static).
 # -----------------------------------------------------------------------------
 add_library(OpenAnima
-    NPCBrain.cpp)
+    NPCBrain.cpp
+    ProviderConfig.cpp
+    RestProvider.cpp)
+
+if(OPENANIMA_WITH_CURL)
+    target_sources(OpenAnima
+        PRIVATE
+            HttpTransportCurl.cpp)
+endif()
 
 add_library(OpenAnima::OpenAnima ALIAS OpenAnima)
 
@@ -17,6 +25,14 @@ target_include_directories(OpenAnima
 target_link_libraries(OpenAnima
     PUBLIC
         nlohmann_json::nlohmann_json)
+
+# The HTTP client is an implementation detail: consumers see HttpTransport only,
+# so its headers and libraries never leak into their builds.
+if(OPENANIMA_WITH_CURL)
+    target_link_libraries(OpenAnima
+        PRIVATE
+            ${OPENANIMA_CURL_TARGET})
+endif()
 
 if(MSVC)
     target_compile_options(OpenAnima PRIVATE /W4 /permissive-)

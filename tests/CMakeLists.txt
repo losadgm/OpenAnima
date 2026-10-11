@@ -2,7 +2,10 @@
 #  Test suite (Catch2 v3). Registered with CTest via catch_discover_tests.
 # -----------------------------------------------------------------------------
 add_executable(open_anima_tests
-    test_npc_brain.cpp)
+    test_npc_brain.cpp
+    test_provider_config.cpp
+    test_rest_provider.cpp
+    fake_http_transport.h)
 
 target_link_libraries(open_anima_tests
     PRIVATE
