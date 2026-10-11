@@ -31,6 +31,7 @@ endif()
 option(OPENANIMA_BUILD_EXAMPLES "Build the OpenAnima example programs" ON)
 option(OPENANIMA_ENABLE_CLANG_TIDY "Run clang-tidy while compiling (clang only)" OFF)
 option(OPENANIMA_WITH_CURL "Build the libcurl-backed HTTP transport" ON)
+option(OPENANIMA_ENABLE_DOCS "Generate the Doxygen API reference (docs target)" OFF)
 
 # -----------------------------------------------------------------------------
 #  Optional clang-tidy integration (works with the clang/LLVM toolchain only)
@@ -152,4 +153,27 @@ endif()
 
 if(BUILD_TESTING)
     add_subdirectory(tests)
+endif()
+
+# -----------------------------------------------------------------------------
+#  Documentation (optional).
+#  docs/Doxyfile.in is a template; configure_file() substitutes the project
+#  metadata. Configure with -DOPENANIMA_ENABLE_DOCS=ON to get a `docs` target.
+# -----------------------------------------------------------------------------
+if(OPENANIMA_ENABLE_DOCS)
+    find_package(Doxygen QUIET)
+    if(NOT DOXYGEN_FOUND)
+        message(WARNING "OPENANIMA_ENABLE_DOCS=ON but Doxygen was not found.")
+    else()
+        configure_file(
+            ${CMAKE_CURRENT_SOURCE_DIR}/docs/Doxyfile.in
+            ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+            @ONLY)
+        add_custom_target(docs
+            COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
+            WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+            COMMENT "Generating the API reference with Doxygen"
+            VERBATIM)
+        message(STATUS "Documentation: target 'docs' with ${DOXYGEN_EXECUTABLE}")
+    endif()
 endif()
