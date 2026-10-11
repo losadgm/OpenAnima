@@ -10,9 +10,11 @@ around them and talk to each other.
 - Documentation: https://losadgm.github.io/OpenAnima/
 - API reference: https://losadgm.github.io/OpenAnima/api/
 - Roadmap: https://losadgm.github.io/OpenAnima/roadmap.html
-- License: [MIT](LICENSE)
+
+## License
+
+MIT. The full text is in [LICENSE](LICENSE).
 
 ## Credits
 
 - Author: Marcos Losada García ([losadgm](https://github.com/losadgm))
-- Nobody else so far.
