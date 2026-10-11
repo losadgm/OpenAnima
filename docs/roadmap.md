@@ -160,4 +160,4 @@ player works end to end; the other two drive the milestones below.
    already the planned fix. It is the first thing a long session hits.
 3. **Drop `NPCBrain::ping()`** before the API freeze. It only proves that the library links.
 
-`CMakeLists.txt` carries version 0.1.0. It moves to 0.2.0 when the asynchronous core lands.
+`CMakeLists.txt` carries version 0.1.5. It moves to 0.2.0 when the asynchronous core lands.

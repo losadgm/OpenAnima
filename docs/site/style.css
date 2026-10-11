@@ -9,6 +9,7 @@
     --border: #d1d9e0;
     --code-bg: #f6f8fa;
     --measure: 80ch;
+    --header-height: 3.25rem;
 }
 
 * {
@@ -37,6 +38,7 @@ body {
     position: sticky;
     top: 0;
     z-index: 10;
+    min-height: var(--header-height);
     background: var(--bg);
     border-bottom: 1px solid var(--border);
 }
@@ -112,7 +114,7 @@ article.doc h1,
 article.doc h2,
 article.doc h3,
 article.doc h4 {
-    scroll-margin-top: 4.5rem;
+    scroll-margin-top: calc(var(--header-height) + 1rem);
     line-height: 1.3;
 }
 
@@ -272,8 +274,8 @@ tbody tr:nth-child(even) {
     main.wrap>.toc {
         grid-column: 1;
         position: sticky;
-        top: 4.5rem;
-        max-height: calc(100vh - 6rem);
+        top: calc(var(--header-height) + 2rem);
+        max-height: calc(100vh - var(--header-height) - 3rem);
         overflow-y: auto;
         margin-bottom: 0;
     }

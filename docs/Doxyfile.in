@@ -19,6 +19,9 @@ HIDE_UNDOC_MEMBERS     = NO
 INPUT                  = "@CMAKE_SOURCE_DIR@/include" \
                          "@CMAKE_SOURCE_DIR@/docs/namespaces.dox" \
                          "@CMAKE_SOURCE_DIR@/README.md"
+# The README is the front page. Without this line Doxygen treats it as one more page,
+# it appears under Related Pages, and the main page comes out with nothing on it.
+USE_MDFILE_AS_MAINPAGE = "@CMAKE_SOURCE_DIR@/README.md"
 RECURSIVE              = YES
 FILE_PATTERNS          = *.h *.hpp *.dox *.md
 EXCLUDE_PATTERNS       = */build/*
@@ -32,6 +35,10 @@ WARN_AS_ERROR          = NO
 # -- Output --------------------------------------------------------------------
 GENERATE_HTML          = YES
 HTML_OUTPUT            = html
+# Light, always. The default (AUTO_LIGHT) follows the system preference, which turns
+# the whole reference dark on a desktop with a dark theme. TOGGLE does not fix that
+# either: it keeps the same starting point and only adds a button.
+HTML_COLORSTYLE        = LIGHT
 GENERATE_LATEX         = NO
 GENERATE_XML           = YES
 XML_OUTPUT             = xml

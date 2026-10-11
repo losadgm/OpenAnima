@@ -5,7 +5,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(OpenAnima
-    VERSION 0.1.0
+    VERSION 0.1.5
     DESCRIPTION "Middleware for conversational NPCs that interact with the player, the world and each other"
     HOMEPAGE_URL "https://github.com/losadgm/OpenAnima"
     LANGUAGES CXX)
