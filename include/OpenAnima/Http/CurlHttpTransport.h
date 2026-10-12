@@ -16,7 +16,10 @@ public:
     CurlHttpTransport() = default;
 
     /// @copydoc HttpTransport::post
-    HttpResponse post(const HttpRequest& request) override;
+    long post(const HttpRequest& request, const ResponseObserver& observer) override;
+
+    /// Keeps the buffered overload of the interface reachable through this type.
+    using HttpTransport::post;
 
     /// @return A transport ready to be injected into a provider.
     static std::shared_ptr<HttpTransport> create();

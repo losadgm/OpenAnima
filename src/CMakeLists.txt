@@ -8,12 +8,21 @@ add_library(OpenAnima
     OpenAnima/OpenAnima.cpp
     OpenAnima/Core/NPCBrain.cpp
     OpenAnima/Http/CurlHttpTransport.cpp
+    OpenAnima/Http/HttpTransport.cpp
     OpenAnima/Provider/RestProvider.cpp
-    OpenAnima/Provider/RestProviderConfig.cpp)
+    OpenAnima/Provider/RestProviderConfig.cpp
+    OpenAnima/Provider/SseReader.cpp)
 
 add_library(OpenAnima::OpenAnima ALIAS OpenAnima)
 
 target_compile_features(OpenAnima PUBLIC cxx_std_17)
+
+# SseReader.h is an implementation detail, so it lives next to its implementation
+# instead of in the public tree: including it as "OpenAnima/Provider/SseReader.h"
+# keeps the same shape a public header has without installing it.
+target_include_directories(OpenAnima
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR})
 
 target_include_directories(OpenAnima
     PUBLIC
