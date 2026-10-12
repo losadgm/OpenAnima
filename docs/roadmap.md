@@ -53,6 +53,12 @@ player works end to end; the other two drive the milestones below.
   - `ConfigError`, `TransportError`, `ProviderError` (which carries the HTTP status) and
     `ParseError`, all derived from `OpenAnimaError`, so one `catch` in the host application
     covers the whole library.
+- [x] Streamed answers.
+  - `IProvider::complete()` takes a sink and reports every piece as it arrives, and
+    `RestProvider` reads the `text/event-stream` the contract answers with, so a caller can
+    paint an answer while the model is still writing it. Under it, `HttpTransport` reports the
+    status and the body as they land, an exchange can be abandoned through a short write, and
+    what is bounded is the silence rather than the whole exchange.
 - [ ] Asynchronous core.
   - `ask()` blocks the caller, and there is no thread, no future and no mutex anywhere in the
     library. A game loop cannot afford that wait: this closes the promise the project makes

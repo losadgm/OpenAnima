@@ -23,7 +23,8 @@ The conversation is one of three channels an NPC uses:
 ## What it does today
 
 - A conversation object, `OpenAnima::Core::NPCBrain`, with a system prompt, a history, and a
-  single call that sends a prompt and returns the answer.
+  call that sends a prompt and returns the answer. The same call takes a sink and reports the
+  text while the provider is still producing it, piece by piece.
 - One provider interface, `OpenAnima::Provider::IProvider`, and a REST implementation for the
   OpenAI chat-completions contract. Ollama, llama.cpp and vLLM speak it too.
 - One HTTP boundary, `OpenAnima::Http::HttpTransport`, so providers can be tested without a
@@ -32,8 +33,9 @@ The conversation is one of three channels an NPC uses:
 - An umbrella header, `OpenAnima/OpenAnima.h`, and a `makeNpc()` entry point that wires the
   default stack in one call.
 
-Asynchronous calls, streaming, and a context strategy for long conversations are not here
-yet. [The roadmap](roadmap.html) is what comes next.
+Asynchronous calls and a context strategy for long conversations are not here yet: `ask()`
+blocks until the whole answer has arrived, even when it has been reporting the answer piece by
+piece along the way. [The roadmap](roadmap.html) is what comes next.
 
 ## A request, end to end
 
