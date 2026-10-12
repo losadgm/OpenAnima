@@ -30,7 +30,7 @@ using OpenAnimaTui::Role;
 using OpenAnimaTui::ScreenState;
 
 constexpr const char* NpcName = "Aldric";
-constexpr const char* Dim = "\x1b[2m";
+constexpr const char* Muted = "\x1b[38;2;128;128;128m";  ///< OpenCode's muted gray, #808080.
 constexpr const char* Reset = "\x1b[0m";
 
 /// Erases the live region, leaving the cursor where the frame started.
@@ -53,7 +53,7 @@ void printCommitted(OpenAnimaTui::Terminal& terminal, const std::string& speaker
 
 /// Prints a dim note, for what the client itself has to say.
 void printNote(OpenAnimaTui::Terminal& terminal, const std::string& text) {
-    terminal.write(std::string(Dim) + text + Reset + "\n");
+    terminal.write(std::string(Muted) + text + Reset + "\n");
 }
 
 /// Erases the live region and paints it again, leaving the cursor at the draft caret.

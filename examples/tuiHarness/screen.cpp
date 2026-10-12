@@ -1,6 +1,7 @@
 #include "screen.h"
 
 #include <algorithm>
+#include <array>
 #include <utility>
 
 namespace OpenAnimaTui {
@@ -8,14 +9,22 @@ namespace OpenAnimaTui {
 namespace {
 
 constexpr std::size_t PrefixWidth = 8;  ///< Width every speaker prefix is padded to.
-constexpr std::size_t PromptWidth = 2;  ///< Width of the prompt marker "> ".
+constexpr std::size_t PromptWidth = 2;  ///< Width of the prompt marker, one glyph plus a space.
 constexpr const char* NpcName = "Aldric";
 
-constexpr const char* Dim = "\x1b[2m";
-constexpr const char* Bold = "\x1b[1m";
+// The OpenCode dark palette, taken from its theme.json, as 24-bit SGR. The accents and the
+// muted gray are the parts of its look this client borrows.
+constexpr const char* Accent = "\x1b[38;2;157;124;216m";   // #9d7cd8
+constexpr const char* Primary = "\x1b[38;2;250;178;131m";  // #fab283
+constexpr const char* Muted = "\x1b[38;2;128;128;128m";    // #808080
 constexpr const char* Reset = "\x1b[0m";
-constexpr const char* UserColour = "\x1b[34m";
-constexpr const char* NpcColour = "\x1b[32m";
+
+/// The prompt marker, as OpenCode draws its prompts, and the dots it spins while working.
+constexpr const char* PromptMarker = "\u2771";
+constexpr std::array<const char*, 10> SpinnerFrames = {
+    "\u280B", "\u2819", "\u2839", "\u2838", "\u283C",
+    "\u2834", "\u2826", "\u2827", "\u2807", "\u280F",
+};
 
 /// The draft as display rows: body text per row, and the position of every character
 /// index (including one past the end) as a row and a column within that body.
@@ -109,7 +118,7 @@ std::vector<std::string> wrap(const std::string& text, std::size_t width) {
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters) -- the speaker first reads better.
 std::vector<std::string> renderLine(const std::string& speaker, const std::string& text,
                                     std::size_t width, Role role) {
-    const char* colour = role == Role::Npc ? NpcColour : UserColour;
+    const char* colour = role == Role::Npc ? Primary : Muted;
     const std::size_t bodyWidth = width > PrefixWidth ? width - PrefixWidth : 1;
     const std::vector<std::string> wrapped = wrap(text, bodyWidth);
 
@@ -132,11 +141,13 @@ std::string renderFrame(const ScreenState& state, std::size_t width) {
             frame += '\n';
         }
         const std::size_t tenths = elapsedTenths(state);
-        frame += std::string(PrefixWidth, ' ') + Dim + "working " + std::to_string(tenths / 10) +
-                 "." + std::to_string(tenths % 10) + "s   esc to cancel" + Reset + '\n';
+        const std::size_t spinner = tenths % SpinnerFrames.size();
+        frame += std::string(PrefixWidth - 1, ' ') + Accent + SpinnerFrames.at(spinner) + Reset +
+                 Muted + "working " + std::to_string(tenths / 10) + "." +
+                 std::to_string(tenths % 10) + "s   esc to cancel" + Reset + '\n';
     } else {
         frame +=
-            std::string(PrefixWidth, ' ') + Dim + state.model + "   " + state.hint + Reset + '\n';
+            std::string(PrefixWidth, ' ') + Muted + state.model + "   " + state.hint + Reset + '\n';
     }
 
     const DraftLayout layout = layoutDraft(state.draft, width);
@@ -144,7 +155,8 @@ std::string renderFrame(const ScreenState& state, std::size_t width) {
         if (row != 0) {
             frame += '\n';
         }
-        frame += row == 0 ? std::string{Bold} + "> " + Reset : std::string(PromptWidth, ' ');
+        frame += row == 0 ? std::string{Accent} + PromptMarker + " " + Reset
+                          : std::string(PromptWidth, ' ');
         frame += layout.rows[row];
     }
     return frame;

@@ -64,8 +64,8 @@ TEST_CASE("renderLine colours the role") {
         OpenAnimaTui::renderLine("Aldric", "a", 20, OpenAnimaTui::Role::Npc);
     const std::vector<std::string> user =
         OpenAnimaTui::renderLine("you", "a", 20, OpenAnimaTui::Role::User);
-    CHECK(npc[0].find("\x1b[32m") != std::string::npos);
-    CHECK(user[0].find("\x1b[34m") != std::string::npos);
+    CHECK(npc[0].find("\x1b[38;2;250;178;131m") != std::string::npos);   // primary #fab283
+    CHECK(user[0].find("\x1b[38;2;128;128;128m") != std::string::npos);  // muted #808080
 }
 
 TEST_CASE("renderFrame draws the quiet line and the prompt when idle") {
@@ -76,7 +76,7 @@ TEST_CASE("renderFrame draws the quiet line and the prompt when idle") {
 
     const std::string frame = OpenAnimaTui::renderFrame(state, 40);
     const std::string plain = stripAnsi(frame);
-    CHECK(plain == "        mock   ask something\n> hello");
+    CHECK(plain == "        mock   ask something\n\u2771 hello");
 }
 
 TEST_CASE("renderFrame draws the answer and the working line while busy") {
@@ -88,7 +88,8 @@ TEST_CASE("renderFrame draws the answer and the working line while busy") {
     const std::string frame = OpenAnimaTui::renderFrame(state, 40);
     const std::string plain = stripAnsi(frame);
     CHECK(plain.find("Aldric  Iron?") == 0);
-    CHECK(plain.find("\n        working 0.0s   esc to cancel\n> ") != std::string::npos);
+    CHECK(plain.find("working 0.0s   esc to cancel") != std::string::npos);
+    CHECK(plain.find("\u2771 ") != std::string::npos);
 }
 
 TEST_CASE("renderFrame wraps a long draft into more rows") {
@@ -97,7 +98,8 @@ TEST_CASE("renderFrame wraps a long draft into more rows") {
 
     const std::string frame = OpenAnimaTui::renderFrame(state, 20);
     const std::string plain = stripAnsi(frame);
-    CHECK(plain == "           \n> a fairly long ques\n  tion that does not\n   fit in one row");
+    CHECK(plain ==
+          "           \n\u2771 a fairly long ques\n  tion that does not\n   fit in one row");
 }
 
 TEST_CASE("caretOffset is zero at the end of the draft") {

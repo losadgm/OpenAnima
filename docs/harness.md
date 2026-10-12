@@ -66,6 +66,8 @@ happening and what can be pressed.
 - The live region is redrawn in place while the answer arrives, and a finished answer is
   written once as plain lines, so it stays there untouched.
 - Each role has its own colour and its own prefix, so a long session is readable at a glance.
+- The look borrows the OpenCode theme: a purple accent for the prompt marker and the spinner,
+  a warm peach for the persona, muted gray for the quiet text, and the same braille spinner.
 - The hint line under the prompt carries the state: which model answered, how long the turn
   has been running, and the key that stops it.
 - While a turn is in flight the prompt stays usable, the next question can be typed, and the
