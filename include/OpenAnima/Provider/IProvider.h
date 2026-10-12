@@ -74,8 +74,9 @@ public:
     /// @return The assistant answer, its metadata, and why generation stopped.
     /// @throws OpenAnimaError subclasses when the call cannot be completed.
     ///
-    /// A class that implements the form above must repeat `using IProvider::complete;` to
-    /// keep the conveniences reachable through its own type.
+    /// A class that implements the virtual form keeps both conveniences reachable
+    /// through its own type: the provider here brings them in, and anything else can
+    /// either do the same with `using IProvider::complete;` or forward to them.
     OpenAnima::Core::Completion
     complete(const std::vector<OpenAnima::Core::ChatMessage>& messages) {
         return complete(messages, Call{});

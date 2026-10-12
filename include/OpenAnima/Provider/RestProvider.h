@@ -24,12 +24,35 @@ public:
     RestProvider(RestProviderConfig config,
                  std::shared_ptr<OpenAnima::Http::HttpTransport> transport);
 
-    /// @copydoc IProvider::complete
+    /// Sends a whole conversation and returns the answer.
+    ///
+    /// The same contract as the interface, written out again because the interface has
+    /// three `complete` members and a `@copydoc` cannot say which one counts.
+    /// @param messages Conversation in chronological order; the last entry is the current turn.
+    /// @param call Where the pieces go, and how the call can be abandoned.
+    /// @return The assistant answer, its metadata, and why generation stopped.
+    /// @throws OpenAnimaError subclasses when the call cannot be completed.
     OpenAnima::Core::Completion complete(const std::vector<OpenAnima::Core::ChatMessage>& messages,
                                          const Call& call) override;
 
-    /// Keeps the convenience overload of the interface reachable through this type.
-    using IProvider::complete;
+    /// Sends a whole conversation and reports the answer while it is produced.
+    /// @param messages Conversation in chronological order; the last entry is the current turn.
+    /// @param onDelta Called with every piece of the answer as it arrives, in order.
+    /// @return The assistant answer, its metadata, and why generation stopped.
+    /// @throws OpenAnimaError subclasses when the call cannot be completed.
+    OpenAnima::Core::Completion complete(const std::vector<OpenAnima::Core::ChatMessage>& messages,
+                                         const DeltaSink& onDelta) {
+        return IProvider::complete(messages, onDelta);
+    }
+
+    /// Sends a whole conversation and waits for the answer.
+    /// @param messages Conversation in chronological order; the last entry is the current turn.
+    /// @return The assistant answer, its metadata, and why generation stopped.
+    /// @throws OpenAnimaError subclasses when the call cannot be completed.
+    OpenAnima::Core::Completion
+    complete(const std::vector<OpenAnima::Core::ChatMessage>& messages) {
+        return IProvider::complete(messages);
+    }
 
     /// @return The configuration this provider was created with.
     [[nodiscard]] const RestProviderConfig& config() const noexcept {

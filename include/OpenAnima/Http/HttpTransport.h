@@ -80,8 +80,9 @@ public:
     /// @return The status the endpoint answered with, or 0 when it reported none.
     /// @throws TransportError when the exchange cannot be completed at all.
     ///
-    /// A class that implements this one must repeat `using HttpTransport::post;` to
-    /// keep the buffered overload below reachable through its own type.
+    /// A class that implements this one keeps the buffered overload below reachable
+    /// through its own type: the implementations here bring it in, and anything else
+    /// can either do the same with `using HttpTransport::post;` or forward to it.
     virtual long post(const HttpRequest& request, const ResponseObserver& observer) = 0;
 
     /// Performs a blocking POST and returns the whole answer.

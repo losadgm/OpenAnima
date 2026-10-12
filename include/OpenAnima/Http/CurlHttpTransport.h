@@ -15,11 +15,23 @@ class CurlHttpTransport : public HttpTransport {
 public:
     CurlHttpTransport() = default;
 
-    /// @copydoc HttpTransport::post
+    /// Performs a blocking POST and reports the answer while it arrives.
+    ///
+    /// The same contract as the interface, written out again because the interface has
+    /// two `post` members and a `@copydoc` cannot say which one counts.
+    /// @param request Fully built request.
+    /// @param observer Where the status and the body go, as they arrive.
+    /// @return The status the endpoint answered with, or 0 when it reported none.
+    /// @throws TransportError when the exchange cannot be completed at all.
     long post(const HttpRequest& request, const ResponseObserver& observer) override;
 
-    /// Keeps the buffered overload of the interface reachable through this type.
-    using HttpTransport::post;
+    /// Performs a blocking POST and returns the whole answer.
+    /// @param request Fully built request.
+    /// @return The status and the body, buffered.
+    /// @throws TransportError when the exchange cannot be completed at all.
+    HttpResponse post(const HttpRequest& request) {
+        return HttpTransport::post(request);
+    }
 
     /// @return A transport ready to be injected into a provider.
     static std::shared_ptr<HttpTransport> create();
