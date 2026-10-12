@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -33,6 +34,9 @@ public:
 
         std::string produced;
         for (const std::string& piece : deltas) {
+            if (beforeEachDelta) {
+                beforeEachDelta();
+            }
             if (call.keepGoing && !call.keepGoing()) {
                 // What a real provider does when the exchange was abandoned: it hands back
                 // what it had produced by then, marked for what it is.
@@ -54,8 +58,9 @@ public:
 
     std::vector<std::vector<ChatMessage>> requests;  ///< Every conversation received, in order.
     Completion answer;                               ///< Answer replayed for every call.
-    std::vector<std::string> deltas;  ///< Pieces reported to the sink before answering.
-    const char* failure{nullptr};     ///< When set, complete() throws.
+    std::vector<std::string> deltas;        ///< Pieces reported to the sink before answering.
+    const char* failure{nullptr};           ///< When set, complete() throws.
+    std::function<void()> beforeEachDelta;  ///< Runs before each piece, to hold the answer.
 };
 
 }  // namespace OpenAnima::TestSupport

@@ -31,7 +31,8 @@ target_include_directories(OpenAnima
 
 target_link_libraries(OpenAnima
     PUBLIC
-        nlohmann_json::nlohmann_json)
+        nlohmann_json::nlohmann_json
+        Threads::Threads)
 
 # The HTTP client is an implementation detail: consumers see HttpTransport only,
 # so its headers and libraries never leak into their builds.

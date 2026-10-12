@@ -62,6 +62,11 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+# The async calls run on a thread, so the platform thread library is not optional,
+# and a consumer that links this library has to get it too.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 # -----------------------------------------------------------------------------
 #  HTTP transport backend.
 #  The system libcurl is used when present; otherwise curl is built from source
