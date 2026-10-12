@@ -144,7 +144,7 @@ player works end to end; the other two drive the milestones below.
   - `examples/cli_harness` is interactive, keeps the conversation across turns, streams the
     answer as it arrives and loads `.env` on its own, but it drives a single agent with no
     world around it and it paints one line at a time.
-- [ ] Terminal client under `apps/`.
+- [ ] Terminal client under `examples/`.
   - A live region at the bottom, with the answer growing in place and the keys still answering
     while the model writes. Two prototypes first, one over FTXUI and one written by hand, and
     the smaller dependency is the one that stays.

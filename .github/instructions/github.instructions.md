@@ -47,7 +47,7 @@ two disagree, the roadmap wins and the issue is edited.
 | `build` | `8b949e` | CMake, dependencies, toolchain and packaging |
 | `ci` | `fbca04` | Workflows and repository automation |
 | `tests` | `b60205` | The suite and what verifies a change |
-| `examples` | `f97316` | Runnable clients under `examples/` and `apps/` |
+| `examples` | `f97316` | Runnable clients under `examples/` |
 
 - `documentation` is the label GitHub ships and means what a `docs` label would: use it
   instead of adding a second one.
@@ -115,7 +115,7 @@ gh api "repos/{owner}/{repo}/milestones?state=all" --paginate \
     --jq '.[] | "\(.title): \(.open_issues) open / \(.closed_issues) closed"'
 
 # One issue per point, in its stage. The body is the roadmap note, so it goes in a file.
-gh issue create --title 'Terminal client under apps/' --body-file /tmp/body.md \
+gh issue create --title 'Terminal client under examples/' --body-file /tmp/body.md \
     --milestone 'v0.9.0 - Polish, profiling and examples'
 gh issue close <url>
 
