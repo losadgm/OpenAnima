@@ -10,8 +10,8 @@
 /// @namespace OpenAnima::Core
 /// @brief The agent and the vocabulary of a conversation.
 ///
-/// Messages, roles, the answer a provider returns, and the brain that keeps the
-/// history and drives the exchange.
+/// Messages, roles, the answer a provider returns, the events a turn reports, and the
+/// brain that keeps the history and drives the exchange.
 
 /// @namespace OpenAnima::Http
 /// @brief The boundary with the network.
