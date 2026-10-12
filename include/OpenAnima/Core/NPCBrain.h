@@ -59,10 +59,20 @@ public:
     /// has succeeded, so a caller that drew half an answer and then failed still has
     /// the conversation it had before.
     /// @param prompt Text produced by the player or by the client application.
+    /// @param call Where the pieces of the answer go, and how the call can be
+    ///        abandoned half way.
+    /// @return The assembled answer, and why generation stopped.
+    /// @throws OpenAnimaError when no backend is attached or the call fails.
+    Completion ask(const std::string& prompt, const Provider::Call& call);
+
+    /// Sends a prompt and reports the answer while it is being produced.
+    /// @param prompt Text produced by the player or by the client application.
     /// @param onDelta Called with every piece of the answer as it arrives, in order.
     /// @return The assembled answer, and why generation stopped.
     /// @throws OpenAnimaError when no backend is attached or the call fails.
-    Completion ask(const std::string& prompt, const Provider::DeltaSink& onDelta);
+    Completion ask(const std::string& prompt, const Provider::DeltaSink& onDelta) {
+        return ask(prompt, Provider::Call{onDelta, {}});
+    }
 
     /// @return The conversation so far, in chronological order.
     const std::vector<ChatMessage>& history() const noexcept {

@@ -33,6 +33,11 @@ public:
             chunks.push_back(response.body);
         }
         for (const std::string& chunk : chunks) {
+            if (request.keepGoing && !request.keepGoing()) {
+                // What the real transport does when the caller abandons the exchange: it
+                // stops delivering, and reports no failure for it.
+                break;
+            }
             if (observer.onBody && !observer.onBody(chunk)) {
                 break;
             }

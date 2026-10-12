@@ -19,6 +19,7 @@ using OpenAnima::Core::ChatMessage;
 using OpenAnima::Core::Completion;
 using OpenAnima::Core::FinishReason;
 using OpenAnima::Core::Role;
+using OpenAnima::Provider::Call;
 using OpenAnima::Provider::RestProvider;
 using OpenAnima::Provider::RestProviderConfig;
 using OpenAnima::TestSupport::FakeHttpTransport;
@@ -350,6 +351,29 @@ TEST_CASE("RestProvider reports the status of a rejected stream", "[provider]") 
         CHECK(error.statusCode() == 401);
         CHECK(std::string(error.what()).find("bad key") != std::string::npos);
     }
+}
+
+TEST_CASE("RestProvider marks an answer the caller abandoned", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->chunks = {"data: {\"choices\":[{\"delta\":{\"content\":\"first\"}}]}\n\n",
+                         "data: {\"choices\":[{\"delta\":{\"content\":\" second\"}}]}\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    bool stop = false;
+    std::vector<std::string> pieces;
+    const Completion completion =
+        provider.complete(oneTurn("hi"), Call{[&pieces, &stop](std::string_view piece) {
+                                                  pieces.emplace_back(piece);
+                                                  stop = true;  // the caller decides to stop here
+                                              },
+                                              [&stop] { return !stop; }});
+
+    // What had been produced is real and comes back, marked for what it is: not a
+    // failure, but not a finished answer either.
+    CHECK(completion.text == "first");
+    CHECK(completion.finishReason == FinishReason::Cancelled);
+    REQUIRE(pieces.size() == 1);
+    CHECK(pieces[0] == "first");
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

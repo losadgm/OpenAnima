@@ -249,18 +249,20 @@ RestProvider::RestProvider(RestProviderConfig config,
     assert(m_transport != nullptr && "RestProvider requires a transport");
 }
 
-Completion RestProvider::complete(const std::vector<ChatMessage>& messages,
-                                  const DeltaSink& onDelta) {
+Completion RestProvider::complete(const std::vector<ChatMessage>& messages, const Call& call) {
     assert(!messages.empty() && "complete() requires at least one message");
 
     // A caller that wants the pieces gets a streamed answer; one that wants it whole
     // gets a single response, which is also the mode every server reports usage in.
-    const bool streamed = static_cast<bool>(onDelta);
+    const bool streamed = static_cast<bool>(call.onDelta);
 
     HttpRequest request;
     request.url = m_config.chatCompletionsUrl();
     request.body = buildRequestBody(m_config, messages, streamed);
     request.timeoutSeconds = m_config.timeoutSeconds;
+    // The transport asks this on its own timer, which is what lets a caller abandon a
+    // stream that went quiet instead of waiting for the silence to time out.
+    request.keepGoing = call.keepGoing;
     request.headers.emplace_back("Content-Type", "application/json");
     request.headers.emplace_back("Accept", streamed ? "text/event-stream" : "application/json");
     if (!m_config.apiKey.empty()) {
@@ -268,7 +270,7 @@ Completion RestProvider::complete(const std::vector<ChatMessage>& messages,
     }
 
     if (streamed) {
-        return readStream(request, onDelta);
+        return readStream(request, call);
     }
 
     const HttpResponse response = m_transport->post(request);
@@ -280,7 +282,7 @@ Completion RestProvider::complete(const std::vector<ChatMessage>& messages,
     return parseCompletion(response.body);
 }
 
-Completion RestProvider::readStream(const HttpRequest& request, const DeltaSink& onDelta) {
+Completion RestProvider::readStream(const HttpRequest& request, const Call& call) {
     Completion completion;
     long statusCode = 0;
     std::string errorBody;
@@ -301,7 +303,7 @@ Completion RestProvider::readStream(const HttpRequest& request, const DeltaSink&
                 // waiting for the server to close a connection it is done with.
                 return false;
             }
-            applyChunk(std::string(payload), statusCode, completion, onDelta);
+            applyChunk(std::string(payload), statusCode, completion, call.onDelta);
             return true;
         });
     };
@@ -312,6 +314,12 @@ Completion RestProvider::readStream(const HttpRequest& request, const DeltaSink&
         throw ProviderError("provider answered with HTTP " + std::to_string(statusCode) + ": " +
                                 snippet(errorBody),
                             statusCode);
+    }
+    // A caller that stopped the call gets what had been produced by then, marked for what
+    // it is. An answer the server had already finished is left alone: the check can turn
+    // false a moment after the last token arrives.
+    if (completion.finishReason == FinishReason::Unknown && call.keepGoing && !call.keepGoing()) {
+        completion.finishReason = FinishReason::Cancelled;
     }
     return completion;
 }
