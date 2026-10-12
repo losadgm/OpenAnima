@@ -23,6 +23,9 @@ namespace OpenAnima::Provider {
 /// Only the `data` field is kept. Comments (the keep-alives a server sends to hold a
 /// connection open), `event`, `id` and `retry` are read and dropped, as the format
 /// says, and several `data` lines in one event are joined with a newline.
+///
+/// A `data` field with an empty value is a heartbeat rather than an event and is
+/// dropped for the same reason: the format says an empty data buffer is not dispatched.
 class SseReader {
 public:
     /// Called with the payload of one complete event.

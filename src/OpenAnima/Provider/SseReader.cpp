@@ -89,9 +89,16 @@ bool SseReader::dispatch(const PayloadSink& onPayload) {
         return true;
     }
 
+    // An empty data buffer is not an event: `data:` with nothing after it is one of the
+    // heartbeats a server sends to hold the connection open, not the payload of a chunk.
+    const bool carriesPayload = !m_payload.empty();
+    m_sawData = false;
+    if (!carriesPayload) {
+        return true;
+    }
+
     const bool keepGoing = onPayload(m_payload);
     m_payload.clear();
-    m_sawData = false;
     return keepGoing;
 }
 

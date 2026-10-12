@@ -67,6 +67,18 @@ TEST_CASE("SseReader drops the comments a server uses to stay connected", "[prov
     CHECK(payloads[0] == "one");
 }
 
+TEST_CASE("SseReader drops a data field with nothing in it", "[provider][sse]") {
+    // A heartbeat is a `data` field carrying nothing, with or without the space the
+    // format strips: it is not an event, so it is not handed over as one.
+    CHECK(read({"data:\n\n"}).empty());
+    CHECK(read({"data: \n\n"}).empty());
+
+    // And it does not leak into the event that follows it.
+    const std::vector<std::string> payloads = read({"data:\n\ndata: one\n\n"});
+    REQUIRE(payloads.size() == 1);
+    CHECK(payloads[0] == "one");
+}
+
 TEST_CASE("SseReader ignores the fields it does not know", "[provider][sse]") {
     const std::vector<std::string> payloads =
         read({"retry: 500\nevent: chunk\nid: 7\ndata: one\n\n"});

@@ -263,6 +263,27 @@ TEST_CASE("RestProvider assembles a streamed answer and reports every piece", "[
     CHECK(pieces[1] == "!");
 }
 
+TEST_CASE("RestProvider ignores the heartbeats a server sends while it thinks", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    // A `data` field with nothing in it is what a server sends to hold the connection
+    // open. Reading it as a chunk ended the turn with a JSON error.
+    transport->chunks = {
+        "data:\n\n", "data: {\"choices\":[{\"delta\":{\"content\":\"Halt\"}}]}\n\n", "data: \n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"!\"},\"finish_reason\":\"stop\"}]}\n\n"
+        "data: [DONE]\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    std::vector<std::string> pieces;
+    const Completion completion = provider.complete(
+        oneTurn("hi"), [&pieces](std::string_view piece) { pieces.emplace_back(piece); });
+
+    CHECK(completion.text == "Halt!");
+    CHECK(completion.finishReason == FinishReason::Stop);
+    REQUIRE(pieces.size() == 2);
+    CHECK(pieces[0] == "Halt");
+    CHECK(pieces[1] == "!");
+}
+
 TEST_CASE("RestProvider asks for a stream only when the caller wants the pieces", "[provider]") {
     auto transport = std::make_shared<FakeHttpTransport>();
     transport->response = {200, completionBody("hello there")};

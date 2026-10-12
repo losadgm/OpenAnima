@@ -5,10 +5,12 @@
 #include <cstddef>
 #include <cstdlib>
 #include <curl/curl.h>
+#include <exception>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <utility>
 
 #include "OpenAnima/Errors.h"
 
@@ -45,7 +47,28 @@ struct Exchange {
     std::chrono::seconds silentFor{0};               ///< Longest silence allowed.
     bool stopped{false};                             ///< The caller asked to stop.
     bool wentQuiet{false};                           ///< Dropped for silence.
+    std::exception_ptr failure;                      ///< What a callback threw, if anything.
 };
+
+/// Calls back into the caller without letting anything escape into libcurl.
+///
+/// The callbacks below run inside C frames that have no way to release the handle they
+/// belong to, so an exception leaving one would both unwind through code that was not
+/// written for it and skip the cleanup in post(). A failure is kept here instead, the
+/// callback counts as having asked to stop, and post() raises it again once the handle
+/// is gone.
+/// @param exchange Exchange the callback belongs to, where a failure is kept.
+/// @param callback Callback to run.
+/// @return What the callback returned, or false when it threw.
+template <typename Callback>
+bool observeFailure(Exchange& exchange, Callback&& callback) {
+    try {
+        return std::forward<Callback>(callback)();
+    } catch (...) {
+        exchange.failure = std::current_exception();
+        return false;
+    }
+}
 
 /// @param line A status line such as "HTTP/1.1 200 OK".
 /// @return The status, or 0 when the line carries none.
@@ -82,7 +105,14 @@ size_t receiveHeader(char* data, size_t size, size_t count, void* userdata) {
     }
     exchange->status = status;
     if (exchange->observer->onStatus) {
-        exchange->observer->onStatus(status);
+        const bool reported = observeFailure(*exchange, [&] {
+            exchange->observer->onStatus(status);
+            return true;
+        });
+        if (!reported) {
+            exchange->stopped = true;
+            return 0;
+        }
     }
     return length;
 }
@@ -92,10 +122,15 @@ size_t receiveBody(char* data, size_t size, size_t count, void* userdata) {
     auto* exchange = static_cast<Exchange*>(userdata);
     exchange->lastByte = std::chrono::steady_clock::now();
 
-    if (exchange->observer->onBody && !exchange->observer->onBody(std::string_view(data, length))) {
-        // A short write stops the transfer, which is how a caller cancels it.
-        exchange->stopped = true;
-        return 0;
+    if (exchange->observer->onBody) {
+        const bool keepGoing = observeFailure(
+            *exchange, [&] { return exchange->observer->onBody(std::string_view(data, length)); });
+        if (!keepGoing) {
+            // A short write stops the transfer: how the exchange is cut short, whether
+            // the caller asked for it or the sink threw.
+            exchange->stopped = true;
+            return 0;
+        }
     }
     return length;
 }
@@ -108,9 +143,13 @@ size_t receiveBody(char* data, size_t size, size_t count, void* userdata) {
 int reportProgress(void* userdata, curl_off_t, curl_off_t, curl_off_t, curl_off_t) {
     auto* exchange = static_cast<Exchange*>(userdata);
 
-    if (exchange->request->keepGoing && !exchange->request->keepGoing()) {
-        exchange->stopped = true;
-        return 1;
+    if (exchange->request->keepGoing) {
+        const bool keepGoing =
+            observeFailure(*exchange, [&] { return exchange->request->keepGoing(); });
+        if (!keepGoing) {
+            exchange->stopped = true;
+            return 1;
+        }
     }
     if (exchange->silentFor.count() > 0 &&
         std::chrono::steady_clock::now() - exchange->lastByte > exchange->silentFor) {
@@ -169,6 +208,13 @@ long CurlHttpTransport::post(const HttpRequest& request, const ResponseObserver&
 
     curl_slist_free_all(headers);
     curl_easy_cleanup(handle);
+
+    if (exchange.failure != nullptr) {
+        // Raised here instead of where it happened: inside a callback there would be no
+        // way to release the handle just freed, and the exception would travel through
+        // frames of a library written in C.
+        std::rethrow_exception(exchange.failure);
+    }
 
     if (result != CURLE_OK && !exchange.stopped) {
         if (exchange.wentQuiet) {
