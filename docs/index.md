@@ -22,8 +22,10 @@ The conversation is one of three channels an NPC uses:
 
 ## What it does today
 
-- A conversation object, `OpenAnima::Core::NPCBrain`, with a system prompt, a history, and a
-  single call that sends a prompt and returns the answer.
+- A conversation object, `OpenAnima::Core::NPCBrain`, with a system prompt, a history and a
+  call that sends a prompt and returns the answer. The same call takes a sink and reports the
+  text while the provider is still producing it, and a turn can also be asked for without
+  waiting and collected as it goes.
 - One provider interface, `OpenAnima::Provider::IProvider`, and a REST implementation for the
   OpenAI chat-completions contract. Ollama, llama.cpp and vLLM speak it too.
 - One HTTP boundary, `OpenAnima::Http::HttpTransport`, so providers can be tested without a
@@ -32,8 +34,8 @@ The conversation is one of three channels an NPC uses:
 - An umbrella header, `OpenAnima/OpenAnima.h`, and a `makeNpc()` entry point that wires the
   default stack in one call.
 
-Asynchronous calls, streaming, and a context strategy for long conversations are not here
-yet. [The roadmap](roadmap.html) is what comes next.
+What is still missing is a strategy for the context of a long conversation, which grows until
+it no longer fits and is not trimmed yet. [The roadmap](roadmap.html) is what comes next.
 
 ## A request, end to end
 
@@ -61,7 +63,52 @@ One include, one line of setup. When the pieces have to be told apart (a test, a
 a custom transport), they are still there, one per header; `makeNpc()` just wires the default
 stack.
 
-The configuration comes from four environment variables, of which two are required:
+## Streaming and asynchronous calls
+
+The same turn can be read while it is being written, and asked for without waiting for it:
+
+```cpp
+// Piece by piece, as they arrive, on the thread of the caller.
+brain.ask("Do you have any iron daggers?",
+          [](std::string_view piece) { std::cout << piece << std::flush; });
+
+// Or on a thread of the brain's own, collected when it suits the caller.
+const Core::RequestId turn = brain.askAsync("Do you have any iron daggers?");
+for (;;) {
+    const std::optional<Core::Event> event = brain.poll(std::chrono::milliseconds{100});
+    if (!event.has_value()) {
+        continue;  // Nothing happened yet.
+    }
+    if (event->kind == Core::EventKind::Delta) {
+        std::cout << event->text << std::flush;
+    }
+    if (event->kind == Core::EventKind::Finished || event->kind == Core::EventKind::Failed) {
+        break;
+    }
+}
+```
+
+Stopping a turn mid-answer is `brain.cancel(turn)`. The stream ends, whatever the model had
+produced by then is kept, and the turn arrives as a `Finished` event marked
+`FinishReason::Cancelled`.
+
+What comes with it:
+
+- One turn at a time per brain. A second `askAsync()` while one is in flight throws, and
+  `isBusy()` answers first when the client wants to ask rather than catch.
+- The conversation belongs to the caller's thread: the turn gets a copy of it, and the history
+  is written when the last event of the turn has been collected. A client that draws an answer
+  decides when the turn becomes part of the conversation, which is also what keeps the turns
+  in the order the player saw them.
+- A turn that failed leaves the conversation as it was, the same way a failed `ask()` does. One
+  that was cancelled keeps what had been produced, so the agent remembers what the player
+  actually read.
+- What `OPENANIMA_TIMEOUT_SECONDS` bounds is the silence, not the whole exchange: a model that
+  thinks for a minute is fine, one that goes quiet for a minute is not.
+- A heartbeat from the server, a `data` field with nothing after it, is dropped. A chunk that
+  cannot be read at all fails the turn with a `ParseError` rather than half an answer.
+
+The configuration comes from six environment variables, of which two are required:
 
 | Variable | Required | Default |
 | --- | --- | --- |

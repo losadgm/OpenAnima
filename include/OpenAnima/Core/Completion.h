@@ -11,11 +11,12 @@ namespace OpenAnima::Core {
 
 /// Why a provider stopped generating.
 enum class FinishReason : std::uint8_t {
-    Unknown,       ///< Not reported, or a value this library does not model.
-    Stop,          ///< Natural end, or a stop sequence was reached.
-    Length,        ///< The token budget ran out before the answer finished.
-    ToolCalls,     ///< The model asked for a tool instead of answering.
-    ContentFilter  ///< The provider withheld or trimmed the answer.
+    Unknown,        ///< Not reported, or a value this library does not model.
+    Stop,           ///< Natural end, or a stop sequence was reached.
+    Length,         ///< The token budget ran out before the answer finished.
+    ToolCalls,      ///< The model asked for a tool instead of answering.
+    ContentFilter,  ///< The provider withheld or trimmed the answer.
+    Cancelled       ///< The caller stopped the call; the text is what it had produced.
 };
 
 /// Tokens billed for one exchange.

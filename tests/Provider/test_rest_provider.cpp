@@ -2,6 +2,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "OpenAnima/Core/Types.h"
@@ -18,6 +19,8 @@ using OpenAnima::Core::ChatMessage;
 using OpenAnima::Core::Completion;
 using OpenAnima::Core::FinishReason;
 using OpenAnima::Core::Role;
+using OpenAnima::Core::TokenUsage;
+using OpenAnima::Provider::Call;
 using OpenAnima::Provider::RestProvider;
 using OpenAnima::Provider::RestProviderConfig;
 using OpenAnima::TestSupport::FakeHttpTransport;
@@ -54,8 +57,9 @@ std::vector<ChatMessage> oneTurn(const std::string& text) {
 
 }  // namespace
 
-// Catch2 assertions expand into do-while blocks and test cases are long by design, so
-// the rules written for production code do not fit here.
+// Catch2 assertions expand into do-while blocks, test cases are long by design, and the
+// analyzer cannot see through REQUIRE(), so an optional it has just seen checked still
+// looks unchecked to it. None of the three fits production code.
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
 
 TEST_CASE("RestProvider sends the chat-completions contract", "[provider]") {
@@ -190,9 +194,12 @@ TEST_CASE("RestProvider reads the metadata of the answer", "[provider]") {
     CHECK(completion.model == "gpt-4o-2024-08-06");
     CHECK(completion.finishReason == FinishReason::Stop);
     REQUIRE(completion.usage.has_value());
-    CHECK(completion.usage->promptTokens == 11);
-    CHECK(completion.usage->completionTokens == 7);
-    CHECK(completion.usage->totalTokens == 18);
+    // The assertion above is the check; the analyzer cannot see through it.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const TokenUsage& reported = completion.usage.value();
+    CHECK(reported.promptTokens == 11);
+    CHECK(reported.completionTokens == 7);
+    CHECK(reported.totalTokens == 18);
 }
 
 TEST_CASE("RestProvider tolerates an answer without metadata", "[provider]") {
@@ -230,6 +237,172 @@ TEST_CASE("RestProvider tolerates a null finish reason", "[provider]") {
     RestProvider provider{localConfig(), transport};
 
     CHECK(provider.complete(oneTurn("hi")).finishReason == FinishReason::Unknown);
+}
+
+TEST_CASE("RestProvider assembles a streamed answer and reports every piece", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    // The pieces land in separate pieces of the body, which is the shape a socket
+    // hands over and the one a reader written against whole lines gets wrong.
+    transport->chunks = {
+        "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"\"}}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"Halt\"}}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"!\"}}]}\n\ndata: "
+        "{\"choices\":[{\"delta\":{},",
+        "\"finish_reason\":\"stop\"}],\"model\":\"qwen2.5:7b\"}\n\ndata: [DONE]\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    std::vector<std::string> pieces;
+    const Completion completion = provider.complete(
+        oneTurn("hi"), [&pieces](std::string_view piece) { pieces.emplace_back(piece); });
+
+    CHECK(completion.text == "Halt!");
+    CHECK(completion.model == "qwen2.5:7b");
+    CHECK(completion.finishReason == FinishReason::Stop);
+    REQUIRE(pieces.size() == 2);
+    CHECK(pieces[0] == "Halt");
+    CHECK(pieces[1] == "!");
+}
+
+TEST_CASE("RestProvider ignores the heartbeats a server sends while it thinks", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    // A `data` field with nothing in it is what a server sends to hold the connection
+    // open. Reading it as a chunk ended the turn with a JSON error.
+    transport->chunks = {
+        "data:\n\n", "data: {\"choices\":[{\"delta\":{\"content\":\"Halt\"}}]}\n\n", "data: \n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"!\"},\"finish_reason\":\"stop\"}]}\n\n"
+        "data: [DONE]\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    std::vector<std::string> pieces;
+    const Completion completion = provider.complete(
+        oneTurn("hi"), [&pieces](std::string_view piece) { pieces.emplace_back(piece); });
+
+    CHECK(completion.text == "Halt!");
+    CHECK(completion.finishReason == FinishReason::Stop);
+    REQUIRE(pieces.size() == 2);
+    CHECK(pieces[0] == "Halt");
+    CHECK(pieces[1] == "!");
+}
+
+TEST_CASE("RestProvider asks for a stream only when the caller wants the pieces", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->response = {200, completionBody("hello there")};
+    RestProvider provider{localConfig(), transport};
+
+    SECTION("without a sink") {
+        provider.complete(oneTurn("hi"));
+
+        const nlohmann::json body = nlohmann::json::parse(transport->lastBody());
+        CHECK(body["stream"] == false);
+        CHECK_FALSE(body.contains("stream_options"));
+        CHECK(transport->lastHeader("Accept") == "application/json");
+    }
+
+    SECTION("with a sink") {
+        provider.complete(oneTurn("hi"), [](std::string_view) {});
+
+        const nlohmann::json body = nlohmann::json::parse(transport->lastBody());
+        CHECK(body["stream"] == true);
+        // Without this the answer comes back with no token usage at all.
+        CHECK(body["stream_options"]["include_usage"] == true);
+        CHECK(transport->lastHeader("Accept") == "text/event-stream");
+    }
+}
+
+TEST_CASE("RestProvider reads the usage of a chunk that carries only that", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    // The chunk that closes a stream reports an empty choices array and the usage, and
+    // it arrives after the finish reason.
+    transport->chunks = {
+        "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\n",
+        "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":14,\"completion_tokens\":3}}\n\n",
+        "data: [DONE]\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    const Completion completion = provider.complete(oneTurn("hi"), [](std::string_view) {});
+
+    CHECK(completion.text == "ok");
+    REQUIRE(completion.usage.has_value());
+    // The assertion above is the check; the analyzer cannot see through it.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const TokenUsage& reported = completion.usage.value();
+    CHECK(reported.promptTokens == 14);
+    CHECK(reported.completionTokens == 3);
+}
+
+TEST_CASE("RestProvider stops reading at the sentinel", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    // Anything after the sentinel is not part of the answer, and a server that keeps
+    // talking after it must not be believed.
+    transport->chunks = {"data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n",
+                         "data: [DONE]\n\n",
+                         "data: {\"choices\":[{\"delta\":{\"content\":\" and more\"}}]}\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    const Completion completion = provider.complete(oneTurn("hi"), [](std::string_view) {});
+
+    CHECK(completion.text == "ok");
+}
+
+TEST_CASE("RestProvider reports an error streamed in the middle of an answer", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->chunks = {"data: {\"choices\":[{\"delta\":{\"content\":\"half\"}}]}\n\n",
+                         "data: {\"error\":{\"message\":\"rate limit\"}}\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    std::vector<std::string> pieces;
+    CHECK_THROWS_AS(
+        provider.complete(oneTurn("hi"),
+                          [&pieces](std::string_view piece) { pieces.emplace_back(piece); }),
+        ProviderError);
+    // What arrived before the failure is real and stays with the caller.
+    REQUIRE(pieces.size() == 1);
+    CHECK(pieces[0] == "half");
+}
+
+TEST_CASE("RestProvider refuses a streamed answer that is not JSON", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->chunks = {"data: not json at all\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    CHECK_THROWS_AS(provider.complete(oneTurn("hi"), [](std::string_view) {}), ParseError);
+}
+
+TEST_CASE("RestProvider reports the status of a rejected stream", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->response = {401, R"({"error":{"message":"bad key"}})"};
+    RestProvider provider{localConfig("wrong"), transport};
+
+    try {
+        provider.complete(oneTurn("hi"), [](std::string_view) {});
+        FAIL("the call should have reported the status");
+    } catch (const ProviderError& error) {
+        CHECK(error.statusCode() == 401);
+        CHECK(std::string(error.what()).find("bad key") != std::string::npos);
+    }
+}
+
+TEST_CASE("RestProvider marks an answer the caller abandoned", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->chunks = {"data: {\"choices\":[{\"delta\":{\"content\":\"first\"}}]}\n\n",
+                         "data: {\"choices\":[{\"delta\":{\"content\":\" second\"}}]}\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    bool stop = false;
+    std::vector<std::string> pieces;
+    const Completion completion =
+        provider.complete(oneTurn("hi"), Call{[&pieces, &stop](std::string_view piece) {
+                                                  pieces.emplace_back(piece);
+                                                  stop = true;  // the caller decides to stop here
+                                              },
+                                              [&stop] { return !stop; }});
+
+    // What had been produced is real and comes back, marked for what it is: not a
+    // failure, but not a finished answer either.
+    CHECK(completion.text == "first");
+    CHECK(completion.finishReason == FinishReason::Cancelled);
+    REQUIRE(pieces.size() == 1);
+    CHECK(pieces[0] == "first");
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

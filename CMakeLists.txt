@@ -5,7 +5,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(OpenAnima
-    VERSION 0.1.5
+    VERSION 0.2.0
     DESCRIPTION "Middleware for conversational NPCs that interact with the player, the world and each other"
     HOMEPAGE_URL "https://github.com/losadgm/OpenAnima"
     LANGUAGES CXX)
@@ -61,6 +61,11 @@ FetchContent_Declare(
     GIT_SHALLOW    TRUE
 )
 FetchContent_MakeAvailable(nlohmann_json)
+
+# The async calls run on a thread, so the platform thread library is not optional,
+# and a consumer that links this library has to get it too.
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
 
 # -----------------------------------------------------------------------------
 #  HTTP transport backend.
@@ -138,6 +143,20 @@ if(BUILD_TESTING)
     )
     FetchContent_MakeAvailable(Catch2)
 endif()
+
+# -----------------------------------------------------------------------------
+#  Warnings.
+#  One project, one set of rules: the library, the tests and the examples are all
+#  compiled with the same warnings, so nothing sneaks in through a target that
+#  nobody looked at.
+# -----------------------------------------------------------------------------
+function(open_anima_enable_warnings target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endfunction()
 
 # -----------------------------------------------------------------------------
 #  Targets

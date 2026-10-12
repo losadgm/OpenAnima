@@ -40,7 +40,7 @@ public:
         : OpenAnimaError(message), m_statusCode(statusCode) {}
 
     /// @return The HTTP status reported by the provider, or 0 when there is none.
-    long statusCode() const noexcept {
+    [[nodiscard]] long statusCode() const noexcept {
         return m_statusCode;
     }
 

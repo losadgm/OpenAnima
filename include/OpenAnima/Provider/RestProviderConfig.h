@@ -41,7 +41,7 @@ struct RestProviderConfig {
     static RestProviderConfig fromEnvironment(const EnvironmentLookup& lookup);
 
     /// @return The chat-completions endpoint built from baseUrl, without a doubled slash.
-    std::string chatCompletionsUrl() const;
+    [[nodiscard]] std::string chatCompletionsUrl() const;
 };
 
 }  // namespace OpenAnima::Provider

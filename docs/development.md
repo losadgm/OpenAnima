@@ -42,9 +42,10 @@ include/OpenAnima/     public headers
     Provider/          the backend interface, the settings, the REST provider
 src/OpenAnima/         the implementation, mirroring the headers
 tests/                 Catch2 tests, one directory per package
-examples/cli_harness/  a runnable client: reads .env, sends a prompt, prints the answer
+examples/cli_harness/  a runnable client: reads .env, sends a prompt, prints the answer as it arrives
 docs/                  these pages, the Doxyfile template and the site template
 .github/scripts/       helpers used by the pipeline, including the site builder
+.github/instructions/  the conventions of this repository, for editor tooling
 ```
 
 A header and its implementation share a path: `OpenAnima/Core/NPCBrain.h` is implemented by
@@ -60,6 +61,14 @@ A header and its implementation share a path: `OpenAnima/Core/NPCBrain.h` is imp
 - Identifiers, comments and documentation are written in English. ASCII only.
 - `assert` is for broken preconditions: null, empty, malformed. A rule of the domain is an
   exception, not an assertion.
+
+## Threads
+
+`Core::NPCBrain::askAsync()` runs a turn on a thread of the library's own, and the target
+links `Threads::Threads` publicly, so a consumer that links `OpenAnima::OpenAnima` gets it
+without asking. Nothing else starts a thread: the synchronous calls, the provider and the
+transport work on the thread that called them, and the conversation is written on that thread
+when the events of a turn are collected.
 
 ## Documentation
 
