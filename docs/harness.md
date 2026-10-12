@@ -6,7 +6,7 @@ both are meant to be read as much as run.
 | Client | What it is | Where it stands |
 | --- | --- | --- |
 | `cliHarness` | The command line: one prompt at a time, or a session over stdin | in place |
-| `tuiHarness` | The terminal UI: the conversation on screen, the answer arriving as it is written | planned, v0.9.0 |
+| `tuiHarness` | The terminal UI: the conversation on screen, the answer arriving as it is written | built |
 
 ## cliHarness
 
@@ -31,8 +31,8 @@ demonstrated: a conversation with an NPC, the answer arriving while the model wr
 the keys alive the whole time. It is also where the room of several agents will live (v0.6.0),
 and the piece that has to look good enough to show the library off.
 
-It is not built yet. What follows is the design, so that the shape is agreed before the code
-exists.
+It is built. What follows is the shape that was agreed before the code existed, and what the
+code now does.
 
 ### The problem
 
@@ -77,6 +77,7 @@ happening and what can be pressed.
 | --- | --- |
 | Enter | Sends the draft |
 | Ctrl+J, or a trailing `\` | Starts a new line instead of sending |
+| Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Left, Right | Moves the cursor in the draft |
 | Up, Down | Walks the prompts of this session |
 | Esc, Ctrl+C | Cancels the turn in flight, keeping what it had produced |
 | Ctrl+C with nothing in flight | Clears the draft, and leaves when it is already empty |
@@ -95,13 +96,14 @@ happening and what can be pressed.
 
 - **A terminal layer of its own**, with two implementations: raw mode and ANSI sequences on
   Unix (termios), and the console API with virtual terminal sequences on Windows. Windows is a
-  target from the start rather than a port to attempt later.
+  target from the start rather than a port to attempt later. It is `terminal.h` with
+  `terminalUnix.cpp` and `terminalWindows.cpp`.
 - **The draw loop is driven by the events of a turn.** `askAsync()` and `poll()` already hand
   the text over as it arrives, so the screen changes when something happens and the loop never
   blocks. `cancel()` is what the interrupting keys call.
 - **The screen logic knows nothing about terminals.** What to draw, where the cursor goes and
   what a key means are pieces that take a width and a string and return lines, which is what
-  makes them testable without a terminal.
+  makes them testable without a terminal. It is `screen.h`.
 - **Two clients, one configuration**: the same environment, the same `.env` loader and the
   same provider as the command line.
 
@@ -116,8 +118,14 @@ happening and what can be pressed.
 
 1. Two prototypes, one over FTXUI and one written by hand, in a branch of their own, with the
    minimum needed to compare them: the prompt, the answer growing, and the key that cancels.
-   They are thrown away once one of them wins.
+   They are thrown away once one of them wins. The hand-written one won: FTXUI was dropped
+   because its inline renderer emits cursor moves with a negative parameter (`\x1b[-1B`), which
+   both the terminal in the editor and a strict emulator misrender.
 2. The skeleton of the real client around the winner, with the terminal layer abstracted and
    both of its implementations.
 3. The loop: input, live region, cancellation, history and commands.
 4. The tests above, and these pages brought up to date.
+
+Steps 1, 2 and 3 are done, and the piece tests of step 4 are in the suite. What is left is the
+in-suite client test over a pseudo-terminal, so the client itself is exercised by the same
+command that runs the rest.
