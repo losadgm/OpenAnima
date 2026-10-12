@@ -96,7 +96,13 @@ void printLine(const std::string& speaker, const std::string& text) {
 }
 
 /// Draws the live region: the answer in flight and the prompt under it.
+///
+/// It erases what the previous frame left before painting. The callers that print a
+/// finished line erase first and then draw, which makes the erase here a no-op in that
+/// case and keeps this one from ever painting over the frame above.
 void draw(Screen& screen) {
+    eraseLive(screen);
+
     const std::size_t width = OpenAnimaPrototype::terminalWidth();
     const std::size_t tenths = elapsedTenths(screen);
 
@@ -233,7 +239,6 @@ int main() {
             // The clock on the status line is the only thing that changes on its own.
             if (screen.busy && elapsedTenths(screen) != drawnTenths) {
                 drawnTenths = elapsedTenths(screen);
-                eraseLive(screen);
                 draw(screen);
             }
         }
