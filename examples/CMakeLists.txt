@@ -13,55 +13,24 @@ target_link_libraries(open_anima_cli
 open_anima_enable_warnings(open_anima_cli)
 
 # -----------------------------------------------------------------------------
-#  Prototypes of the terminal client. Throwaway code: two candidates for the same
-#  job, to be compared and deleted, so they are kept out of the build unless asked
-#  for with -DOPENANIMA_BUILD_PROTOTYPES=ON.
+#  `tuiHarness` is the terminal client. It reads the environment the same way the
+#  command line does, keeps one conversation and paints the answer as it arrives,
+#  in the last lines of the terminal. The terminal layer has a Unix backend and a
+#  Windows one, and the screen logic lives apart from both so it can be tested.
 # -----------------------------------------------------------------------------
-option(OPENANIMA_BUILD_PROTOTYPES "Build the terminal client prototypes" OFF)
+add_executable(open_anima_tui
+    tuiHarness/main.cpp
+    tuiHarness/screen.cpp
+    tuiHarness/terminalUnix.cpp
+    tuiHarness/terminalWindows.cpp
+    cliHarness/dotenv.cpp)
 
-if(OPENANIMA_BUILD_PROTOTYPES)
-    # FTXUI, only for the prototype that tries it out: the point of the exercise is to
-    # see what having it as a dependency of a client would cost.
-    include(FetchContent)
-    set(OPENANIMA_FTXUI_TAG "v7.0.3" CACHE STRING "FTXUI revision the prototype builds against")
-    FetchContent_Declare(
-        ftxui
-        GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git
-        GIT_TAG        ${OPENANIMA_FTXUI_TAG}
-        GIT_SHALLOW    TRUE)
+target_include_directories(open_anima_tui
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/cliHarness)
 
-    set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(FTXUI_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-    set(FTXUI_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-    set(FTXUI_ENABLE_INSTALL OFF CACHE BOOL "" FORCE)
-    set(FTXUI_QUIET ON CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(ftxui)
+target_link_libraries(open_anima_tui
+    PRIVATE
+        OpenAnima::OpenAnima)
 
-    add_executable(tui_prototype_handwritten
-        tuiPrototype/handwritten/main.cpp
-        tuiPrototype/handwritten/terminal.cpp
-        cliHarness/dotenv.cpp)
-
-    add_executable(tui_prototype_ftxui
-        tuiPrototype/ftxui/main.cpp
-        cliHarness/dotenv.cpp)
-
-    # The environment loader is the one the command line client already has.
-    foreach(prototype IN ITEMS tui_prototype_handwritten tui_prototype_ftxui)
-        target_include_directories(${prototype}
-            PRIVATE
-                ${CMAKE_CURRENT_SOURCE_DIR}/cliHarness)
-
-        target_link_libraries(${prototype}
-            PRIVATE
-                OpenAnima::OpenAnima)
-
-        open_anima_enable_warnings(${prototype})
-    endforeach()
-
-    target_link_libraries(tui_prototype_ftxui
-        PRIVATE
-            ftxui::component
-            ftxui::dom
-            ftxui::screen)
-endif()
+open_anima_enable_warnings(open_anima_tui)
