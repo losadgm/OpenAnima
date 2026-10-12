@@ -8,3 +8,5 @@ add_executable(open_anima_cli
 target_link_libraries(open_anima_cli
     PRIVATE
         OpenAnima::OpenAnima)
+
+open_anima_enable_warnings(open_anima_cli)

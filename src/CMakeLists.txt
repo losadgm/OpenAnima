@@ -39,11 +39,7 @@ target_link_libraries(OpenAnima
     PRIVATE
         ${OPENANIMA_CURL_TARGET})
 
-if(MSVC)
-    target_compile_options(OpenAnima PRIVATE /W4 /permissive-)
-else()
-    target_compile_options(OpenAnima PRIVATE -Wall -Wextra -Wpedantic)
-endif()
+open_anima_enable_warnings(OpenAnima)
 
 set_target_properties(OpenAnima PROPERTIES
     VERSION ${PROJECT_VERSION}

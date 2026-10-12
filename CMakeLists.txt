@@ -140,6 +140,20 @@ if(BUILD_TESTING)
 endif()
 
 # -----------------------------------------------------------------------------
+#  Warnings.
+#  One project, one set of rules: the library, the tests and the examples are all
+#  compiled with the same warnings, so nothing sneaks in through a target that
+#  nobody looked at.
+# -----------------------------------------------------------------------------
+function(open_anima_enable_warnings target)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(${target} PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endfunction()
+
+# -----------------------------------------------------------------------------
 #  Targets
 # -----------------------------------------------------------------------------
 add_subdirectory(src)
