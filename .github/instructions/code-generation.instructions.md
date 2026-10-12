@@ -64,27 +64,65 @@ place.
 
 ## The clang-tidy review
 
-Compiling is not the bar. The editor runs clangd with the checks in `.clang-tidy`, so
-whatever this review leaves behind is what the next reader meets in Problems.
+Compiling is not the bar. The editor runs clangd over `.clang-tidy` and
+`build/compile_commands.json`, which is exactly what the command line tool reads, so this
+review is the one that decides whether the next reader meets anything in Problems.
 
 ```bash
-clang-tidy -p build <the translation units the change touches> 1>/tmp/tidy.txt
-grep -E "^/[^ ]*:[0-9]+:[0-9]+: (warning|error):" /tmp/tidy.txt | grep -v /_deps/
+clang-tidy --use-color=0 -p build <the translation units the change touches> 1>/tmp/tidy.txt 2>/tmp/tidy.err
+grep -cE "^[^ ]+:[0-9]+:[0-9]+: (warning|error):" /tmp/tidy.txt
+grep -E "^[^ ]+:[0-9]+:[0-9]+: (warning|error):" /tmp/tidy.txt | grep -v /_deps/
+tail -2 /tmp/tidy.err
 ```
 
+- **`--use-color=0` is not optional.** `.clang-tidy` sets `UseColor: true`, so a plain run
+  wraps every line in escape sequences: nothing starts with a path any more, a filter
+  matching the shape of a diagnostic finds nothing, and a run with thirty findings reads
+  exactly like a clean one. The option takes a boolean, so it is `0` or `1`.
+- **The two streams carry different things.** The findings go to stdout. The progress
+  (`[1/3] Processing file ...`), the summary, and everything that went wrong go to stderr:
+  `Found compiler error(s)` and `Error while processing` are there, and so is the closing
+  `Suppressed N warnings (...)`, which is how a run that finished is told from one that
+  stopped. Capture both, and read both. Sending stderr to `/dev/null` hides a file that was
+  never analysed; reading only stderr hides every finding.
+- **The exit code is not the answer either.** Warnings do not fail the run: a pass with
+  hundreds of findings leaves ours at 0, and so does an empty one. The count and the
+  summary are the answer.
+- **Count before filtering, and open the log.** `grep -cE` says whether there is anything to
+  read at all. A filter that returns nothing is a claim about the filter until the file has
+  been looked at.
 - Run it over every translation unit the change touches, not only the new file. A finding
   normally lands in a header, or in whoever includes it.
-- **The diagnostics go to stdout.** Capturing stderr reads an empty file, and an empty file
-  looks exactly like a clean run.
-- Match the shape of a diagnostic, as above, rather than the word `warning`. Under every
-  finding clang-tidy echoes the offending source line, and one of those lines can carry the
-  word on its own: filtering by path alone then reports findings that are not there.
 - Keep the lines pointing into `src/`, `include/`, `tests/` or `examples/`. The rest is
-  nlohmann, Catch2 and the platform headers.
+  nlohmann, Catch2 and the platform headers, and it is most of the output: a review with
+  nothing to say prints thousands of lines about the dependencies.
 - A line reading `N warnings generated` is not the number of findings: it counts the whole
-  run, dependencies included. The findings are the `path:line:col: warning: [check]` lines.
+  run, dependencies included. A line of garbage, or one of the echoed source lines, is not
+  a finding either.
 - Search the output for `error`. clang-tidy calls errors things the compiler accepts, an
   unmatched `NOLINTBEGIN` among them, and when it finds one it stops analysing that file:
   `Found compiler error(s)` means the review did not finish.
 - Every finding that lands in our files is either fixed or answered with a reason. Not
   having noticed it is not a reason.
+- Two findings come back often enough to write down:
+  - `bugprone-unchecked-optional-access` after `REQUIRE(value.has_value())`: the analyzer
+    cannot see through the macro, so it reads the `value()` that follows as unchecked. Take
+    it into a reference under `// NOLINTNEXTLINE(bugprone-unchecked-optional-access)`, with
+    a comment saying that the assertion above is the check.
+  - `NOLINTBEGIN(...)` fits on one line or it does not work. A check list that goes past
+    100 columns is reflowed by clang-format, clang-tidy parses the marker per line, and a
+    list split in two comes back as `unmatched NOLINTBEGIN`: an error, and the suppression
+    for everything below it is gone. When the list is long, use per-line
+    `// NOLINTNEXTLINE(check)` instead of a block.
+
+## Keeping clangd honest
+
+- `.clangd` reads its flags from `build/compile_commands.json`, which exists because the
+  build exports it. After adding, moving or deleting a file, configure again before
+  believing the editor: a file that is not in the database gets guessed flags in Problems,
+  and `clang-tidy -p build <file>` falls back to a default command with a warning instead of
+  the real one.
+- When the editor and the command line disagree, the database is the stale one. Point
+  clangd at the build tree the change was compiled in, not at another one.
+- `.clangd` adds checks of its own on top of `.clang-tidy`, and never removes one the
+  review depends on. Passing the command line review is the stronger of the two.
