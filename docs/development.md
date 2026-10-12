@@ -45,6 +45,7 @@ tests/                 Catch2 tests, one directory per package
 examples/cli_harness/  a runnable client: reads .env, sends a prompt, prints the answer
 docs/                  these pages, the Doxyfile template and the site template
 .github/scripts/       helpers used by the pipeline, including the site builder
+.github/instructions/  the conventions of this repository, for editor tooling
 ```
 
 A header and its implementation share a path: `OpenAnima/Core/NPCBrain.h` is implemented by
