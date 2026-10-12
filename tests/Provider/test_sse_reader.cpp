@@ -104,3 +104,5 @@ TEST_CASE("SseReader stops when the sink says so", "[provider][sse]") {
     CHECK_FALSE(keepGoing);
     CHECK(seen == 1);
 }
+
+// NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

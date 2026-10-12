@@ -9,7 +9,6 @@
 #include <mutex>
 #include <string>
 #include <string_view>
-#include <utility>
 
 #include "OpenAnima/Errors.h"
 
@@ -103,6 +102,9 @@ size_t receiveBody(char* data, size_t size, size_t count, void* userdata) {
 
 /// Runs on libcurl's own timer, at least once a second, which is what makes a
 /// cancellation land even while the stream is silent and no body has arrived.
+/// The three counters libcurl also passes describe the transfer in progress, and
+/// this transport has no use for them: only the hook matters.
+// NOLINTNEXTLINE(readability-named-parameter)
 int reportProgress(void* userdata, curl_off_t, curl_off_t, curl_off_t, curl_off_t) {
     auto* exchange = static_cast<Exchange*>(userdata);
 

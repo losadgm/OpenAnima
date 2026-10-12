@@ -36,6 +36,12 @@ public:
     bool feed(std::string_view piece, const PayloadSink& onPayload);
 
 private:
+    /// Consumes one byte of the body.
+    /// @param character Byte to consume.
+    /// @param onPayload Sink the events go to.
+    /// @return false when the sink asked to stop.
+    bool consume(char character, const PayloadSink& onPayload);
+
     /// Handles a line that has just ended, and dispatches the event when it is blank.
     bool endLine(const PayloadSink& onPayload);
 

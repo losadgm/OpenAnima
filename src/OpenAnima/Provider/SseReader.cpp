@@ -1,5 +1,6 @@
 #include "OpenAnima/Provider/SseReader.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <string>
 #include <string_view>
@@ -35,24 +36,29 @@ std::string_view fieldName(const std::string& line) {
 }  // namespace
 
 bool SseReader::feed(std::string_view piece, const PayloadSink& onPayload) {
-    for (const char character : piece) {
-        if (m_swallowLineFeed) {
-            m_swallowLineFeed = false;
-            if (character == '\n') {
-                // The second half of a CRLF, not a line end of its own.
-                continue;
-            }
-        }
+    // Reading a body is walking its bytes in order and stopping at the first one the
+    // sink rejects, which is exactly what all_of does with a predicate that keeps
+    // state: the name is the only odd thing about using it here.
+    return std::all_of(piece.begin(), piece.end(), [this, &onPayload](char character) {
+        return consume(character, onPayload);
+    });
+}
 
-        if (character == '\r' || character == '\n') {
-            m_swallowLineFeed = character == '\r';
-            if (!endLine(onPayload)) {
-                return false;
-            }
-            continue;
+bool SseReader::consume(char character, const PayloadSink& onPayload) {
+    if (m_swallowLineFeed) {
+        m_swallowLineFeed = false;
+        if (character == '\n') {
+            // The second half of a CRLF, not a line end of its own.
+            return true;
         }
-        m_line += character;
     }
+
+    if (character == '\r' || character == '\n') {
+        m_swallowLineFeed = character == '\r';
+        return endLine(onPayload);
+    }
+
+    m_line += character;
     return true;
 }
 
