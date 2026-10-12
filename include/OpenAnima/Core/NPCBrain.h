@@ -4,7 +4,6 @@
 #pragma once
 
 #include <chrono>
-#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -97,8 +96,8 @@ public:
     /// event, and the answer is marked as cancelled. An id that is not the turn
     /// in flight is ignored, so a client can call this with an id it collected
     /// long ago without checking it first.
-    /// @param id Turn to stop, as returned by askAsync().
-    void cancel(RequestId id);
+    /// @param turnId Turn to stop, as returned by askAsync().
+    void cancel(RequestId turnId);
 
     /// Collects the next event of a turn, waiting for one to appear.
     ///
@@ -111,10 +110,10 @@ public:
     std::optional<Event> poll(std::chrono::milliseconds timeout = std::chrono::milliseconds{0});
 
     /// @return Whether a turn has been asked for and not collected yet.
-    bool isBusy() const noexcept;
+    [[nodiscard]] bool isBusy() const noexcept;
 
     /// @return The conversation so far, in chronological order.
-    const std::vector<ChatMessage>& history() const noexcept {
+    [[nodiscard]] const std::vector<ChatMessage>& history() const noexcept {
         return m_history;
     }
 

@@ -19,6 +19,7 @@ using OpenAnima::Core::ChatMessage;
 using OpenAnima::Core::Completion;
 using OpenAnima::Core::FinishReason;
 using OpenAnima::Core::Role;
+using OpenAnima::Core::TokenUsage;
 using OpenAnima::Provider::Call;
 using OpenAnima::Provider::RestProvider;
 using OpenAnima::Provider::RestProviderConfig;
@@ -56,8 +57,9 @@ std::vector<ChatMessage> oneTurn(const std::string& text) {
 
 }  // namespace
 
-// Catch2 assertions expand into do-while blocks and test cases are long by design, so
-// the rules written for production code do not fit here.
+// Catch2 assertions expand into do-while blocks, test cases are long by design, and the
+// analyzer cannot see through REQUIRE(), so an optional it has just seen checked still
+// looks unchecked to it. None of the three fits production code.
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
 
 TEST_CASE("RestProvider sends the chat-completions contract", "[provider]") {
@@ -192,9 +194,12 @@ TEST_CASE("RestProvider reads the metadata of the answer", "[provider]") {
     CHECK(completion.model == "gpt-4o-2024-08-06");
     CHECK(completion.finishReason == FinishReason::Stop);
     REQUIRE(completion.usage.has_value());
-    CHECK(completion.usage->promptTokens == 11);
-    CHECK(completion.usage->completionTokens == 7);
-    CHECK(completion.usage->totalTokens == 18);
+    // The assertion above is the check; the analyzer cannot see through it.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const TokenUsage& reported = completion.usage.value();
+    CHECK(reported.promptTokens == 11);
+    CHECK(reported.completionTokens == 7);
+    CHECK(reported.totalTokens == 18);
 }
 
 TEST_CASE("RestProvider tolerates an answer without metadata", "[provider]") {
@@ -297,8 +302,11 @@ TEST_CASE("RestProvider reads the usage of a chunk that carries only that", "[pr
 
     CHECK(completion.text == "ok");
     REQUIRE(completion.usage.has_value());
-    CHECK(completion.usage->promptTokens == 14);
-    CHECK(completion.usage->completionTokens == 3);
+    // The assertion above is the check; the analyzer cannot see through it.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const TokenUsage& reported = completion.usage.value();
+    CHECK(reported.promptTokens == 14);
+    CHECK(reported.completionTokens == 3);
 }
 
 TEST_CASE("RestProvider stops reading at the sentinel", "[provider]") {

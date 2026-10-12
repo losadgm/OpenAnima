@@ -49,13 +49,13 @@ public:
     using HttpTransport::post;
 
     /// @return The body of the last request, empty when nothing was sent.
-    std::string lastBody() const {
+    [[nodiscard]] std::string lastBody() const {
         return requests.empty() ? std::string{} : requests.back().body;
     }
 
     /// @param name Header name to look for in the last request.
     /// @return The header value, empty when the header was not sent.
-    std::string lastHeader(const std::string& name) const {
+    [[nodiscard]] std::string lastHeader(const std::string& name) const {
         if (requests.empty()) {
             return {};
         }

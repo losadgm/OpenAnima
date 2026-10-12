@@ -32,7 +32,7 @@ public:
     using IProvider::complete;
 
     /// @return The configuration this provider was created with.
-    const RestProviderConfig& config() const noexcept {
+    [[nodiscard]] const RestProviderConfig& config() const noexcept {
         return m_config;
     }
 

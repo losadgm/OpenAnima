@@ -23,8 +23,9 @@ using OpenAnima::Core::RequestId;
 using OpenAnima::Core::Role;
 using OpenAnima::TestSupport::FakeProvider;
 
-// Catch2 assertions expand into do-while blocks and test cases are long by design, so
-// the rules written for production code do not fit here.
+// Catch2 assertions expand into do-while blocks, test cases are long by design, and the
+// analyzer cannot see through REQUIRE(), so an optional it has just seen checked still
+// looks unchecked to it. None of the three fits production code.
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
 
 TEST_CASE("NPCBrain::ping reports a successful initialization", "[npcbrain]") {
@@ -109,13 +110,13 @@ TEST_CASE("NPCBrain::clearHistory drops the conversation and nothing else", "[np
 /// the test chooses instead of at a point it guesses.
 class Halt {
 public:
-    /// @param at Piece before which the backend waits.
-    explicit Halt(int at) : m_at(at) {}
+    /// @param blockAt Piece before which the backend waits.
+    explicit Halt(int blockAt) : m_blockAt(blockAt) {}
 
     /// Runs before each piece the backend produces.
     void operator()() {
         std::unique_lock<std::mutex> lock{m_mutex};
-        if (++m_calls != m_at) {
+        if (++m_calls != m_blockAt) {
             return;
         }
         m_cv.wait(lock, [this] { return m_open; });
@@ -133,7 +134,7 @@ public:
 private:
     std::mutex m_mutex;
     std::condition_variable m_cv;
-    int m_at;            ///< Call that waits.
+    int m_blockAt;       ///< Call that waits.
     int m_calls{0};      ///< Calls seen so far.
     bool m_open{false};  ///< Whether the waiting call may return.
 };
@@ -144,10 +145,13 @@ private:
 std::vector<Event> drain(NPCBrain& brain) {
     std::vector<Event> events;
     for (;;) {
-        std::optional<Event> event = brain.poll(std::chrono::milliseconds{5000});
-        REQUIRE(event.has_value());
-        const bool ends = event->kind == EventKind::Finished || event->kind == EventKind::Failed;
-        events.push_back(*event);
+        std::optional<Event> pending = brain.poll(std::chrono::milliseconds{5000});
+        REQUIRE(pending.has_value());
+        // The assertion above is the check; the analyzer cannot see through it.
+        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+        const Event& event = pending.value();
+        const bool ends = event.kind == EventKind::Finished || event.kind == EventKind::Failed;
+        events.push_back(event);
         if (ends) {
             return events;
         }
@@ -159,7 +163,7 @@ TEST_CASE("NPCBrain::askAsync reports a turn piece by piece", "[npcbrain]") {
     provider->deltas = {"under", "stood"};
     NPCBrain brain{provider};
 
-    const RequestId id = brain.askAsync("hi");
+    const RequestId turnId = brain.askAsync("hi");
     CHECK(brain.isBusy());
 
     const std::vector<Event> events = drain(brain);
@@ -172,7 +176,7 @@ TEST_CASE("NPCBrain::askAsync reports a turn piece by piece", "[npcbrain]") {
     CHECK(events[3].kind == EventKind::Finished);
     CHECK(events[3].completion.text == "understood");
     for (const Event& event : events) {
-        CHECK(event.id == id);
+        CHECK(event.id == turnId);
     }
 
     // The turn joins the conversation when its answer has been collected, not when
@@ -190,16 +194,19 @@ TEST_CASE("NPCBrain::askAsync stops a turn the caller abandons", "[npcbrain]") {
     provider->beforeEachDelta = [&halt] { halt(); };
     NPCBrain brain{provider};
 
-    const RequestId id = brain.askAsync("think");
+    const RequestId turnId = brain.askAsync("think");
 
     std::optional<Event> seen = brain.poll(std::chrono::milliseconds{5000});
-    while (seen.has_value() && seen->kind != EventKind::Delta) {
+    while (seen.has_value() && seen.value().kind != EventKind::Delta) {
         seen = brain.poll(std::chrono::milliseconds{5000});
     }
     REQUIRE(seen.has_value());
-    CHECK(seen->text == "half");
+    // The assertion above is the check; the analyzer cannot see through it.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const Event first = seen.value();
+    CHECK(first.text == "half");
 
-    brain.cancel(id);
+    brain.cancel(turnId);
     halt.release();
 
     const std::vector<Event> events = drain(brain);
@@ -219,14 +226,14 @@ TEST_CASE("NPCBrain::cancel ignores a turn that is not the one in flight", "[npc
     provider->deltas = {"understood"};
     NPCBrain brain{provider};
 
-    const RequestId id = brain.askAsync("hi");
-    brain.cancel(id + 1);  // Some other turn, from some other time.
+    const RequestId turnId = brain.askAsync("hi");
+    brain.cancel(turnId + 1);  // Some other turn, from some other time.
 
     const std::vector<Event> events = drain(brain);
     CHECK(events.back().completion.finishReason != FinishReason::Cancelled);
     CHECK(events.back().completion.text == "understood");
 
-    brain.cancel(id);  // Already collected: ignored, not an error.
+    brain.cancel(turnId);  // Already collected: ignored, not an error.
     CHECK_FALSE(brain.isBusy());
 }
 

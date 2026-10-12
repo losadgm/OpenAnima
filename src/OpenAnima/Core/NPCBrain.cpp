@@ -35,12 +35,12 @@ struct Job {
 };
 
 /// Builds an event with only what every kind of event carries.
-/// @param id Turn the event belongs to.
+/// @param turnId Turn the event belongs to.
 /// @param kind What happened.
 /// @return The event, with the fields of its kind still empty.
-Event makeEvent(RequestId id, EventKind kind) {
+Event makeEvent(RequestId turnId, EventKind kind) {
     Event event;
-    event.id = id;
+    event.id = turnId;
     event.kind = kind;
     return event;
 }
@@ -53,6 +53,8 @@ public:
     TurnWorker() = default;
     TurnWorker(const TurnWorker&) = delete;
     TurnWorker& operator=(const TurnWorker&) = delete;
+    TurnWorker(TurnWorker&&) = delete;  // Binds its threads to itself, so it stays put.
+    TurnWorker& operator=(TurnWorker&&) = delete;
 
     /// Stops the turn in flight and waits for the thread to end.
     ///
@@ -74,29 +76,29 @@ public:
             throw OpenAnimaError("a turn is already in flight: collect its events, or cancel it");
         }
 
-        const RequestId id = ++m_lastId;
-        m_current.store(id);
+        const RequestId turnId = ++m_lastId;
+        m_current.store(turnId);
         m_abandoned.store(0);
         m_busy = true;
 
         {
             std::lock_guard<std::mutex> lock{m_mutex};
-            m_job = Job{id, std::move(provider), std::move(messages)};
+            m_job = Job{turnId, std::move(provider), std::move(messages)};
         }
         if (!m_thread.joinable()) {
             m_thread = std::thread{&NPCBrain::TurnWorker::run, this};
         }
         m_jobReady.notify_one();
-        return id;
+        return turnId;
     }
 
     /// Asks the turn in flight to stop.
-    /// @param id Turn to stop as handed out by start(); other ids are ignored.
-    void cancel(RequestId id) {
-        if (id != m_current.load()) {
+    /// @param turnId Turn to stop as handed out by start(); other ids are ignored.
+    void cancel(RequestId turnId) {
+        if (turnId != m_current.load()) {
             return;
         }
-        m_abandoned.store(id);
+        m_abandoned.store(turnId);
     }
 
     /// @param timeout Longest wait for an event.
@@ -119,7 +121,7 @@ public:
     }
 
     /// @return Whether a turn was handed over and not collected yet.
-    bool busy() const noexcept {
+    [[nodiscard]] bool busy() const noexcept {
         return m_busy;
     }
 
@@ -151,13 +153,13 @@ private:
         push(makeEvent(job.id, EventKind::Started));
 
         OpenAnima::Provider::Call call;
-        call.onDelta = [this, id = job.id](std::string_view piece) {
-            Event event = makeEvent(id, EventKind::Delta);
+        call.onDelta = [this, turnId = job.id](std::string_view piece) {
+            Event event = makeEvent(turnId, EventKind::Delta);
             event.text = std::string{piece};
             push(std::move(event));
         };
-        call.keepGoing = [this, id = job.id] {
-            return !m_stopping.load() && m_abandoned.load() != id;
+        call.keepGoing = [this, turnId = job.id] {
+            return !m_stopping.load() && m_abandoned.load() != turnId;
         };
 
         try {
@@ -274,17 +276,17 @@ RequestId NPCBrain::askAsync(std::string prompt) {
     if (m_worker == nullptr) {
         m_worker = std::make_unique<TurnWorker>();
     }
-    const RequestId id = m_worker->start(std::move(request), m_provider);
+    const RequestId turnId = m_worker->start(std::move(request), m_provider);
 
     // Kept here, on the caller's thread, because the history belongs to it: the
     // turn is written down when its last event is collected, not when it ends.
     m_pendingPrompt = std::move(prompt);
-    return id;
+    return turnId;
 }
 
-void NPCBrain::cancel(RequestId id) {
+void NPCBrain::cancel(RequestId turnId) {
     if (m_worker != nullptr) {
-        m_worker->cancel(id);
+        m_worker->cancel(turnId);
     }
 }
 
