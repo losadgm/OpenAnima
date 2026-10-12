@@ -141,7 +141,7 @@ player works end to end; the other two drive the milestones below.
 ## v0.9.0 - Polish, profiling and examples
 
 - [~] Interactive CLI harness under `examples/`.
-  - `examples/cli_harness` is interactive, keeps the conversation across turns, streams the
+  - `examples/cliHarness` is interactive, keeps the conversation across turns, streams the
     answer as it arrives and loads `.env` on its own, but it drives a single agent with no
     world around it and it paints one line at a time.
 - [ ] Terminal client under `examples/`.

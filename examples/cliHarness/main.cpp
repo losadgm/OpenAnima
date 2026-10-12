@@ -35,7 +35,8 @@ void printAnswer(NPCBrain& brain, const std::string& prompt) {
 
 }  // namespace
 
-/// Minimal harness: sends prompts to a chat-completions endpoint and prints the replies.
+/// Minimal client: sends prompts to a chat-completions endpoint, prints the replies as they
+/// arrive, and keeps the conversation between turns.
 /// @return EXIT_SUCCESS on a completed session, 1 when a request failed, 2 when the
 /// environment is not configured.
 int main(int argc, char** argv) {
