@@ -61,10 +61,11 @@ two disagree, the roadmap wins and the issue is edited.
 
 1. Title in Conventional Commits. The repository merges with squash only, so the title is the
    commit that lands on the default branch.
-2. Body: the header of the title repeated as the first line, then `## What` (what changed and
-   why it is worth merging), `## How to check` (the commands to run and what a green result
-   looks like) and `## Notes` (only what the reviewer needs: an open question, a decision
-   taken, what the change deliberately leaves out).
+2. Body: `## What` (what changed and why it is worth merging), `## How to check` (the commands
+   to run and what a green result looks like) and `## Notes` (only what the reviewer needs: an
+   open question, a decision taken, what the change deliberately leaves out). The body starts
+   at `## What`: the title is already the header, and repeating it above the first section is a
+   line the reader has just read.
 3. Labels of the areas it works on.
 4. **A pull request does not carry a milestone.** Milestones count roadmap points, so a stage
    shows the state of its stage and not how many pull requests it took.
