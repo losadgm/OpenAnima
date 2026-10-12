@@ -1,7 +1,7 @@
 ---
 name: 'Code generation'
 description: 'Use when writing, changing or reviewing C++ code in this project: where a file goes, how it is named, how it is documented, when to assert and when to throw, and the checks a change passes before it is called done.'
-applyTo: ["**/*.h", "**/*.hpp", "**/*.cpp", "**/*.cxx"]
+applyTo: '**/*.h, **/*.hpp, **/*.cpp, **/*.cxx'
 ---
 
 # Generating code
