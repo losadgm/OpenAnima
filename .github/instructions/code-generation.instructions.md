@@ -64,6 +64,9 @@ place.
 5. The API reference builds, which is the `docs` job of the pipeline and not something the
    compiler can tell you about. See the last section.
 
+Once it passes, what reaches GitHub with it, and how the roadmap and the issues are kept in
+step, is in `github.instructions.md`.
+
 ## The clang-tidy review
 
 Compiling is not the bar. The editor runs clangd over `.clang-tidy` and
