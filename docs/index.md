@@ -33,9 +33,11 @@ The conversation is one of three channels an NPC uses:
 - An umbrella header, `OpenAnima/OpenAnima.h`, and a `makeNpc()` entry point that wires the
   default stack in one call.
 
-Asynchronous calls and a context strategy for long conversations are not here yet: `ask()`
-blocks until the whole answer has arrived, even when it has been reporting the answer piece by
-piece along the way. [The roadmap](roadmap.html) is what comes next.
+A call can be made without waiting for it, and then collected: `askAsync()` returns an id,
+`poll()` hands back what the turn reports while it runs, and `cancel()` stops it and keeps the
+text it had produced. What is still missing is a strategy for the context of a long
+conversation, which grows until it no longer fits and is not trimmed yet.
+[The roadmap](roadmap.html) is what comes next.
 
 ## A request, end to end
 

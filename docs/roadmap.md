@@ -59,10 +59,12 @@ player works end to end; the other two drive the milestones below.
     paint an answer while the model is still writing it. Under it, `HttpTransport` reports the
     status and the body as they land, an exchange can be abandoned through a short write, and
     what is bounded is the silence rather than the whole exchange.
-- [ ] Asynchronous core.
-  - `ask()` blocks the caller, and there is no thread, no future and no mutex anywhere in the
-    library. A game loop cannot afford that wait: this closes the promise the project makes
-    about not blocking the client, and it is the first thing to build.
+- [x] Asynchronous core.
+  - `NPCBrain::askAsync()` hands a turn to a thread of its own and reports it as events:
+    `poll()` collects them, `cancel()` stops a turn and keeps the text it had produced, and
+    `isBusy()` says whether one is still open. The conversation is written on the caller's
+    thread, when the last event of the turn is collected, so a client that draws an answer
+    still owns the order the turns are written in.
 
 ## v0.3.0 - Strict parsing (data structuring)
 
@@ -126,9 +128,10 @@ player works end to end; the other two drive the milestones below.
 
 - [ ] Global inference queue (avoid VRAM contention when several agents run at once).
 - [ ] Strict thread safety through mutexes and locks on shared resources and memory.
-  - `NPCBrain` is not thread-safe: two concurrent `ask()` calls on the same brain would corrupt
-    the history. The transport is closer, with one curl handle per call, `CURLOPT_NOSIGNAL` and
-    a `std::call_once` initialisation.
+  - A brain is driven from one thread: the asynchronous calls run a turn on a thread of the
+    library's own and hand its events to whoever collects them, but two threads calling
+    `ask()` on the same brain would still race on the history. The transport is closer, with
+    one curl handle per call, `CURLOPT_NOSIGNAL` and a `std::call_once` initialisation.
 - [ ] Barks system (filler lines while inference is slow).
 
 ## v0.9.0 - Polish, profiling and examples
@@ -159,11 +162,12 @@ player works end to end; the other two drive the milestones below.
 
 ## Next steps
 
-1. **The asynchronous core** (v0.2.0). It is isolated behind a single call to
-   `IProvider::complete()`, so it is cheap now and expensive later, and everything above it
-   makes the wait worse.
-2. **A bounded context** (v0.4.0). The history grows without limit, and the FIFO window is
+1. **A bounded context** (v0.4.0). The history grows without limit, and the FIFO window is
    already the planned fix. It is the first thing a long session hits.
+2. **One queue for every brain** (v0.8.0). Each brain runs its turn on a thread of its own
+   today, which is enough for a client driving one agent and not enough for a room of them
+   sharing one machine.
 3. **Drop `NPCBrain::ping()`** before the API freeze. It only proves that the library links.
 
-`CMakeLists.txt` carries version 0.1.5. It moves to 0.2.0 when the asynchronous core lands.
+`CMakeLists.txt` carries version 0.1.5. It moves to 0.2.0 once the asynchronous core has been
+verified against a real provider.
