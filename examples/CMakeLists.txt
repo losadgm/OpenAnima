@@ -23,10 +23,11 @@ if(OPENANIMA_BUILD_PROTOTYPES)
     # FTXUI, only for the prototype that tries it out: the point of the exercise is to
     # see what having it as a dependency of a client would cost.
     include(FetchContent)
+    set(OPENANIMA_FTXUI_TAG "v7.0.3" CACHE STRING "FTXUI revision the prototype builds against")
     FetchContent_Declare(
         ftxui
         GIT_REPOSITORY https://github.com/ArthurSonzogni/FTXUI.git
-        GIT_TAG        v7.0.3
+        GIT_TAG        ${OPENANIMA_FTXUI_TAG}
         GIT_SHALLOW    TRUE)
 
     set(FTXUI_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
