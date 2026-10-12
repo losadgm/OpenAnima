@@ -188,6 +188,32 @@ pre {
     line-height: 1.5;
 }
 
+/* Pandoc appends its own rules for highlighted code after this sheet, and the one
+   it writes for `.sourceCode` says `overflow: visible`. It is a class, so it beats
+   the `pre` above and a line longer than the column is painted outside the block
+   instead of scrolling inside it. Naming the class here is what keeps the box the
+   scroll container, and what keeps the background covering the whole block. */
+pre.sourceCode {
+    overflow-x: auto;
+    /* A bar that appears only while scrolling makes a line cut at the edge look like
+       the end of the line. Thin, and in the colour of the borders. */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+}
+
+pre.sourceCode::-webkit-scrollbar {
+    height: 10px;
+}
+
+pre.sourceCode::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+pre.sourceCode::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 5px;
+}
+
 pre code {
     background: none;
     border: 0;

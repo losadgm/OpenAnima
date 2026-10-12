@@ -106,6 +106,11 @@ python3, no packages to install.
 Note that pandoc does not run diagram tools. A diagram has to be committed as an image (SVG
 is preferred: it stays readable when zoomed) and linked from the Markdown.
 
+Pandoc appends its own stylesheet for highlighted code after `docs/site/style.css`, so a rule
+there and a rule here that select the same element are won by that one, and by class rather
+than by element. A rule that has to hold for code blocks names the class: `pre.sourceCode`,
+not `pre`. The horizontal scroll of a long line is one of those.
+
 ## Continuous integration
 
 | Workflow | What it checks |
