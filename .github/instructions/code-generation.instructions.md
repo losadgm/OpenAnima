@@ -61,6 +61,8 @@ place.
 2. `ctest --test-dir build --output-on-failure` green.
 3. `clang-format --dry-run --Werror <files>` silent. The style is in `.clang-format`.
 4. The clang-tidy review below, with nothing left open.
+5. The API reference builds, which is the `docs` job of the pipeline and not something the
+   compiler can tell you about. See the last section.
 
 ## The clang-tidy review
 
@@ -126,3 +128,38 @@ tail -2 /tmp/tidy.err
   clangd at the build tree the change was compiled in, not at another one.
 - `.clangd` adds checks of its own on top of `.clang-tidy`, and never removes one the
   review depends on. Passing the command line review is the stronger of the two.
+
+## The API reference is a check too
+
+The `docs` job builds the reference over `include/` with the Doxygen that ships in Ubuntu
+(1.9.8 today) and rewrites `WARN_AS_ERROR` to `YES` first, so a missing `@param`, a missing
+`@return` or a broken cross reference fails the pull request after the build and the tests
+have already gone green. Compiling says nothing about it.
+
+Where it bites is a member that is pure virtual in a base class and overloaded in the class
+being documented, which is both interfaces of this library:
+
+- `@copydoc Base::name` needs a name that appears once in `Base`. With more than one, it
+  resolves to none of them and the override comes out with its parameters undocumented.
+  Spelling the arguments, `@copydoc Base::name(const A&, const B&)`, is not resolved either.
+  Write the block out and give the override its own `@param`s.
+- `using Base::name;`, the way a derived class keeps a convenience overload reachable,
+  resolves to the abstract member the name was brought in from, and Doxygen then asks the
+  class to document parameters it never declares. Declaring the overload and forwarding to
+  the base reads the same and documents cleanly.
+
+To run the job's check before pushing, use the same version the runner installs:
+
+```bash
+curl -sL -o /tmp/doxygen.tar.gz \
+  https://github.com/doxygen/doxygen/releases/download/Release_1_9_8/doxygen-1.9.8.linux.bin.tar.gz
+tar xzf /tmp/doxygen.tar.gz -C /tmp
+PATH=/tmp/doxygen-1.9.8/bin:$PATH cmake -S . -B build-docs -G Ninja \
+  -DBUILD_TESTING=OFF -DOPENANIMA_BUILD_EXAMPLES=OFF -DOPENANIMA_ENABLE_DOCS=ON
+sed -i 's/^WARN_AS_ERROR *=.*/WARN_AS_ERROR = YES/' build-docs/Doxyfile
+PATH=/tmp/doxygen-1.9.8/bin:$PATH cmake --build build-docs --target docs
+```
+
+A newer local Doxygen is not the check: the warnings differ between releases, and a version
+that is happy says nothing about the runner. When the job fails, the log names the file and
+the line, and the run above reproduces it in seconds.
