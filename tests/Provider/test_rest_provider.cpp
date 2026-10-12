@@ -2,6 +2,7 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "OpenAnima/Core/Types.h"
@@ -230,6 +231,125 @@ TEST_CASE("RestProvider tolerates a null finish reason", "[provider]") {
     RestProvider provider{localConfig(), transport};
 
     CHECK(provider.complete(oneTurn("hi")).finishReason == FinishReason::Unknown);
+}
+
+TEST_CASE("RestProvider assembles a streamed answer and reports every piece", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    // The pieces land in separate pieces of the body, which is the shape a socket
+    // hands over and the one a reader written against whole lines gets wrong.
+    transport->chunks = {
+        "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\",\"content\":\"\"}}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"Halt\"}}]}\n\n",
+        "data: {\"choices\":[{\"delta\":{\"content\":\"!\"}}]}\n\ndata: "
+        "{\"choices\":[{\"delta\":{},",
+        "\"finish_reason\":\"stop\"}],\"model\":\"qwen2.5:7b\"}\n\ndata: [DONE]\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    std::vector<std::string> pieces;
+    const Completion completion = provider.complete(
+        oneTurn("hi"), [&pieces](std::string_view piece) { pieces.emplace_back(piece); });
+
+    CHECK(completion.text == "Halt!");
+    CHECK(completion.model == "qwen2.5:7b");
+    CHECK(completion.finishReason == FinishReason::Stop);
+    REQUIRE(pieces.size() == 2);
+    CHECK(pieces[0] == "Halt");
+    CHECK(pieces[1] == "!");
+}
+
+TEST_CASE("RestProvider asks for a stream only when the caller wants the pieces", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->response = {200, completionBody("hello there")};
+    RestProvider provider{localConfig(), transport};
+
+    SECTION("without a sink") {
+        provider.complete(oneTurn("hi"));
+
+        const nlohmann::json body = nlohmann::json::parse(transport->lastBody());
+        CHECK(body["stream"] == false);
+        CHECK_FALSE(body.contains("stream_options"));
+        CHECK(transport->lastHeader("Accept") == "application/json");
+    }
+
+    SECTION("with a sink") {
+        provider.complete(oneTurn("hi"), [](std::string_view) {});
+
+        const nlohmann::json body = nlohmann::json::parse(transport->lastBody());
+        CHECK(body["stream"] == true);
+        // Without this the answer comes back with no token usage at all.
+        CHECK(body["stream_options"]["include_usage"] == true);
+        CHECK(transport->lastHeader("Accept") == "text/event-stream");
+    }
+}
+
+TEST_CASE("RestProvider reads the usage of a chunk that carries only that", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    // The chunk that closes a stream reports an empty choices array and the usage, and
+    // it arrives after the finish reason.
+    transport->chunks = {
+        "data: {\"choices\":[{\"delta\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}\n\n",
+        "data: {\"choices\":[],\"usage\":{\"prompt_tokens\":14,\"completion_tokens\":3}}\n\n",
+        "data: [DONE]\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    const Completion completion = provider.complete(oneTurn("hi"), [](std::string_view) {});
+
+    CHECK(completion.text == "ok");
+    REQUIRE(completion.usage.has_value());
+    CHECK(completion.usage->promptTokens == 14);
+    CHECK(completion.usage->completionTokens == 3);
+}
+
+TEST_CASE("RestProvider stops reading at the sentinel", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    // Anything after the sentinel is not part of the answer, and a server that keeps
+    // talking after it must not be believed.
+    transport->chunks = {"data: {\"choices\":[{\"delta\":{\"content\":\"ok\"}}]}\n\n",
+                         "data: [DONE]\n\n",
+                         "data: {\"choices\":[{\"delta\":{\"content\":\" and more\"}}]}\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    const Completion completion = provider.complete(oneTurn("hi"), [](std::string_view) {});
+
+    CHECK(completion.text == "ok");
+}
+
+TEST_CASE("RestProvider reports an error streamed in the middle of an answer", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->chunks = {"data: {\"choices\":[{\"delta\":{\"content\":\"half\"}}]}\n\n",
+                         "data: {\"error\":{\"message\":\"rate limit\"}}\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    std::vector<std::string> pieces;
+    CHECK_THROWS_AS(
+        provider.complete(oneTurn("hi"),
+                          [&pieces](std::string_view piece) { pieces.emplace_back(piece); }),
+        ProviderError);
+    // What arrived before the failure is real and stays with the caller.
+    REQUIRE(pieces.size() == 1);
+    CHECK(pieces[0] == "half");
+}
+
+TEST_CASE("RestProvider refuses a streamed answer that is not JSON", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->chunks = {"data: not json at all\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    CHECK_THROWS_AS(provider.complete(oneTurn("hi"), [](std::string_view) {}), ParseError);
+}
+
+TEST_CASE("RestProvider reports the status of a rejected stream", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->response = {401, R"({"error":{"message":"bad key"}})"};
+    RestProvider provider{localConfig("wrong"), transport};
+
+    try {
+        provider.complete(oneTurn("hi"), [](std::string_view) {});
+        FAIL("the call should have reported the status");
+    } catch (const ProviderError& error) {
+        CHECK(error.statusCode() == 401);
+        CHECK(std::string(error.what()).find("bad key") != std::string::npos);
+    }
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

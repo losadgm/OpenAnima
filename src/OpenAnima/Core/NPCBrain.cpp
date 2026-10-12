@@ -32,6 +32,10 @@ void NPCBrain::setSystemPrompt(std::string prompt) {
 }
 
 Completion NPCBrain::ask(const std::string& prompt) {
+    return ask(prompt, Provider::DeltaSink{});
+}
+
+Completion NPCBrain::ask(const std::string& prompt, const Provider::DeltaSink& onDelta) {
     assert(!prompt.empty() && "ask() requires a non-empty prompt");
 
     if (m_provider == nullptr) {
@@ -48,7 +52,7 @@ Completion NPCBrain::ask(const std::string& prompt) {
 
     // The answer is fetched before the history is modified, so a failed call leaves the
     // conversation exactly as it was and the client can retry the same turn.
-    const Completion answer = m_provider->complete(request);
+    const Completion answer = m_provider->complete(request, onDelta);
 
     m_history.push_back(ChatMessage{Role::User, prompt});
     m_history.push_back(ChatMessage{Role::Assistant, answer.text});

@@ -1,6 +1,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <string>
+#include <string_view>
 
 // One include: the umbrella re-exports the whole public API.
 #include "OpenAnima/OpenAnima.h"
@@ -22,6 +23,14 @@ std::string joinArguments(int argc, char** argv) {
         prompt += argv[index];
     }
     return prompt;
+}
+
+/// Sends a prompt and prints the answer while the provider is still producing it.
+/// @param brain Npc to talk to.
+/// @param prompt Text to send.
+void printAnswer(NPCBrain& brain, const std::string& prompt) {
+    brain.ask(prompt, [](std::string_view piece) { std::cout << piece << std::flush; });
+    std::cout << '\n';
 }
 
 }  // namespace
@@ -69,7 +78,7 @@ int main(int argc, char** argv) {
     const std::string prompt = joinArguments(argc, argv);
     if (!prompt.empty()) {
         try {
-            std::cout << brain.ask(prompt).text << '\n';
+            printAnswer(brain, prompt);
         } catch (const OpenAnima::OpenAnimaError& error) {
             std::cerr << "error: " << error.what() << '\n';
             return 1;
@@ -89,7 +98,7 @@ int main(int argc, char** argv) {
             continue;
         }
         try {
-            std::cout << brain.ask(line).text << '\n';
+            printAnswer(brain, line);
         } catch (const OpenAnima::OpenAnimaError& error) {
             std::cerr << "error: " << error.what() << '\n';
         }

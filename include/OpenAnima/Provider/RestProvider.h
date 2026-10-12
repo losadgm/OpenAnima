@@ -25,8 +25,11 @@ public:
                  std::shared_ptr<OpenAnima::Http::HttpTransport> transport);
 
     /// @copydoc IProvider::complete
-    OpenAnima::Core::Completion
-    complete(const std::vector<OpenAnima::Core::ChatMessage>& messages) override;
+    OpenAnima::Core::Completion complete(const std::vector<OpenAnima::Core::ChatMessage>& messages,
+                                         const DeltaSink& onDelta) override;
+
+    /// Keeps the convenience overload of the interface reachable through this type.
+    using IProvider::complete;
 
     /// @return The configuration this provider was created with.
     const RestProviderConfig& config() const noexcept {
@@ -34,6 +37,13 @@ public:
     }
 
 private:
+    /// Sends the request and builds the answer out of the chunks of the stream.
+    /// @param request Fully built streamed request.
+    /// @param onDelta Called with every piece of the answer as it arrives.
+    /// @return The assembled answer.
+    OpenAnima::Core::Completion readStream(const OpenAnima::Http::HttpRequest& request,
+                                           const DeltaSink& onDelta);
+
     RestProviderConfig m_config;
     std::shared_ptr<OpenAnima::Http::HttpTransport> m_transport;
 };

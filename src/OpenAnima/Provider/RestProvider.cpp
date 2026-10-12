@@ -6,11 +6,13 @@
 #include <nlohmann/json.hpp>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "OpenAnima/Core/Completion.h"
 #include "OpenAnima/Errors.h"
+#include "OpenAnima/Provider/SseReader.h"
 
 namespace OpenAnima::Provider {
 
@@ -57,20 +59,29 @@ std::string snippet(const std::string& payload) {
 }
 
 /// Marshals the conversation into the chat-completions request body.
+/// @param config Settings of the call.
+/// @param messages Conversation to send.
+/// @param streamed Whether the answer is asked for as a stream of chunks.
 std::string buildRequestBody(const RestProviderConfig& config,
-                             const std::vector<ChatMessage>& messages) {
+                             const std::vector<ChatMessage>& messages, bool streamed) {
     nlohmann::json conversation = nlohmann::json::array();
     for (const ChatMessage& message : messages) {
         conversation.push_back({{"role", roleName(message.role)}, {"content", message.content}});
     }
 
-    const nlohmann::json body = {
+    nlohmann::json body = {
         {"model", config.model},
         {"messages", conversation},
         {"temperature", config.temperature},
         {"max_tokens", config.maxTokens},
-        {"stream", false},
+        {"stream", streamed},
     };
+    if (streamed) {
+        // Without this the answer comes back without its token usage, which the other
+        // mode reports. A server that does not know the field ignores it, and then
+        // reports none, which the contract allows.
+        body["stream_options"] = {{"include_usage", true}};
+    }
     return body.dump();
 }
 
@@ -154,6 +165,80 @@ Completion parseCompletion(const std::string& payload) {
     return completion;
 }
 
+/// The sentinel a chat-completions stream ends with. It is not part of the event
+/// format: it is how this contract says the answer is complete.
+constexpr std::string_view DoneSentinel = "[DONE]";
+
+/// @return Whether the payload is the sentinel, allowing for stray blanks around it.
+bool isDoneSentinel(std::string_view payload) {
+    while (!payload.empty() && (payload.back() == ' ' || payload.back() == '\t')) {
+        payload.remove_suffix(1);
+    }
+    return payload == DoneSentinel;
+}
+
+/// Reads one chunk of a streamed answer and folds it into the answer being assembled.
+///
+/// A chunk can arrive with an empty delta, with a delta carrying no text, with the
+/// finish reason on its own, or carrying nothing but the token usage. All four are
+/// normal and none of them is a failure.
+/// @param payload JSON of one chunk.
+/// @param statusCode Status of the exchange, carried by any error the chunk reports.
+/// @param completion Answer being assembled.
+/// @param onDelta Called with the text of the chunk, when it carries any.
+/// @throws ProviderError when the chunk reports an error.
+/// @throws ParseError when the chunk is not JSON, or carries no choices at all.
+void applyChunk(const std::string& payload, long statusCode, Completion& completion,
+                const DeltaSink& onDelta) {
+    nlohmann::json parsed;
+    try {
+        parsed = nlohmann::json::parse(payload);
+    } catch (const nlohmann::json::exception& error) {
+        throw ParseError("provider streamed a chunk that is not JSON: " +
+                         std::string(error.what()));
+    }
+
+    if (parsed.contains("error")) {
+        throw ProviderError("provider reported an error: " + snippet(parsed["error"].dump()),
+                            statusCode);
+    }
+    if (parsed.contains("model") && parsed["model"].is_string()) {
+        completion.model = parsed["model"].get<std::string>();
+    }
+    // Only a chunk that reports usage may overwrite it: the rest carry a null.
+    if (const std::optional<TokenUsage> usage = parseUsage(parsed); usage.has_value()) {
+        completion.usage = usage;
+    }
+
+    if (!parsed.contains("choices") || !parsed["choices"].is_array()) {
+        throw ParseError("provider streamed a chunk with no 'choices' array: " + snippet(payload));
+    }
+    if (parsed["choices"].empty()) {
+        // The chunk that carries only the token usage reports an empty array.
+        return;
+    }
+
+    const nlohmann::json& choice = parsed["choices"][0];
+    if (choice.contains("finish_reason") && choice["finish_reason"].is_string()) {
+        completion.finishReason = toFinishReason(choice["finish_reason"].get<std::string>());
+    }
+
+    const bool hasText = choice.contains("delta") && choice["delta"].contains("content") &&
+                         choice["delta"]["content"].is_string();
+    if (!hasText) {
+        return;
+    }
+    const std::string text = choice["delta"]["content"].get<std::string>();
+    if (text.empty()) {
+        // The first chunk of a stream announces the role with no text in it.
+        return;
+    }
+    completion.text += text;
+    if (onDelta) {
+        onDelta(text);
+    }
+}
+
 }  // namespace
 
 RestProvider::RestProvider(RestProviderConfig config,
@@ -164,17 +249,26 @@ RestProvider::RestProvider(RestProviderConfig config,
     assert(m_transport != nullptr && "RestProvider requires a transport");
 }
 
-Completion RestProvider::complete(const std::vector<ChatMessage>& messages) {
+Completion RestProvider::complete(const std::vector<ChatMessage>& messages,
+                                  const DeltaSink& onDelta) {
     assert(!messages.empty() && "complete() requires at least one message");
+
+    // A caller that wants the pieces gets a streamed answer; one that wants it whole
+    // gets a single response, which is also the mode every server reports usage in.
+    const bool streamed = static_cast<bool>(onDelta);
 
     HttpRequest request;
     request.url = m_config.chatCompletionsUrl();
-    request.body = buildRequestBody(m_config, messages);
+    request.body = buildRequestBody(m_config, messages, streamed);
     request.timeoutSeconds = m_config.timeoutSeconds;
     request.headers.emplace_back("Content-Type", "application/json");
-    request.headers.emplace_back("Accept", "application/json");
+    request.headers.emplace_back("Accept", streamed ? "text/event-stream" : "application/json");
     if (!m_config.apiKey.empty()) {
         request.headers.emplace_back("Authorization", "Bearer " + m_config.apiKey);
+    }
+
+    if (streamed) {
+        return readStream(request, onDelta);
     }
 
     const HttpResponse response = m_transport->post(request);
@@ -184,6 +278,42 @@ Completion RestProvider::complete(const std::vector<ChatMessage>& messages) {
                             response.statusCode);
     }
     return parseCompletion(response.body);
+}
+
+Completion RestProvider::readStream(const HttpRequest& request, const DeltaSink& onDelta) {
+    Completion completion;
+    long statusCode = 0;
+    std::string errorBody;
+    SseReader reader;
+
+    Http::ResponseObserver observer;
+    observer.onStatus = [&statusCode](long status) { statusCode = status; };
+    observer.onBody = [&](std::string_view piece) -> bool {
+        if (statusCode < 200 || statusCode >= 300) {
+            // The body of a rejected call is not a stream: keep it whole so the error
+            // can say what the server objected to.
+            errorBody.append(piece);
+            return true;
+        }
+        return reader.feed(piece, [&](std::string_view payload) {
+            if (isDoneSentinel(payload)) {
+                // Nothing follows the sentinel, so the exchange can end here instead of
+                // waiting for the server to close a connection it is done with.
+                return false;
+            }
+            applyChunk(std::string(payload), statusCode, completion, onDelta);
+            return true;
+        });
+    };
+
+    m_transport->post(request, observer);
+
+    if (statusCode < 200 || statusCode >= 300) {
+        throw ProviderError("provider answered with HTTP " + std::to_string(statusCode) + ": " +
+                                snippet(errorBody),
+                            statusCode);
+    }
+    return completion;
 }
 
 }  // namespace OpenAnima::Provider

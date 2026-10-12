@@ -54,6 +54,16 @@ public:
     /// @throws OpenAnimaError when no backend is attached or the call fails.
     Completion ask(const std::string& prompt);
 
+    /// Sends a prompt and reports the answer while it is being produced.
+    /// The history is touched the same way ask() touches it, and only once the call
+    /// has succeeded, so a caller that drew half an answer and then failed still has
+    /// the conversation it had before.
+    /// @param prompt Text produced by the player or by the client application.
+    /// @param onDelta Called with every piece of the answer as it arrives, in order.
+    /// @return The assembled answer, and why generation stopped.
+    /// @throws OpenAnimaError when no backend is attached or the call fails.
+    Completion ask(const std::string& prompt, const Provider::DeltaSink& onDelta);
+
     /// @return The conversation so far, in chronological order.
     const std::vector<ChatMessage>& history() const noexcept {
         return m_history;
