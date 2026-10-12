@@ -18,6 +18,8 @@ The conversation is one of three channels an NPC uses:
 | Other NPCs | shared rooms, and a ledger of who said what | planned, v0.6.0 |
 
 - [Development guide](development.html) - build it, test it, and how these pages are built.
+- [Harnesses](harness.html) - the two clients that ship with the library, and what the console
+  one is meant to be.
 - [API reference](api/index.html) - the classes, in Doxygen form, generated from the headers.
 
 ## What it does today
