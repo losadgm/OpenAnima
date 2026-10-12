@@ -28,7 +28,7 @@ player works end to end; the other two drive the milestones below.
     shared at the root. A public header and its implementation share a path, so
     `Core/NPCBrain.h` is implemented by `Core/NPCBrain.cpp`.
 - [x] Base layout and a base unit test suite (Catch2).
-  - 25 test cases and not one of them touches the network.
+  - The suite is Catch2, and no case in it touches the network.
 - [x] Editor and local tooling.
   - clang-format, clang-tidy, clangd, build and debug configurations, and a compile database
     that both tools read.
