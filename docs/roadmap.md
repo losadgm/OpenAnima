@@ -244,6 +244,15 @@ place so the ideas are not lost.
   interface is chat only today), an index that stays in process so the library stays light, and
   a retrieval policy, which is what separates an NPC that remembers from a search box. A summary
   of the window may be enough before any of that is needed.
+- **A turn that thinks in rounds.** One request is one reply today: the model answers once and the
+  turn is closed. A deeper conclusion sometimes needs a second pass, either to look at its own
+  answer again or, more usefully, to go and get something it did not have - its memory, the world,
+  another NPC - and think again with it in hand. Reasoning over the same context reorders what is
+  already there rather than finding anything new, so the round earns its cost when it brings an
+  observation back, which is the world of `v0.5.0` and the tools behind `Role::Tool`. What is
+  missing is the stop condition - a number of rounds, a word from the model itself, or a judge -
+  and that is what has kept it out of the stages. What it cannot change: intermediary rounds are
+  not turns, they do not enter the history, and only the last reply is kept.
 
 `CMakeLists.txt` carries version 0.2.0: the milestone is closed, with the asynchronous core
 verified against a real provider before the number moved.
