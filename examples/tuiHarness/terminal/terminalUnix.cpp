@@ -190,6 +190,10 @@ private:
         if (sequence == "6~") {
             return Key{Key::Kind::PageDown, static_cast<char>(0)};
         }
+        // Control and Return together, as the kitty protocol and xterm spell it.
+        if (sequence == "13;5u" || sequence == "27;5;13~") {
+            return Key{Key::Kind::CtrlEnter, static_cast<char>(0)};
+        }
         return Key{Key::Kind::Unknown, static_cast<char>(0)};
     }
 

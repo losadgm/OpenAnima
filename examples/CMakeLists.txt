@@ -20,14 +20,18 @@ open_anima_enable_warnings(open_anima_cli)
 # -----------------------------------------------------------------------------
 add_executable(open_anima_tui
     tuiHarness/main.cpp
-    tuiHarness/screen.cpp
-    tuiHarness/terminalUnix.cpp
-    tuiHarness/terminalWindows.cpp
+    tuiHarness/app/commands.cpp
+    tuiHarness/app/model.cpp
+    tuiHarness/screen/render.cpp
+    tuiHarness/screen/text.cpp
+    tuiHarness/terminal/terminalUnix.cpp
+    tuiHarness/terminal/terminalWindows.cpp
     cliHarness/dotenv.cpp)
 
 target_include_directories(open_anima_tui
     PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/cliHarness)
+        ${CMAKE_CURRENT_SOURCE_DIR}/cliHarness
+        ${CMAKE_CURRENT_SOURCE_DIR}/tuiHarness)
 
 target_link_libraries(open_anima_tui
     PRIVATE

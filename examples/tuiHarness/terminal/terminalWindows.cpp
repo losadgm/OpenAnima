@@ -1,5 +1,3 @@
-#include "terminal.h"
-
 #if defined(_WIN32)
 
 #ifndef NOMINMAX
@@ -19,6 +17,8 @@
 #include <string>
 #include <vector>
 #include <windows.h>
+
+#include "terminal.h"
 
 namespace OpenAnimaTui {
 
@@ -131,6 +131,10 @@ private:
             const unsigned char controlByte =
                 static_cast<unsigned char>(record.wVirtualKeyCode - 'A' + 1);
             return controlKey(controlByte);
+        }
+
+        if (control && record.wVirtualKeyCode == VK_RETURN) {
+            return Key{Key::Kind::CtrlEnter, static_cast<char>(0)};
         }
 
         switch (record.wVirtualKeyCode) {

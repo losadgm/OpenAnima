@@ -148,10 +148,11 @@ player works end to end; the other two drive the milestones below.
   - `examples/tuiHarness`, designed in [the harnesses page](harness.html): a full screen with
     a conversation of its own to scroll, a prompt pinned at the bottom with its command
     palette, and a world of NPCs reached by identifier with `/create`, `/enter`, `/npcs` and
-    `/leave`. Built over its own terminal layer (Unix termios, Windows console) and with the
-    screen logic testable on its own. What is left is the client test over a pseudo-terminal
-    inside the suite, and letting several NPCs share one conversation, which needs the library
-    to carry it.
+    `/leave`. Built over its own terminal layer (Unix termios, Windows console) and split into
+    the pure parts (`app/` for the model and the keys, `screen/` for the rendering) and the
+    shell that runs them. What is left is the client test over a pseudo-terminal inside the
+    suite, and letting several NPCs share one conversation, which needs the library to carry
+    it.
 - [ ] Logging hook with levels (Trace, Debug, Warn, Error).
   - The only output today is a stderr note from the harness and the exception messages. A
     library should let the host application decide where the logs go.

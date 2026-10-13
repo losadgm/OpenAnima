@@ -56,22 +56,31 @@ what is happening and what can be pressed.
           never came back for it. Aye, that one
           cost him eleven silver.
 
-  ⠹ working 2.4s   esc to cancel
+  /create
+  /enter
+  /npcs
 
-❯ what about the price?_
-  mock   ask something   /help for keys
+        mock   ask something   /help for keys
+
+❱ /c_
 ```
+
+The commands are listed while one is being typed, up to six of them, with the selected one in
+the accent colour, and the list is cut rather than pushed around when the window is short.
 
 - The client owns the screen: it runs in the alternate screen, paints the whole window on a
   change, and hands the terminal back on the way out.
 - The conversation lives in a viewport of its own. Page up and page down move it, and the
   prompt stays where it is, pinned under the transcript.
-- The prompt is the fixed part: the draft is drawn there, with the command in its own colour
-  while one is being typed, and the commands that complete it floating above.
+- The prompt is the fixed part: the draft is drawn on a panel of its own, with the command in
+  its own colour while one is being typed, and the caret never leaves it.
+- The commands that complete what is being typed float above the prompt on a lighter panel,
+  with the selected one in the accent colour. The arrows walk them, and tab takes the one that
+  is selected.
 - Each role has its own colour and its own prefix, so a long session is readable at a glance.
 - The look borrows the OpenCode theme: a purple accent for the prompt marker and the spinner,
   a warm peach for the persona, muted gray for the quiet text, and the same braille spinner.
-- The hint line carries the state: which model answered, how long the turn has been running,
+- The status line carries the state: which model answered, how long the turn has been running,
   and the key that stops it.
 
 ### Keys
@@ -79,14 +88,18 @@ what is happening and what can be pressed.
 | Key | What it does |
 | --- | --- |
 | Enter | Sends the draft |
-| Ctrl+J, or a trailing `\` | Starts a new line instead of sending |
-| Tab | Completes the command being typed |
+| Ctrl+Enter, Ctrl+J, or a trailing `\` | Starts a new line instead of sending |
+| Tab | Completes the selected command |
+| Up, Down | Walks the command hints while they are showing, and the prompts of this scope otherwise |
 | Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Left, Right | Moves the cursor in the draft |
-| Up, Down | Walks the prompts of this session |
+| Ctrl+P, Ctrl+N | Walks the prompts of this scope |
 | Page up, Page down | Scrolls the conversation |
 | Esc, Ctrl+C | Cancels the turn in flight, keeping what it had produced |
 | Ctrl+C with nothing in flight | Clears the draft, and leaves when it is already empty |
 | Ctrl+D | Leaves |
+
+A tab is never written into the draft. It counts as one column to the client and as up to
+eight to the terminal, and the two disagreeing is what tore the row apart.
 
 ### The world
 
@@ -104,37 +117,55 @@ talk to:
 | `/quit` | Leaves |
 
 An NPC has no name yet, only the number it was given when it was made, so it is shown as
-`npc 1`, `npc 2`. The persona is the description it was created from. NPCs cannot talk to
-each other: that needs the library to carry a conversation between several of them, which is
-not there yet.
+`npc 1`, `npc 2`. The persona is the description it was created from. Any number of NPCs can
+be made and each one keeps its conversation, reachable by id. NPCs cannot talk to each other:
+that needs the library to carry a conversation between several of them, which is not there yet.
+
+Each scope has its own prompt history: inside an NPC the arrows walk what was typed to that
+NPC, and in the lobby what was typed outside. A command that would leave a turn behind waits
+for the answer, and says so.
 
 ### How it is built
 
 - **A terminal layer of its own**, with two implementations: raw mode and ANSI sequences on
   Unix (termios), and the console API with virtual terminal sequences on Windows. Windows is a
-  target from the start rather than a port to attempt later. It is `terminal.h` with
-  `terminalUnix.cpp` and `terminalWindows.cpp`, and it is where the alternate screen and the
-  size of the window come from.
+  target from the start rather than a port to attempt later. It is `terminal/terminal.h` with
+  `terminal/terminalUnix.cpp` and `terminal/terminalWindows.cpp`, and it is where keys, the
+  size of the window and the alternate screen come from.
+- **The rest is a functional core and an imperative shell.** Under `app/` the model, the
+  commands and the keys are pure: `update(model, key)` returns what to do as a list of
+  effects, and `applyEvent(model, event)` folds what came back from the provider into the same
+  model. Under `screen/` the rendering is pure too: `render(model, width, height)` returns the
+  rows, the position of the caret and nothing else. `main.cpp` is the shell, and it is the
+  only place that knows about files, sockets and clocks: it runs the effects against the
+  brains, drains the events, and paints.
 - **The draw loop is driven by the events of a turn.** `askAsync()` and `poll()` already hand
   the text over as it arrives, so the screen changes when something happens and the loop never
-  blocks. `cancel()` is what the interrupting keys call.
-- **The screen logic knows nothing about terminals.** What to draw, where the caret goes, what
-  a key means and which commands complete what is being typed are pieces that take a width, a
-  height and a string and return rows, which is what makes them testable without a terminal.
-  It is `screen.h`.
-- **The world lives in the client.** Each NPC is a `NPCBrain` with a persona and its own
-  transcript; the conversation being shown is swapped in and out on `/enter` and `/leave`. The
+  blocks. `cancel()` is what the interrupting keys ask for, through an effect.
+- **The world lives in the shell.** Each NPC is a `NPCBrain` with a persona and its own
+  transcript; the model holds the ids, the transcripts and which one is being talked to. The
   library does not need to know that several NPCs exist until they have to speak to each
   other.
 - **Two clients, one configuration**: the same environment, the same `.env` loader and the
   same provider as the command line.
 
+### Packets
+
+| Where | What is in it |
+| --- | --- |
+| `app/` | The model, the commands and the keys: what a key does, and what to ask the shell for |
+| `screen/` | Text, colours and the render of a model into rows |
+| `terminal/` | Raw mode, ANSI sequences, key decoding and the size of the window |
+| `main.cpp` | The shell: brains, effects, events, and the paint loop |
+
 ### How it is checked
 
-- The pieces: layout, key decoding and the transcript model, with the terminal replaced by a
-  fake.
-- The client itself: a pseudo-terminal in the suite that sends keys and reads what comes out.
-  PTY on Unix and ConPTY on Windows, so the same test runs on all three platforms.
+- The pieces: `tests/tui/` covers the text (columns, wrapping, cutting), the commands
+  (matching and completing), the model (every key, the world, the events) and the screen
+  (panels, hints, viewport, caret). No terminal is involved.
+- The client itself: driven over a pseudo-terminal, sending keys and reading what comes back,
+  with a throwaway server that streams the answer word by word. PTY on Unix and ConPTY on
+  Windows is where this is going, so the same test runs on all three platforms.
 
 ### The plan
 
@@ -150,4 +181,5 @@ not there yet.
 
 Steps 1 to 3 are done, and the piece tests of step 4 are in the suite. What is left is the
 in-suite client test over a pseudo-terminal, so the client itself is exercised by the same
-command that runs the rest.
+command that runs the rest. The client is painted whole on every change, which is fine for a
+conversation and something to revisit when the screen grows.

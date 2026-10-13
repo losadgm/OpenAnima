@@ -22,6 +22,7 @@ struct Key {
         None,        ///< Nothing was pressed before the timeout.
         Character,   ///< A printable character, in `character`.
         Enter,       ///< Return.
+        CtrlEnter,   ///< Control and Return together: a new line, never a send.
         Backspace,   ///< Delete the character before the cursor.
         Tab,         ///< The tab key.
         Escape,      ///< Escape.
