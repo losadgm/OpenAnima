@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "OpenAnima/Core/Completion.h"
+#include "OpenAnima/Core/ResponseFormat.h"
 #include "OpenAnima/Core/Types.h"
 
 namespace OpenAnima::Provider {
@@ -19,9 +20,10 @@ namespace OpenAnima::Provider {
 /// some servers report the token usage only when the answer is not streamed.
 using DeltaSink = std::function<void(std::string_view text)>;
 
-/// One call to a provider: where the pieces go, and how to abandon it.
+/// One call to a provider: what is asked for, where the pieces go, and how to
+/// abandon it.
 ///
-/// The two live together because a caller that paints an answer as it arrives is
+/// The three live together because a caller that paints an answer as it arrives is
 /// also the caller that wants to be able to stop it half way, and because a second
 /// callback in the argument list is a pair easy to hand over in the wrong order.
 struct Call {
@@ -36,6 +38,11 @@ struct Call {
     /// empty check never abandons the call.
     /// @return false to abandon the call.
     std::function<bool()> keepGoing;
+
+    /// Shape the answer is asked for in. Text by default, which is what a caller that
+    /// says nothing gets, and a shape a provider cannot enforce is still worth asking
+    /// for: what arrives is checked against it either way.
+    Core::ResponseFormat format;
 };
 
 /// An interchangeable inference backend.
@@ -66,7 +73,7 @@ public:
     /// @throws OpenAnimaError subclasses when the call cannot be completed.
     OpenAnima::Core::Completion complete(const std::vector<OpenAnima::Core::ChatMessage>& messages,
                                          const DeltaSink& onDelta) {
-        return complete(messages, Call{onDelta, {}});
+        return complete(messages, Call{onDelta, {}, {}});
     }
 
     /// Sends a whole conversation and waits for the answer.

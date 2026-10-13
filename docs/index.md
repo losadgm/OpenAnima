@@ -29,6 +29,10 @@ The conversation is one of three channels an NPC uses:
   call that sends a prompt and returns the answer. The same call takes a sink and reports the
   text while the provider is still producing it, and a turn can also be asked for without
   waiting and collected as it goes.
+- Structured answers: a call asks for a JSON object or for one that follows a JSON Schema with
+  `Core::ResponseFormat`, and the answer arrives parsed as well as raw. A provider that does
+  not know the field is still checked: an answer that is not the JSON that was asked for is a
+  `ParseError`.
 - One provider interface, `OpenAnima::Provider::IProvider`, and a REST implementation for the
   OpenAI chat-completions contract. Ollama, llama.cpp and vLLM speak it too.
 - One HTTP boundary, `OpenAnima::Http::HttpTransport`, so providers can be tested without a

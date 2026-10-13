@@ -75,7 +75,7 @@ public:
     /// @return The assembled answer, and why generation stopped.
     /// @throws OpenAnimaError when no backend is attached or the call fails.
     Completion ask(const std::string& prompt, const Provider::DeltaSink& onDelta) {
-        return ask(prompt, Provider::Call{onDelta, {}});
+        return ask(prompt, Provider::Call{onDelta, {}, {}});
     }
 
     /// Asks for a turn and returns at once, without waiting for the answer.

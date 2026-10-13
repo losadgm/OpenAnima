@@ -89,9 +89,12 @@ context is what the senses let through.
 
 ## v0.3.0 - Strict parsing (data structuring)
 
-- [ ] Ask the model for structured output and parse it with nlohmann/json.
-  - nlohmann is in the build, but only for the API envelope: the request body and the response
-    parsing. Nothing structures the model's own content yet.
+- [x] Ask the model for structured output and parse it with nlohmann/json.
+  - `Core::ResponseFormat` travels with the call: free text, a JSON object, or a JSON Schema
+    sent as `response_format` where the contract knows the field. The answer comes back read
+    as well as raw, and an answer that is not the JSON that was asked for is a `ParseError`
+    rather than something the caller discovers later. The contract of an NPC's own answer is
+    the next point.
 - [ ] Isolate the output variables: `reasoning`, `dialogue`, `actions`.
   - This is what turns an answer into something an NPC can act on: what it thought, what it
     says, and what it does. `Completion::text` is still opaque text, and `Role::Tool` exists in
