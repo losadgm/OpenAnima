@@ -26,7 +26,7 @@ that reaches for a real endpoint is a test that fails on a plane.
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `OPENANIMA_BUILD_EXAMPLES` | `ON` | Builds `examples/cliHarness` |
+| `OPENANIMA_BUILD_EXAMPLES` | `ON` | Builds the clients under `examples/` |
 | `OPENANIMA_ENABLE_CLANG_TIDY` | `OFF` | Runs clang-tidy while compiling |
 | `OPENANIMA_ENABLE_DOCS` | `OFF` | Adds the `docs` target, which generates the API reference |
 
@@ -43,6 +43,7 @@ include/OpenAnima/     public headers
 src/OpenAnima/         the implementation, mirroring the headers
 tests/                 Catch2 tests, one directory per package
 examples/cliHarness/  a runnable client: reads .env, sends a prompt, prints the answer as it arrives
+examples/tuiHarness/  the terminal client: full screen, transcript, mouse and clipboard
 docs/                  these pages, the Doxyfile template and the site template
 .github/scripts/       helpers used by the pipeline, including the site builder
 .github/instructions/  the conventions of this repository, for editor tooling

@@ -31,8 +31,10 @@ demonstrated: a conversation with an NPC, the answer arriving while the model wr
 the keys alive the whole time. It is also where the room of several agents will live (v0.6.0),
 and the piece that has to look good enough to show the library off.
 
-It is built. What follows is the shape that was agreed before the code existed, and what the
-code now does.
+It is built, and it is provisional: a harness is where the shape of the library is tried out,
+so it moves every time the API moves, and what is written here describes today rather than a
+promise. What follows is the shape that was agreed before the code existed, and what the code
+now does.
 
 ### The problem
 
@@ -112,7 +114,9 @@ eight to the terminal, and the two disagreeing is what tore the row apart.
 The picking out follows the button for as long as it is held: the cells are painted as the
 pointer passes over them, the paint grows and shrinks with it, and the last one stays painted
 when the button comes back up. Everything the conversation holds can be picked out, the prompt,
-the panels and the hints included, because what is read back is what was painted.
+the panels and the hints included, because what is read back is what was painted. While the
+client runs the mouse is the client's, which is the price of the wheel scrolling the
+conversation; holding shift asks the terminal for its own selection back in most of them.
 
 Anything a keyboard can send reaches the draft as bytes, so an enye, an accented vowel or a
 combining mark typed after a letter lands in the same cell as the letter it belongs to. Copying goes out as the terminal's own clipboard sequence and lives in
@@ -199,8 +203,11 @@ for the answer, and says so.
   completing), the model (every key, the world, the events) and the screen (panels, hints,
   viewport, caret, and what the mouse picked out). No terminal is involved.
 - The client itself: driven over a pseudo-terminal, sending keys and reading what comes back,
-  with a throwaway server that streams the answer word by word. PTY on Unix and ConPTY on
-  Windows is where this is going, so the same test runs on all three platforms.
+  with a throwaway server that streams the answer word by word. The keys, the wheel, the
+  accented characters, the picking out and the clipboard are checked that way, and so is the
+  rule that nothing but whole characters ever leaves the client towards the terminal. PTY on
+  Unix and ConPTY on Windows is where this is going, so the same test runs on all three
+  platforms.
 
 ### The plan
 

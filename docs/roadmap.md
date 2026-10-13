@@ -153,6 +153,9 @@ player works end to end; the other two drive the milestones below.
     shell that runs them. What is left is the client test over a pseudo-terminal inside the
     suite, and letting several NPCs share one conversation, which needs the library to carry
     it.
+  - It is provisional on purpose: the client is where the shape of the library is tried out,
+    so it is expected to be reshaped as the API grows towards what the milestones above ask
+    for. What it does today is in the harnesses page; nothing here is frozen until the API is.
 - [ ] Logging hook with levels (Trace, Debug, Warn, Error).
   - The only output today is a stderr note from the harness and the exception messages. A
     library should let the host application decide where the logs go.
