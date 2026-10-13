@@ -72,6 +72,11 @@ const Cell& Canvas::at(std::size_t row, std::size_t column) const {
     return m_cells[index(row, column)];
 }
 
+Cell& Canvas::at(std::size_t row, std::size_t column) {
+    assert(row < m_height && column < m_width);
+    return m_cells[index(row, column)];
+}
+
 void Canvas::detach(std::size_t row, std::size_t column) {
     Cell& cell = m_cells[index(row, column)];
     if (cell.kind == Cell::Kind::Continuation) {

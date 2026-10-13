@@ -127,6 +127,19 @@ public:
         return !m_out.empty();
     }
 
+    void copyToClipboard(std::string_view text) override {
+        // OSC 52: the text travels to the terminal, which puts it in the clipboard of whoever is
+        // looking at the screen. It is the only way that works over ssh with nothing installed at
+        // the other end.
+        if (text.size() > MaxClipboardBytes) {
+            return;
+        }
+        write("\x1b]52;c;");
+        write(base64(text));
+        write("\x07");
+        (void)flush();
+    }
+
 private:
     /// Reads whatever is waiting into the pending buffer.
     /// @param timeout How long to wait for the first byte.
@@ -270,22 +283,50 @@ private:
         }
         // A mouse report: `<button>;<column>;<row>` and an `M` or an `m` for a release.
         if (!sequence.empty() && sequence.front() == '<') {
-            const std::size_t first = sequence.find(';');
-            if (first == std::string::npos) {
-                return Key{Key::Kind::Unknown, static_cast<char>(0)};
-            }
-            const std::string button = sequence.substr(1, first - 1);
-            try {
-                return wheelKey(static_cast<unsigned char>(std::stoi(button)));
-            } catch (const std::exception&) {
-                return Key{Key::Kind::Unknown, static_cast<char>(0)};
-            }
+            return mouseKey(sequence);
         }
         // The start of a paste, which the terminal marks and then hands over as bytes.
         if (sequence == "200~") {
             return paste();
         }
         return Key{Key::Kind::Unknown, static_cast<char>(0)};
+    }
+
+    /// Maps a mouse report to the key it is: a wheel notch, a press, a drag or a release.
+    ///
+    /// @param sequence The report, without the introducer: `<button>;<column>;<row>` and an `M`
+    /// for something happening or an `m` for a button coming back up.
+    /// @return The key, with the position counted from zero.
+    static Key mouseKey(const std::string& sequence) {
+        const std::size_t first = sequence.find(';');
+        const std::size_t second =
+            first == std::string::npos ? std::string::npos : sequence.find(';', first + 1);
+        if (first == std::string::npos || second == std::string::npos) {
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        }
+        const char final = sequence.back();
+        try {
+            const int button = std::stoi(sequence.substr(1, first - 1));
+            const auto column = static_cast<std::size_t>(
+                std::stoul(sequence.substr(first + 1, second - first - 1)));
+            const auto row = static_cast<std::size_t>(std::stoul(sequence.substr(second + 1)));
+            if (const Key wheel = wheelKey(static_cast<unsigned char>(button));
+                wheel.kind != Key::Kind::Unknown) {
+                return wheel;
+            }
+
+            Key key;
+            key.kind = final == 'm' ? Key::Kind::MouseRelease : Key::Kind::MousePress;
+            // Bit five says the mouse is moving with a button held, which is a drag.
+            if (final == 'M' && (button & 32) != 0) {
+                key.kind = Key::Kind::MouseDrag;
+            }
+            key.column = column > 0 ? column - 1 : 0;
+            key.row = row > 0 ? row - 1 : 0;
+            return key;
+        } catch (const std::exception&) {
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        }
     }
 
     /// Maps a mouse button code to a key, which is the wheel or nothing at all.
@@ -489,9 +530,52 @@ private:
             return Key::Kind::CtrlN;
         case 0x10:
             return Key::Kind::CtrlP;
+        case 0x16:
+            return Key::Kind::CtrlV;
         default:
             return Key::Kind::Unknown;
         }
+    }
+
+    /// @param text Text to encode.
+    /// @return The text in base64, which is how the clipboard sequence carries it.
+    static std::string base64(std::string_view text) {
+        static constexpr std::string_view Alphabet =
+            "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        std::string encoded;
+        encoded.reserve(((text.size() + 2) / 3) * 4);
+        std::size_t offset = 0;
+        while (offset + 2 < text.size()) {
+            const auto first = static_cast<unsigned char>(text[offset]);
+            const auto second = static_cast<unsigned char>(text[offset + 1]);
+            const auto third = static_cast<unsigned char>(text[offset + 2]);
+            const std::uint32_t group = (static_cast<std::uint32_t>(first) << 16U) |
+                                        (static_cast<std::uint32_t>(second) << 8U) |
+                                        static_cast<std::uint32_t>(third);
+            encoded += Alphabet.at((group >> 18U) & 0x3FU);
+            encoded += Alphabet.at((group >> 12U) & 0x3FU);
+            encoded += Alphabet.at((group >> 6U) & 0x3FU);
+            encoded += Alphabet.at(group & 0x3FU);
+            offset += 3;
+        }
+        const std::size_t left = text.size() - offset;
+        if (left == 1) {
+            const auto first = static_cast<unsigned char>(text[offset]);
+            const std::uint32_t group = static_cast<std::uint32_t>(first) << 16U;
+            encoded += Alphabet.at((group >> 18U) & 0x3FU);
+            encoded += Alphabet.at((group >> 12U) & 0x3FU);
+            encoded += "==";
+        } else if (left == 2) {
+            const auto first = static_cast<unsigned char>(text[offset]);
+            const auto second = static_cast<unsigned char>(text[offset + 1]);
+            const std::uint32_t group = (static_cast<std::uint32_t>(first) << 16U) |
+                                        (static_cast<std::uint32_t>(second) << 8U);
+            encoded += Alphabet.at((group >> 18U) & 0x3FU);
+            encoded += Alphabet.at((group >> 12U) & 0x3FU);
+            encoded += Alphabet.at((group >> 6U) & 0x3FU);
+            encoded += '=';
+        }
+        return encoded;
     }
 
     termios m_saved{};
@@ -507,6 +591,10 @@ private:
     std::string m_pasted;
     /// Bytes the terminal has not taken yet, which is why writing never waits for it.
     std::string m_out;
+
+    /// The clipboard sequence carries the text inline, and terminals cut it off at some length;
+    /// a region longer than this is not worth a sequence that will be dropped.
+    static constexpr std::size_t MaxClipboardBytes = std::size_t{74} * 1024;
 };
 
 }  // namespace

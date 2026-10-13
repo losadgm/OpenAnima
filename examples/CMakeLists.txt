@@ -26,6 +26,7 @@ add_executable(open_anima_tui
     tuiHarness/screen/cell.cpp
     tuiHarness/screen/diff.cpp
     tuiHarness/screen/render.cpp
+    tuiHarness/screen/selection.cpp
     tuiHarness/screen/style.cpp
     tuiHarness/screen/text.cpp
     tuiHarness/terminal/terminalUnix.cpp

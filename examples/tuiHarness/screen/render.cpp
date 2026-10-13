@@ -10,6 +10,8 @@
 
 #include "app/commands.h"
 #include "canvas.h"
+#include "cell.h"
+#include "selection.h"
 #include "style.h"
 #include "text.h"
 
@@ -176,9 +178,30 @@ std::string statusRow(const Model& model) {
     return std::string(PrefixWidth, ' ') + model.modelName + "   " + hint;
 }
 
+/// Paint what the mouse picked out, over whatever the frame holds there: a selection is about the
+/// screen, not about the conversation behind it.
+/// @param frame Frame to paint on.
+/// @param selection Cells the mouse picked out.
+void pickOutSelection(Canvas& frame, const Selection& selection) {
+    if (selection.empty()) {
+        return;
+    }
+    const std::size_t last = std::min(selection.lastRow(), frame.height() - 1);
+    for (std::size_t picked = selection.firstRow(); picked <= last; ++picked) {
+        for (std::size_t column = 0; column < frame.width(); ++column) {
+            if (!selection.contains(picked, column)) {
+                continue;
+            }
+            Cell& cell = frame.at(picked, column);
+            cell.style = cell.style.withReverse();
+        }
+    }
+}
+
 }  // namespace
 
-RenderResult render(const Model& model, std::size_t width, std::size_t height) {
+RenderResult render(const Model& model, std::size_t width, std::size_t height,
+                    const Selection& selection) {
     RenderResult result{Canvas{width, height}, 0, 0};
     Canvas& frame = result.frame;
     if (width == 0 || height == 0) {
@@ -255,6 +278,8 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height) {
     const auto position = prompt.positions.at(std::min(model.cursor, model.draft.size()));
     result.caretRow = viewRows + hints.size() + (withStatus ? 1 : 0) + position.first;
     result.caretColumn = PromptWidth + position.second;
+
+    pickOutSelection(frame, selection);
     return result;
 }
 

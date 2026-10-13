@@ -108,8 +108,8 @@ public:
                 return std::nullopt;
             }
             if (record.EventType == MOUSE_EVENT) {
-                if (const auto wheel = translateWheel(record.Event.MouseEvent)) {
-                    return wheel;
+                if (const auto mouse = translateMouse(record.Event.MouseEvent)) {
+                    return mouse;
                 }
                 continue;
             }
@@ -147,22 +147,46 @@ public:
     }
 
 private:
-    /// Turns a wheel event into a key, and lets the clicks pass.
+    /// Turns a mouse event into a key: the wheel, or a press, a drag and a release with where
+    /// they happened.
     /// @param record Mouse event the console reported.
-    /// @return The key, or nothing when the event is not the wheel.
-    [[nodiscard]] static std::optional<Key> translateWheel(const MOUSE_EVENT_RECORD& record) {
-        if (record.dwEventFlags != MOUSE_WHEELED) {
+    /// @return The key, or nothing when the event is not one the client uses.
+    [[nodiscard]] static std::optional<Key> translateMouse(const MOUSE_EVENT_RECORD& record) {
+        if (record.dwEventFlags == MOUSE_WHEELED) {
+            // The distance is in the high word, and its sign is the direction.
+            const auto delta = static_cast<SHORT>(HIWORD(record.dwButtonState));
+            if (delta > 0) {
+                return Key{Key::Kind::WheelUp, static_cast<char>(0)};
+            }
+            if (delta < 0) {
+                return Key{Key::Kind::WheelDown, static_cast<char>(0)};
+            }
             return std::nullopt;
         }
-        // The distance is in the high word, and its sign is the direction.
-        const auto delta = static_cast<SHORT>(HIWORD(record.dwButtonState));
-        if (delta > 0) {
-            return Key{Key::Kind::WheelUp, static_cast<char>(0)};
+        if (record.dwEventFlags == MOUSE_MOVED) {
+            return positioned(Key::Kind::MouseDrag, record);
         }
-        if (delta < 0) {
-            return Key{Key::Kind::WheelDown, static_cast<char>(0)};
+        if (record.dwEventFlags == MOUSE_HWHEELED || record.dwEventFlags == DOUBLE_CLICK) {
+            return std::nullopt;
         }
-        return std::nullopt;
+        if ((record.dwButtonState & FROM_LEFT_1ST_BUTTON_PRESSED) != 0) {
+            return positioned(Key::Kind::MousePress, record);
+        }
+        return positioned(Key::Kind::MouseRelease, record);
+    }
+
+    /// Adds where a mouse event happened to the key it is.
+    /// @param kind What happened.
+    /// @param record Mouse event the console reported.
+    /// @return The key, with the position counted from zero.
+    [[nodiscard]] static Key positioned(const Key::Kind kind, const MOUSE_EVENT_RECORD& record) {
+        Key key;
+        key.kind = kind;
+        key.column =
+            record.dwMousePosition.X >= 0 ? static_cast<std::size_t>(record.dwMousePosition.X) : 0;
+        key.row =
+            record.dwMousePosition.Y >= 0 ? static_cast<std::size_t>(record.dwMousePosition.Y) : 0;
+        return key;
     }
 
     /// Bytes the console has not taken yet.

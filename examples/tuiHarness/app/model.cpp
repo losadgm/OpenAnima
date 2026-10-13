@@ -441,6 +441,13 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
 
     case Key::Kind::None:
     case Key::Kind::Unknown:
+    // The mouse is the shell's business: it is the only part that knows where things are on the
+    // screen, which is what a selection is about. A paste of what the client copied last arrives
+    // as the text itself, so this key has nothing to do here either.
+    case Key::Kind::MousePress:
+    case Key::Kind::MouseDrag:
+    case Key::Kind::MouseRelease:
+    case Key::Kind::CtrlV:
         break;
     }
 

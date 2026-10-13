@@ -19,35 +19,41 @@ namespace OpenAnimaTui {
 /// What the keyboard produced.
 struct Key {
     enum class Kind : std::uint8_t {
-        None,        ///< Nothing was pressed before the timeout.
-        Character,   ///< A printable character, in `character`.
-        Enter,       ///< Return.
-        CtrlEnter,   ///< Control and Return together: a new line, never a send.
-        Backspace,   ///< Delete the character before the cursor.
-        Tab,         ///< The tab key.
-        Escape,      ///< Escape.
-        ArrowUp,     ///< Cursor up.
-        ArrowDown,   ///< Cursor down.
-        ArrowLeft,   ///< Cursor left.
-        ArrowRight,  ///< Cursor right.
-        PageUp,      ///< One page of transcript up.
-        PageDown,    ///< One page of transcript down.
-        WheelUp,     ///< The wheel, one notch towards the beginning of the conversation.
-        WheelDown,   ///< The wheel, one notch towards the end.
-        CtrlC,       ///< Interrupt.
-        CtrlD,       ///< End of input.
-        CtrlJ,       ///< Newline without sending.
-        CtrlA,       ///< Start of line.
-        CtrlB,       ///< One character left.
-        CtrlE,       ///< End of line.
-        CtrlF,       ///< One character right.
-        CtrlN,       ///< Next history item.
-        CtrlP,       ///< Previous history item.
-        Unknown      ///< A key this client does not use.
+        None,          ///< Nothing was pressed before the timeout.
+        Character,     ///< A printable character, in `character`.
+        Enter,         ///< Return.
+        CtrlEnter,     ///< Control and Return together: a new line, never a send.
+        Backspace,     ///< Delete the character before the cursor.
+        Tab,           ///< The tab key.
+        Escape,        ///< Escape.
+        ArrowUp,       ///< Cursor up.
+        ArrowDown,     ///< Cursor down.
+        ArrowLeft,     ///< Cursor left.
+        ArrowRight,    ///< Cursor right.
+        PageUp,        ///< One page of transcript up.
+        PageDown,      ///< One page of transcript down.
+        WheelUp,       ///< The wheel, one notch towards the beginning of the conversation.
+        WheelDown,     ///< The wheel, one notch towards the end.
+        MousePress,    ///< A button went down, at `column` and `row`.
+        MouseDrag,     ///< The mouse moved with a button held.
+        MouseRelease,  ///< The button came back up.
+        CtrlC,         ///< Interrupt, or copy what is selected.
+        CtrlD,         ///< End of input.
+        CtrlJ,         ///< Newline without sending.
+        CtrlA,         ///< Start of line.
+        CtrlB,         ///< One character left.
+        CtrlE,         ///< End of line.
+        CtrlF,         ///< One character right.
+        CtrlN,         ///< Next history item.
+        CtrlP,         ///< Previous history item.
+        CtrlV,         ///< Paste what the client copied last.
+        Unknown        ///< A key this client does not use.
     };
 
     Kind kind{Kind::None};  ///< What happened.
     char character{0};      ///< The character, for Kind::Character.
+    std::size_t column{0};  ///< Column of a mouse event, counted from zero.
+    std::size_t row{0};     ///< Row of a mouse event, counted from zero.
 };
 
 /// One terminal, put in raw mode for as long as it lives.
@@ -87,6 +93,14 @@ public:
 
     /// @return Whether something written has not left the process yet.
     [[nodiscard]] virtual bool hasPending() const = 0;
+
+    /// Hands text to the system clipboard.
+    ///
+    /// On Unix this is the terminal's own clipboard, asked for in band: the text travels in an
+    /// escape sequence, so copying works over ssh with no clipboard tool on the other side. A
+    /// terminal that does not allow it (some are configured to refuse) simply ignores it.
+    /// @param text Text to put in the clipboard.
+    virtual void copyToClipboard(std::string_view text) = 0;
 
     /// Switches to the alternate screen, where the client owns every row, and asks the terminal
     /// for the keyboard and the mouse it can report: the enhanced keyboard where it exists, one

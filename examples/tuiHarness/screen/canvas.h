@@ -49,6 +49,13 @@ public:
     /// @return The cell.
     [[nodiscard]] const Cell& at(std::size_t row, std::size_t column) const;
 
+    /// The cell at a position, to be changed in place, which is how a region is picked out of a
+    /// frame that is already painted.
+    /// @param row Row, inside the grid.
+    /// @param column Column, inside the grid.
+    /// @return The cell.
+    [[nodiscard]] Cell& at(std::size_t row, std::size_t column);
+
     /// Writes text at a position, clipping what does not fit.
     ///
     /// Code points are never split, a wide character that does not fit in the column is

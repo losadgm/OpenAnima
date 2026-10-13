@@ -96,11 +96,19 @@ the accent colour, and the list is cut rather than pushed around when the window
 | Page up, Page down | Scrolls the conversation |
 | Wheel | Scrolls the conversation, three rows a notch |
 | Esc, Ctrl+C | Cancels the turn in flight, keeping what it had produced |
-| Ctrl+C with nothing in flight | Clears the draft, and leaves when it is already empty |
+| Drag over the conversation | Picks out those cells, painted reversed |
+| Ctrl+C with something picked out | Copies it, and drops the picking |
+| Ctrl+C with nothing in flight or picked out | Clears the draft, and leaves when it is already empty |
+| Ctrl+V | Types what was copied last |
 | Ctrl+D | Leaves |
 
 A tab is never written into the draft. It counts as one column to the client and as up to
 eight to the terminal, and the two disagreeing is what tore the row apart.
+
+Anything a keyboard can send reaches the draft as bytes, so an enye, an accented vowel or a
+combining mark typed after a letter lands in the same cell as the letter it belongs to.
+Copying goes out as the terminal's own clipboard sequence and lives in the client too, so a
+paste works in a terminal that keeps the clipboard to itself.
 
 ### The world
 
@@ -181,7 +189,7 @@ for the answer, and says so.
   wide characters, combining marks), the frame writer (what it sends, and whether a terminal
   that applies it ends up showing the frame it came from), the commands (matching and
   completing), the model (every key, the world, the events) and the screen (panels, hints,
-  viewport, caret). No terminal is involved.
+  viewport, caret, and what the mouse picked out). No terminal is involved.
 - The client itself: driven over a pseudo-terminal, sending keys and reading what comes back,
   with a throwaway server that streams the answer word by word. PTY on Unix and ConPTY on
   Windows is where this is going, so the same test runs on all three platforms.
@@ -198,9 +206,10 @@ for the answer, and says so.
 3. The loop, the world of NPCs, the scroll of the transcript and the command palette.
 4. The tests above, and these pages brought up to date.
 
-Steps 1 to 3 are done, and the piece tests of step 4 are in the suite. What is left is the
-in-suite client test over a pseudo-terminal, so the client itself is exercised by the same
-command that runs the rest.
+Steps 1 to 3 are done, and the piece tests of step 4 are in the suite. The enhanced keyboard
+is in, the wheel is in, and so is picking text out of the conversation with the mouse and
+handing it to the clipboard. What is left of step 4 is the in-suite client test over a
+pseudo-terminal, so the client itself is exercised by the same command that runs the rest.
 
 What comes next, in the order it will be felt:
 
@@ -209,7 +218,3 @@ What comes next, in the order it will be felt:
    still be surprised. The screen is going to describe itself as a tree of boxes with sizes to
    honour, measure it and then paint it, so that what is asked for and what is shown cannot
    drift apart.
-2. A keyboard that says what it is: the enhanced protocol (kitty) where the terminal speaks it,
-   so Ctrl+Enter, Shift+Enter and a bare Escape arrive as themselves instead of being guessed
-   from escape sequences, and one event per paste instead of a key per line.
-3. The mouse wheel over the conversation, which is a scroll of its own and asks for it.
