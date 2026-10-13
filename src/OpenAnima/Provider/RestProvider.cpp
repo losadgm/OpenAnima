@@ -21,6 +21,7 @@ namespace {
 using OpenAnima::Core::ChatMessage;
 using OpenAnima::Core::Completion;
 using OpenAnima::Core::FinishReason;
+using OpenAnima::Core::ResponseFormat;
 using OpenAnima::Core::Role;
 using OpenAnima::Core::TokenUsage;
 using OpenAnima::Http::HttpRequest;
@@ -62,8 +63,10 @@ std::string snippet(const std::string& payload) {
 /// @param config Settings of the call.
 /// @param messages Conversation to send.
 /// @param streamed Whether the answer is asked for as a stream of chunks.
+/// @param format Shape the answer is asked for in.
 std::string buildRequestBody(const RestProviderConfig& config,
-                             const std::vector<ChatMessage>& messages, bool streamed) {
+                             const std::vector<ChatMessage>& messages, bool streamed,
+                             const ResponseFormat& format) {
     nlohmann::json conversation = nlohmann::json::array();
     for (const ChatMessage& message : messages) {
         conversation.push_back({{"role", roleName(message.role)}, {"content", message.content}});
@@ -81,6 +84,20 @@ std::string buildRequestBody(const RestProviderConfig& config,
         // mode reports. A server that does not know the field ignores it, and then
         // reports none, which the contract allows.
         body["stream_options"] = {{"include_usage", true}};
+    }
+    switch (format.kind) {
+    case ResponseFormat::Kind::Text:
+        // Nothing to ask for: free text is what the contract answers with by default.
+        break;
+    case ResponseFormat::Kind::JsonObject:
+        body["response_format"] = {{"type", "json_object"}};
+        break;
+    case ResponseFormat::Kind::JsonSchema:
+        // The name is an identifier the contract asks for, and the schema travels as it
+        // was given: how strict it is is the schema's business, not this one's.
+        body["response_format"] = {{"type", "json_schema"},
+                                   {"json_schema", {{"name", "reply"}, {"schema", format.schema}}}};
+        break;
     }
     return body.dump();
 }
@@ -122,6 +139,26 @@ std::optional<TokenUsage> parseUsage(const nlohmann::json& payload) {
     tokens.completionTokens = readTokenCount(usage, "completion_tokens");
     tokens.totalTokens = readTokenCount(usage, "total_tokens");
     return tokens;
+}
+
+/// Reads the answer as the JSON that was asked for, when one was asked for.
+///
+/// A turn the caller cancelled is left alone: it never had the chance to be whole, and
+/// what it produced is kept as it is, the way the text is.
+/// @param completion Answer to read, its parsed form set in place.
+/// @param format Shape the call asked for.
+/// @throws ParseError when a JSON answer was asked for and the text is not JSON.
+void readJsonAnswer(Completion& completion, const ResponseFormat& format) {
+    if (format.kind == ResponseFormat::Kind::Text ||
+        completion.finishReason == FinishReason::Cancelled) {
+        return;
+    }
+    try {
+        completion.json = nlohmann::json::parse(completion.text);
+    } catch (const nlohmann::json::exception& error) {
+        throw ParseError("the answer was asked for as JSON and is not: " +
+                         std::string(error.what()) + ": " + snippet(completion.text));
+    }
 }
 
 /// Extracts the assistant answer and its metadata from a chat-completions payload.
@@ -258,7 +295,7 @@ Completion RestProvider::complete(const std::vector<ChatMessage>& messages, cons
 
     HttpRequest request;
     request.url = m_config.chatCompletionsUrl();
-    request.body = buildRequestBody(m_config, messages, streamed);
+    request.body = buildRequestBody(m_config, messages, streamed, call.format);
     request.timeoutSeconds = m_config.timeoutSeconds;
     // The transport asks this on its own timer, which is what lets a caller abandon a
     // stream that went quiet instead of waiting for the silence to time out.
@@ -279,7 +316,9 @@ Completion RestProvider::complete(const std::vector<ChatMessage>& messages, cons
                                 ": " + snippet(response.body),
                             response.statusCode);
     }
-    return parseCompletion(response.body);
+    Completion completion = parseCompletion(response.body);
+    readJsonAnswer(completion, call.format);
+    return completion;
 }
 
 Completion RestProvider::readStream(const HttpRequest& request, const Call& call) {
@@ -321,6 +360,7 @@ Completion RestProvider::readStream(const HttpRequest& request, const Call& call
     if (completion.finishReason == FinishReason::Unknown && call.keepGoing && !call.keepGoing()) {
         completion.finishReason = FinishReason::Cancelled;
     }
+    readJsonAnswer(completion, call.format);
     return completion;
 }
 

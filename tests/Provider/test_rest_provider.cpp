@@ -18,6 +18,7 @@ using OpenAnima::TransportError;
 using OpenAnima::Core::ChatMessage;
 using OpenAnima::Core::Completion;
 using OpenAnima::Core::FinishReason;
+using OpenAnima::Core::ResponseFormat;
 using OpenAnima::Core::Role;
 using OpenAnima::Core::TokenUsage;
 using OpenAnima::Provider::Call;
@@ -53,6 +54,19 @@ std::string completionBody(const std::string& content, const char* finishReason 
 
 std::vector<ChatMessage> oneTurn(const std::string& text) {
     return {ChatMessage{Role::User, text}};
+}
+
+/// Builds one chunk of a streamed answer, which is an event carrying a piece of the text.
+/// @param text Piece of the answer the chunk carries.
+/// @return The chunk, as it arrives in the body of the response.
+std::string deltaChunk(const std::string& text) {
+    nlohmann::json delta;
+    delta["content"] = text;
+    nlohmann::json choice;
+    choice["delta"] = delta;
+    nlohmann::json payload;
+    payload["choices"] = nlohmann::json::array({choice});
+    return "data: " + payload.dump() + "\n\n";
 }
 
 }  // namespace
@@ -395,7 +409,8 @@ TEST_CASE("RestProvider marks an answer the caller abandoned", "[provider]") {
                                                   pieces.emplace_back(piece);
                                                   stop = true;  // the caller decides to stop here
                                               },
-                                              [&stop] { return !stop; }});
+                                              [&stop] { return !stop; },
+                                              {}});
 
     // What had been produced is real and comes back, marked for what it is: not a
     // failure, but not a finished answer either.
@@ -403,6 +418,89 @@ TEST_CASE("RestProvider marks an answer the caller abandoned", "[provider]") {
     CHECK(completion.finishReason == FinishReason::Cancelled);
     REQUIRE(pieces.size() == 1);
     CHECK(pieces[0] == "first");
+}
+
+TEST_CASE("RestProvider asks for a JSON object when one is wanted", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->response = {200, completionBody(R"({"reasoning":"why","dialogue":"hello"})")};
+    RestProvider provider{localConfig(), transport};
+
+    const Completion completion =
+        provider.complete(oneTurn("hi"), Call{{}, {}, ResponseFormat::jsonObject()});
+
+    const nlohmann::json body = nlohmann::json::parse(transport->lastBody());
+    REQUIRE(body.contains("response_format"));
+    CHECK(body["response_format"]["type"] == "json_object");
+
+    // The answer is the JSON that was asked for, and it arrives read as well as raw.
+    REQUIRE(completion.json.has_value());
+    // The REQUIRE above is the check.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const nlohmann::json& answer = *completion.json;
+    CHECK(answer["dialogue"] == "hello");
+    CHECK(completion.text == R"({"reasoning":"why","dialogue":"hello"})");
+}
+
+TEST_CASE("RestProvider sends the schema it was given", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->response = {200, completionBody(R"({"dialogue":"hello"})")};
+    RestProvider provider{localConfig(), transport};
+
+    const nlohmann::json schema = {{"type", "object"},
+                                   {"properties", {{"dialogue", {{"type", "string"}}}}},
+                                   {"required", nlohmann::json::array({"dialogue"})}};
+    (void)provider.complete(oneTurn("hi"), Call{{}, {}, ResponseFormat::jsonSchema(schema)});
+
+    const nlohmann::json body = nlohmann::json::parse(transport->lastBody());
+    REQUIRE(body.contains("response_format"));
+    CHECK(body["response_format"]["type"] == "json_schema");
+    CHECK(body["response_format"]["json_schema"]["schema"] == schema);
+}
+
+TEST_CASE("RestProvider refuses an answer that is not the JSON it asked for", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->response = {200, completionBody("I would rather talk")};
+    RestProvider provider{localConfig(), transport};
+
+    CHECK_THROWS_AS(provider.complete(oneTurn("hi"), Call{{}, {}, ResponseFormat::jsonObject()}),
+                    ParseError);
+}
+
+TEST_CASE("RestProvider reads a streamed answer as JSON too", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->chunks = {deltaChunk(R"({"dialogue":")"), deltaChunk("hi"), deltaChunk(R"("})"),
+                         "data: [DONE]\n\n"};
+    RestProvider provider{localConfig(), transport};
+
+    std::vector<std::string> pieces;
+    const Completion completion = provider.complete(
+        oneTurn("hi"), Call{[&pieces](std::string_view piece) { pieces.emplace_back(piece); },
+                            {},
+                            ResponseFormat::jsonObject()});
+
+    // The pieces are the raw JSON of the answer, and the whole of it is read at the end.
+    REQUIRE(pieces.size() == 3);
+    REQUIRE(completion.json.has_value());
+    // The REQUIRE above is the check.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const nlohmann::json& answer = *completion.json;
+    CHECK(answer["dialogue"] == "hi");
+}
+
+TEST_CASE("RestProvider leaves a cancelled turn unread", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    transport->chunks = {deltaChunk(R"({"dialogue":")"), deltaChunk("half")};
+    RestProvider provider{localConfig(), transport};
+
+    bool stop = false;
+    const Completion completion = provider.complete(
+        oneTurn("hi"), Call{[&stop](std::string_view) { stop = true; }, [&stop] { return !stop; },
+                            ResponseFormat::jsonObject()});
+
+    // Half a JSON document is not an answer, and the caller stopped the turn itself: what
+    // it had is kept as text, and nothing is read out of it.
+    CHECK(completion.finishReason == FinishReason::Cancelled);
+    CHECK_FALSE(completion.json.has_value());
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

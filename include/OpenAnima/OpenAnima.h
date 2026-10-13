@@ -9,6 +9,7 @@
 // The marked includes are intentional even where nothing in this file names the type.
 #include "OpenAnima/Core/Completion.h"  // IWYU pragma: keep
 #include "OpenAnima/Core/NPCBrain.h"
+#include "OpenAnima/Core/ResponseFormat.h"     // IWYU pragma: keep
 #include "OpenAnima/Core/Types.h"              // IWYU pragma: keep
 #include "OpenAnima/Errors.h"                  // IWYU pragma: keep
 #include "OpenAnima/Http/CurlHttpTransport.h"  // IWYU pragma: keep
