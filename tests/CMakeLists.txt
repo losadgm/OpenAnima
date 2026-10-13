@@ -6,17 +6,35 @@ add_executable(open_anima_tests
     Provider/test_rest_provider_config.cpp
     Provider/test_rest_provider.cpp
     Provider/test_sse_reader.cpp
+    tui/test_tui_canvas.cpp
+    tui/test_tui_commands.cpp
+    tui/test_tui_diff.cpp
+    tui/test_tui_model.cpp
+    tui/test_tui_render.cpp
+    tui/test_tui_selection.cpp
+    tui/test_tui_text.cpp
+    ../examples/tuiHarness/app/commands.cpp
+    ../examples/tuiHarness/app/model.cpp
+    ../examples/tuiHarness/screen/canvas.cpp
+    ../examples/tuiHarness/screen/cell.cpp
+    ../examples/tuiHarness/screen/diff.cpp
+    ../examples/tuiHarness/screen/render.cpp
+    ../examples/tuiHarness/screen/selection.cpp
+    ../examples/tuiHarness/screen/style.cpp
+    ../examples/tuiHarness/screen/text.cpp
     test_facade.cpp
     support/fake_http_transport.h
     support/fake_provider.h)
 
-# The test sources include the shared fakes as "support/...", and the private
+# The test sources include the shared fakes as "support/...", the private
 # headers of the library as "OpenAnima/Provider/...", which is where an
-# implementation-only piece such as the SSE reader lives.
+# implementation-only piece such as the SSE reader lives, and the pure parts of
+# the terminal client as "app/..." and "screen/...".
 target_include_directories(open_anima_tests
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+        ${CMAKE_CURRENT_SOURCE_DIR}/../src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../examples/tuiHarness)
 
 target_link_libraries(open_anima_tests
     PRIVATE
