@@ -94,6 +94,7 @@ the accent colour, and the list is cut rather than pushed around when the window
 | Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Left, Right | Moves the cursor in the draft |
 | Ctrl+P, Ctrl+N | Walks the prompts of this scope |
 | Page up, Page down | Scrolls the conversation |
+| Wheel | Scrolls the conversation, three rows a notch |
 | Esc, Ctrl+C | Cancels the turn in flight, keeping what it had produced |
 | Ctrl+C with nothing in flight | Clears the draft, and leaves when it is already empty |
 | Ctrl+D | Leaves |
@@ -112,7 +113,7 @@ talk to:
 | `/enter <id>` | Talks to another NPC, with the conversation where it was left |
 | `/npcs` | Lists the NPCs, and which one is being talked to |
 | `/leave` | Leaves the conversation, keeping it |
-| `/history clear` | Drops the active conversation, keeping the persona |
+| `/clear` | Drops the active conversation, keeping the persona |
 | `/help` | Lists the keys and the commands |
 | `/quit` | Leaves |
 

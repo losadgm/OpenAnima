@@ -13,6 +13,10 @@ namespace {
 constexpr const char* CreateUsage = "usage: /create <description>";
 constexpr const char* WaitForTurn = "wait for the answer, or cancel it first";
 
+/// Rows one notch of the wheel moves the conversation, which is enough to follow what is being
+/// written without losing the line being read.
+constexpr std::size_t WheelStep = 3;
+
 /// Trailing spaces off a submitted line, so a completed command still matches.
 std::string trimRight(std::string text) {
     while (!text.empty() && (text.back() == ' ' || text.back() == '\t')) {
@@ -163,7 +167,7 @@ void showHelp(Model& model) {
     note(model, "  /enter <id>           talk to another npc");
     note(model, "  /npcs                 list the npcs");
     note(model, "  /leave                leave the conversation");
-    note(model, "  /history clear        drop the active conversation, keep the persona");
+    note(model, "  /clear                drop the active conversation, keep the persona");
     note(model, "  /help                 this list");
     note(model, "  /quit                 leave");
 }
@@ -244,7 +248,7 @@ void runCommand(Model& model, const std::string& rawDraft, std::vector<Effect>& 
         return;
     }
 
-    if (draft == "/history clear") {
+    if (draft == "/clear") {
         if (!model.world.active.has_value()) {
             note(model, "no npc to clear");
             return;
@@ -423,6 +427,16 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
 
     case Key::Kind::PageDown:
         model.scrollOffset = model.scrollOffset > scrollStep ? model.scrollOffset - scrollStep : 0;
+        break;
+
+    // The wheel belongs to the conversation, not to the prompt: it moves the viewport and never
+    // touches the draft or the history, which is what the arrows are for.
+    case Key::Kind::WheelUp:
+        model.scrollOffset += WheelStep;
+        break;
+
+    case Key::Kind::WheelDown:
+        model.scrollOffset = model.scrollOffset > WheelStep ? model.scrollOffset - WheelStep : 0;
         break;
 
     case Key::Kind::None:

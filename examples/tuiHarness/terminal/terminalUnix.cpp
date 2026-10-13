@@ -5,6 +5,7 @@
 #include <array>
 #include <cerrno>
 #include <cstring>
+#include <exception>
 #include <fcntl.h>
 #include <memory>
 #include <poll.h>
@@ -177,12 +178,36 @@ private:
         const char introducer = m_pending.front();
         if (introducer == '[' || introducer == 'O') {
             m_pending.erase(0, 1);
+            if (introducer == '[' && !m_pending.empty() && m_pending.front() == 'M') {
+                // The older mouse report: three bytes that carry a button and a position.
+                return x10Mouse();
+            }
             return sequenceKey(consumeSequence());
         }
 
         // Some other escape combination: drop the first byte of it and move on.
         m_pending.erase(0, 1);
         return Key{Key::Kind::Unknown, static_cast<char>(0)};
+    }
+
+    /// Reads the three bytes of an X10 mouse report, the `M` already consumed.
+    ///
+    /// Terminals only send it when they do not know the SGR form, which is asked for on entry,
+    /// but an older emulator is not a reason for the wheel to do nothing.
+    Key x10Mouse() {
+        const std::size_t needed = 3;
+        while (m_pending.size() < needed) {
+            if (!fill(std::chrono::milliseconds{30}) || m_pending.size() < needed) {
+                break;
+            }
+        }
+        if (m_pending.size() < needed) {
+            m_pending.clear();
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        }
+        const auto button = static_cast<unsigned char>(m_pending[0]) - 32;
+        m_pending.erase(0, needed);
+        return wheelKey(button);
     }
 
     /// Consumes a CSI sequence and returns its bytes, final byte included.
@@ -223,7 +248,39 @@ private:
         if (sequence == "13;5u" || sequence == "27;5;13~") {
             return Key{Key::Kind::CtrlEnter, static_cast<char>(0)};
         }
+        // A mouse report: `<button>;<column>;<row>` and an `M` or an `m` for a release.
+        if (!sequence.empty() && sequence.front() == '<') {
+            const std::size_t first = sequence.find_first_of(";");
+            if (first == std::string::npos) {
+                return Key{Key::Kind::Unknown, static_cast<char>(0)};
+            }
+            const std::string button = sequence.substr(1, first - 1);
+            try {
+                return wheelKey(static_cast<unsigned char>(std::stoi(button)));
+            } catch (const std::exception&) {
+                return Key{Key::Kind::Unknown, static_cast<char>(0)};
+            }
+        }
         return Key{Key::Kind::Unknown, static_cast<char>(0)};
+    }
+
+    /// Maps a mouse button code to a key, which is the wheel or nothing at all.
+    ///
+    /// The clicks are not the client's business yet, so anything that is not a wheel notch is
+    /// ignored rather than turned into a key nothing does.
+    /// @param button Button code, the modifier bits included.
+    /// @return The key the report stands for.
+    static Key wheelKey(unsigned char button) {
+        constexpr unsigned char WheelUp = 64;
+        constexpr unsigned char WheelDown = 65;
+        switch (button & 0x7FU) {
+        case WheelUp:
+            return Key{Key::Kind::WheelUp, static_cast<char>(0)};
+        case WheelDown:
+            return Key{Key::Kind::WheelDown, static_cast<char>(0)};
+        default:
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        }
     }
 
     /// Maps a control or printable byte to its key kind.

@@ -221,6 +221,28 @@ TEST_CASE("the page keys move the viewport and not the caret") {
     CHECK(model.scrollOffset == 0);
 }
 
+TEST_CASE("the wheel moves the conversation and leaves the prompt alone") {
+    Model model;
+    type(model, "/create");
+    (void)press(model, Key::Kind::ArrowUp);
+    const std::string draft = model.draft;
+
+    (void)press(model, Key::Kind::WheelUp);
+    CHECK(model.scrollOffset == 3);
+    (void)press(model, Key::Kind::WheelUp);
+    CHECK(model.scrollOffset == 6);
+    (void)press(model, Key::Kind::WheelDown);
+    CHECK(model.scrollOffset == 3);
+
+    // A wheel notch is not an arrow: what is typed and what was typed before stay put.
+    CHECK(model.draft == draft);
+    CHECK(model.hintIndex == 0);
+
+    (void)press(model, Key::Kind::WheelDown);
+    (void)press(model, Key::Kind::WheelDown);
+    CHECK(model.scrollOffset == 0);
+}
+
 TEST_CASE("creating an npc asks the shell for a brain and enters it") {
     Model model;
     const std::vector<Effect> effects = submit(model, "/create a smith");

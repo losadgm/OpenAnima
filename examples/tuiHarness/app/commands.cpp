@@ -5,8 +5,10 @@
 namespace OpenAnimaTui::App {
 
 const std::vector<std::string>& commands() {
+    // The order is the order the hints are offered in, which is the order they are reached: the
+    // ones that start a conversation first, and the way out last.
     static const std::vector<std::string> list = {
-        "/create", "/enter", "/npcs", "/leave", "/help", "/history clear", "/quit",
+        "/create", "/enter", "/npcs", "/leave", "/clear", "/help", "/quit",
     };
     return list;
 }

@@ -49,7 +49,7 @@ public:
         const DWORD rawInput =
             inputMode &
             ~static_cast<DWORD>(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
-        if (SetConsoleMode(m_input, rawInput) == 0) {
+        if (SetConsoleMode(m_input, rawInput | ENABLE_MOUSE_INPUT) == 0) {
             throw std::runtime_error("SetConsoleMode failed");
         }
 
@@ -107,6 +107,12 @@ public:
             if (ReadConsoleInputW(m_input, &record, 1, &read) == 0 || read == 0) {
                 return std::nullopt;
             }
+            if (record.EventType == MOUSE_EVENT) {
+                if (const auto wheel = translateWheel(record.Event.MouseEvent)) {
+                    return wheel;
+                }
+                continue;
+            }
             if (record.EventType != KEY_EVENT || record.Event.KeyEvent.bKeyDown == FALSE) {
                 continue;
             }
@@ -141,6 +147,24 @@ public:
     }
 
 private:
+    /// Turns a wheel event into a key, and lets the clicks pass.
+    /// @param record Mouse event the console reported.
+    /// @return The key, or nothing when the event is not the wheel.
+    [[nodiscard]] static std::optional<Key> translateWheel(const MOUSE_EVENT_RECORD& record) {
+        if (record.dwEventFlags != MOUSE_WHEELED) {
+            return std::nullopt;
+        }
+        // The distance is in the high word, and its sign is the direction.
+        const auto delta = static_cast<SHORT>(HIWORD(record.dwButtonState));
+        if (delta > 0) {
+            return Key{Key::Kind::WheelUp, static_cast<char>(0)};
+        }
+        if (delta < 0) {
+            return Key{Key::Kind::WheelDown, static_cast<char>(0)};
+        }
+        return std::nullopt;
+    }
+
     /// Bytes the console has not taken yet.
     std::string m_out;
     /// Turns one key event into a key, spelling printable characters as UTF-8 bytes in the
