@@ -1,12 +1,13 @@
 # OpenAnima
 
-C++17 middleware for conversational NPCs: agents that talk to the player, react to the world
-around them and talk to each other.
+C++17 middleware for a world of agents: NPCs that talk to the player and reason about what they
+perceive, information sources that log what happens, and senses that decide what each NPC makes
+of it.
 
 An NPC is not a chat box. It plays a persona, remembers what happened, and has to stay coherent
-while the player, the environment and the other agents keep talking to it. The library holds
-that state, decides what the model needs to see next, and turns the answer into something the
-host application can act on. Which provider, which transport, and what to do with the text are
+while the player, the world and the other agents keep talking to it. The library holds that
+state, decides what the model needs to see next, and turns the answer into something the host
+application can act on. Which provider, which transport, and what to do with the text are
 decisions of the application, not of the library.
 
 The conversation is one of three channels an NPC uses:
@@ -14,7 +15,7 @@ The conversation is one of three channels an NPC uses:
 | Channel | What it carries | Where it stands |
 | --- | --- | --- |
 | The player | dialogue turns, with a persona and a history behind them | in place |
-| The world | events the agent perceives and reacts to | planned, v0.4.0 |
+| The world | what the application publishes into its sources, and what each NPC perceives of it | planned, v0.4.0 |
 | Other NPCs | shared rooms, and a ledger of who said what | planned, v0.6.0 |
 
 - [Development guide](development.html) - build it, test it, and how these pages are built.

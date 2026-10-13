@@ -6,10 +6,29 @@ What the library is meant to become, milestone by milestone.
 - `[~]` partially in place; the note says what is missing
 - `[ ]` not started
 
-The scope, in one line: middleware for conversational NPCs that talk to the player, react to the
-world and talk to each other. Each NPC is an agent with a persona, a memory and a place in the
-world, and the library keeps that state coherent across the three channels. The channel with the
-player works end to end; the other two drive the milestones below.
+The scope, in one line: middleware for a world of agents. The host application creates a world
+and, inside it, actors: NPCs, which converse and reason, and information sources, logs the
+application publishes what happens in the world into. Everything in a world can interact, but
+nothing in it knows everything: an NPC reads the sources its host subscribed it to, and what
+reaches its context is not the record but what its senses make of it. The channel with the player
+works end to end; the world and the other agents drive the milestones below.
+
+## The shape of a world
+
+- A **world** is what the application creates, and what everything else lives in.
+- An **actor** is what a world holds: an **NPC**, an entity with a persona, a memory and senses,
+  or an **information source**, a log the application publishes what happens in the world into.
+- An NPC does not read the world. The application **subscribes** it to the sources it should
+  follow, and to those only, so two of them in the same room can stand next to two different
+  accounts of what is happening.
+- A **sense** belongs to the NPC and decides how much of a source, and in which form, reaches
+  its context. The source keeps the whole record; the NPC gets what its senses made of it.
+
+An apple falls off a table, and the source that logs it keeps the moment and the millimetres. An
+NPC with sight and hearing, subscribed to that source, reads that something small landed nearby
+when it is looking elsewhere, and reads an apple of a colour, falling in a way, at about the
+distance its eye can tell when it happens to be looking that way. The record is exact; the
+context is what the senses let through.
 
 ## v0.1.0 - Foundations and scaffolding
 
@@ -91,7 +110,7 @@ player works end to end; the other two drive the milestones below.
     The decorator keeps `RestProvider` free of the policy, but it needs the transport to know
     which failures are worth repeating.
 
-## v0.4.0 - Memory and environment perception
+## v0.4.0 - Memory, the world and perception
 
 - [ ] FIFO short-term memory with a configurable message limit.
   - `history` grows without bound: no window, no truncation, no summarisation, so a long session
@@ -101,8 +120,25 @@ player works end to end; the other two drive the milestones below.
   - `setSystemPrompt()` stores one fixed string, deliberately kept out of the history so the
     persona can change mid-conversation. Nothing assembles it from state or events yet.
 - [ ] Event injection (`NPCBrain::injectEvent`).
-  - The world channel: the host application reports what happened around the agent, so the agent
-    can react to it instead of only answering questions.
+  - The world channel in its simplest form: the host application reports what happened around the
+    agent, so the agent can react to it instead of only answering questions. It is the pipe the
+    points below are built on.
+- [ ] A world that holds its actors.
+  - `makeNpc()` hands out a brain on its own today, and the rest of the state stays with the
+    application. The world is where the brains, the sources they follow and everything the
+    application publishes live together, and it is what the milestones after this one assume.
+- [ ] Information sources: the world's logs.
+  - An actor that carries records. The application publishes what happens in the world into it, a
+    door opening or an apple falling, and the source keeps them whole, in order and exact.
+- [ ] Subscriptions: which sources feed each NPC.
+  - The application decides, from the moment the NPC is made, and an NPC reads nothing else. It
+    is what lets a world be shared without the knowledge being.
+- [ ] Senses: what an NPC makes of what it is subscribed to.
+  - One per way of perceiving, owned by the NPC, each turning a source record into the
+    approximation that reaches the prompt. A pass-through is the first one, so the pipeline
+    exists before any sense is clever.
+  - Open question: whether a sense is configuration of the NPC or an interface the host
+    implements. The apple above wants the second; the first is enough to start.
 
 ## v0.5.0 - State machine and narrative agenda
 
@@ -112,7 +148,9 @@ player works end to end; the other two drive the milestones below.
 
 ## v0.6.0 - Multi-agent architecture (pub/sub)
 
-- The other-NPCs channel: several agents in one room, each hearing only what concerns it.
+- The other-NPCs channel: several agents in one room, over the subscriptions v0.4.0 leaves in
+  place. The room is shared and the knowledge is not: each agent reads what it is subscribed to,
+  and perceives it through senses of its own.
 - [ ] `ConversationManager` (virtual room coordinator).
 - [ ] Shared ledger (event and dialogue history for everyone present).
 - [ ] Passive attention heuristic filter to wake only the agents involved.
@@ -183,10 +221,13 @@ player works end to end; the other two drive the milestones below.
 
 1. **A bounded context** (v0.4.0). The history grows without limit, and the FIFO window is
    already the planned fix. It is the first thing a long session hits.
-2. **One queue for every brain** (v0.8.0). Each brain runs its turn on a thread of its own
+2. **The world** (v0.4.0). The library creates worlds in the plan and hands out a brain in the
+   code: `makeNpc()` is all of it today, and the sources, the subscriptions and the senses the
+   milestones above assume are what turns one brain into a world.
+3. **One queue for every brain** (v0.8.0). Each brain runs its turn on a thread of its own
    today, which is enough for a client driving one agent and not enough for a room of them
    sharing one machine.
-3. **Drop `NPCBrain::ping()`** before the API freeze. It only proves that the library links.
+4. **Drop `NPCBrain::ping()`** before the API freeze. It only proves that the library links.
 
 `CMakeLists.txt` carries version 0.2.0: the milestone is closed, with the asynchronous core
 verified against a real provider before the number moved.
