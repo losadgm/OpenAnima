@@ -69,8 +69,8 @@ what is happening and what can be pressed.
 The commands are listed while one is being typed, up to six of them, with the selected one in
 the accent colour, and the list is cut rather than pushed around when the window is short.
 
-The blank row between a prompt and its answer separates the turns, so a conversation reads
-as question and answer instead of as one block of text.
+A blank row separates every message from the one before it, so a conversation reads as turns
+instead of as one block of text.
 
 - The client owns the screen: it runs in the alternate screen, paints the whole window on a
   change, and hands the terminal back on the way out.
@@ -115,9 +115,8 @@ when the button comes back up. Everything the conversation holds can be picked o
 the panels and the hints included, because what is read back is what was painted.
 
 Anything a keyboard can send reaches the draft as bytes, so an enye, an accented vowel or a
-combining mark typed after a letter lands in the same cell as the letter it belongs to.
-Copying goes out as the terminal's own clipboard sequence and lives in the client too, so a
-paste works in a terminal that keeps the clipboard to itself.
+combining mark typed after a letter lands in the same cell as the letter it belongs to. Copying goes out as the terminal's own clipboard sequence and lives in
+the client too, so a paste works in a terminal that keeps the clipboard to itself.
 
 ### The world
 
