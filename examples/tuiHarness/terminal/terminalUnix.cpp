@@ -89,6 +89,9 @@ public:
     }
 
     std::optional<Key> readKey(std::chrono::milliseconds timeout) override {
+        if (!m_utf8.empty()) {
+            return nextUtf8Byte();
+        }
         if (!fill(timeout)) {
             return std::nullopt;
         }
@@ -210,6 +213,18 @@ private:
         return wheelKey(button);
     }
 
+    /// Waits for the rest of a sequence that has begun.
+    /// @param needed Bytes the sequence still needs.
+    /// @return Whether they arrived.
+    bool waitFor(std::size_t needed) {
+        while (m_pending.size() < needed) {
+            if (!fill(std::chrono::milliseconds{30}) || m_pending.size() < needed) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /// Consumes a CSI sequence and returns its bytes, final byte included.
     std::string consumeSequence() {
         std::string sequence;
@@ -225,7 +240,7 @@ private:
     }
 
     /// Maps a cursor sequence to the key it spells.
-    static Key sequenceKey(const std::string& sequence) {
+    Key sequenceKey(const std::string& sequence) {
         if (sequence == "A") {
             return Key{Key::Kind::ArrowUp, static_cast<char>(0)};
         }
@@ -248,9 +263,14 @@ private:
         if (sequence == "13;5u" || sequence == "27;5;13~") {
             return Key{Key::Kind::CtrlEnter, static_cast<char>(0)};
         }
+        // The enhanced keyboard protocol: a key is its code point, then its modifiers, then the
+        // kind of event. Shift and Return together is a new line, and so is Control and Return.
+        if (!sequence.empty() && sequence.back() == 'u') {
+            return kittyKey(sequence.substr(0, sequence.size() - 1));
+        }
         // A mouse report: `<button>;<column>;<row>` and an `M` or an `m` for a release.
         if (!sequence.empty() && sequence.front() == '<') {
-            const std::size_t first = sequence.find_first_of(";");
+            const std::size_t first = sequence.find(';');
             if (first == std::string::npos) {
                 return Key{Key::Kind::Unknown, static_cast<char>(0)};
             }
@@ -260,6 +280,10 @@ private:
             } catch (const std::exception&) {
                 return Key{Key::Kind::Unknown, static_cast<char>(0)};
             }
+        }
+        // The start of a paste, which the terminal marks and then hands over as bytes.
+        if (sequence == "200~") {
+            return paste();
         }
         return Key{Key::Kind::Unknown, static_cast<char>(0)};
     }
@@ -281,6 +305,154 @@ private:
         default:
             return Key{Key::Kind::Unknown, static_cast<char>(0)};
         }
+    }
+
+    /// Maps a key of the enhanced keyboard protocol to the key it is.
+    ///
+    /// The form is `<code point>;<modifiers>[:event]`, where the modifiers are a bit mask: one
+    /// is shift, two is alt, four is control and eight is the super key, with one added to the
+    /// lot. Return with any of shift, alt or control is a new line, which is the whole reason
+    /// the protocol is asked for: without it those chords are indistinguishable from a plain
+    /// Return, a Tab or an Escape.
+    /// @param parameters The sequence without its final byte.
+    /// @return The key it spells.
+    Key kittyKey(const std::string& parameters) {
+        const std::size_t separator = parameters.find(';');
+        if (separator == std::string::npos) {
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        }
+        const std::string code = parameters.substr(0, separator);
+        std::string modifiers = parameters.substr(separator + 1);
+        // The event kind comes after a colon: `1` is a press, which is the only one acted on.
+        const std::size_t colon = modifiers.find(':');
+        std::string kind;
+        if (colon != std::string::npos) {
+            kind = modifiers.substr(colon + 1);
+            modifiers = modifiers.substr(0, colon);
+        }
+        if (!kind.empty() && kind != "1") {
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        }
+
+        unsigned long mask = 1;
+        unsigned long codepoint = 0;
+        try {
+            codepoint = std::stoul(code);
+            mask = std::stoul(modifiers);
+        } catch (const std::exception&) {
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        }
+        // The modifiers carry a one that has to come off before the bits mean anything: shift is
+        // one, alt is two, control is four, the super key is eight.
+        const unsigned long bits = mask > 0 ? mask - 1 : 0;
+        const bool shift = (bits & 1UL) != 0;
+        const bool control = (bits & 4UL) != 0;
+
+        if (codepoint == 13 || codepoint == 10) {
+            return Key{(control || shift) ? Key::Kind::CtrlEnter : Key::Kind::Enter,
+                       static_cast<char>(0)};
+        }
+        if (codepoint == 9) {
+            return Key{shift ? Key::Kind::Unknown : Key::Kind::Tab, static_cast<char>(0)};
+        }
+        if (codepoint == 27) {
+            return Key{Key::Kind::Escape, static_cast<char>(0)};
+        }
+        if (codepoint == 127) {
+            return Key{Key::Kind::Backspace, static_cast<char>(0)};
+        }
+        if (codepoint < 0x20 || codepoint > 0x10FFFF) {
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        }
+        if (control) {
+            // Control and a letter is the byte the classic encoding would send.
+            const auto lowercase =
+                static_cast<unsigned long>(std::tolower(static_cast<unsigned char>(codepoint)));
+            if (lowercase >= 'a' && lowercase <= 'z') {
+                return Key{controlOrCharacter(static_cast<unsigned char>(lowercase - 'a' + 1)),
+                           static_cast<char>(0)};
+            }
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        }
+        if (codepoint < 0x80) {
+            return Key{Key::Kind::Character, static_cast<char>(codepoint)};
+        }
+        // Anything above ASCII arrives as its bytes, one key each, the way they do from an
+        // ordinary terminal.
+        const std::string bytes = encodeUtf8(codepoint);
+        m_utf8.insert(m_utf8.end(), bytes.begin(), bytes.end());
+        return nextUtf8Byte();
+    }
+
+    /// @param codepoint Code point to write.
+    /// @return Its UTF-8 bytes.
+    static std::string encodeUtf8(unsigned long codepoint) {
+        std::string bytes;
+        if (codepoint < 0x80) {
+            bytes += static_cast<char>(codepoint);
+        } else if (codepoint < 0x800) {
+            bytes += static_cast<char>(0xC0U | (codepoint >> 6U));
+            bytes += static_cast<char>(0x80U | (codepoint & 0x3FU));
+        } else if (codepoint < 0x10000) {
+            bytes += static_cast<char>(0xE0U | (codepoint >> 12U));
+            bytes += static_cast<char>(0x80U | ((codepoint >> 6U) & 0x3FU));
+            bytes += static_cast<char>(0x80U | (codepoint & 0x3FU));
+        } else {
+            bytes += static_cast<char>(0xF0U | (codepoint >> 18U));
+            bytes += static_cast<char>(0x80U | ((codepoint >> 12U) & 0x3FU));
+            bytes += static_cast<char>(0x80U | ((codepoint >> 6U) & 0x3FU));
+            bytes += static_cast<char>(0x80U | (codepoint & 0x3FU));
+        }
+        return bytes;
+    }
+
+    /// @return The next byte of the character being typed, UTF-8 bytes one key at a time.
+    Key nextUtf8Byte() {
+        const auto first = static_cast<unsigned char>(m_utf8.front());
+        m_utf8.erase(0, 1);
+        return Key{Key::Kind::Character, static_cast<char>(first)};
+    }
+
+    /// Reads a paste, which the terminal hands over as one block between two markers.
+    ///
+    /// The bytes are handed over as characters, and the line breaks inside become new lines in
+    /// the draft rather than sends: pasting five lines is not five questions.
+    /// @return The first key of the paste, or an unknown key when it never ended.
+    Key paste() {
+        while (true) {
+            if (m_pending.empty() && !fill(std::chrono::milliseconds{500})) {
+                m_pasted.clear();
+                return Key{Key::Kind::Unknown, static_cast<char>(0)};
+            }
+            const std::size_t end = m_pending.find("\x1b[201~");
+            if (end != std::string::npos) {
+                m_pasted += m_pending.substr(0, end);
+                m_pending.erase(0, end + 6);
+                break;
+            }
+            m_pasted += m_pending;
+            m_pending.clear();
+        }
+
+        std::string insertion;
+        for (std::size_t offset = 0; offset < m_pasted.size(); ++offset) {
+            const char value = m_pasted[offset];
+            if (value == '\r') {
+                // A line ending of either kind becomes the newline the draft knows.
+                if (offset + 1 < m_pasted.size() && m_pasted[offset + 1] == '\n') {
+                    ++offset;
+                }
+                insertion += '\n';
+                continue;
+            }
+            insertion += value;
+        }
+        m_pasted.clear();
+        m_utf8 = insertion + m_utf8;
+        if (m_utf8.empty()) {
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        }
+        return nextUtf8Byte();
     }
 
     /// Maps a control or printable byte to its key kind.
@@ -325,6 +497,11 @@ private:
     /// Bytes read but not turned into keys yet: a read hands over everything that is
     /// waiting, and a paste or a fast typist hands over several.
     std::string m_pending;
+    /// Bytes of a character that arrived whole, which are handed over one at a time so the rest
+    /// of the client keeps seeing what a keyboard produces.
+    std::string m_utf8;
+    /// Text of the paste being read.
+    std::string m_pasted;
     /// Bytes the terminal has not taken yet, which is why writing never waits for it.
     std::string m_out;
 };
