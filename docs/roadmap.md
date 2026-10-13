@@ -188,5 +188,18 @@ player works end to end; the other two drive the milestones below.
    sharing one machine.
 3. **Drop `NPCBrain::ping()`** before the API freeze. It only proves that the library links.
 
+## Beyond the MVP
+
+Not planned, and no milestone: where the project may go once the release candidate is out, in one
+place so the ideas are not lost.
+
+- **Long-term memory with retrieval.** The window of `v0.4.0` bounds the conversation, and what
+  falls out of it is gone. A diary an NPC writes what it perceives into, and reads back from by
+  relevance, is the other half of the memory: the short window keeps the exchange and the diary
+  keeps the history. It needs a route for embeddings (the contract has one, and the provider
+  interface is chat only today), an index that stays in process so the library stays light, and
+  a retrieval policy, which is what separates an NPC that remembers from a search box. A summary
+  of the window may be enough before any of that is needed.
+
 `CMakeLists.txt` carries version 0.2.0: the milestone is closed, with the asynchronous core
 verified against a real provider before the number moved.
