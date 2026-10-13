@@ -15,8 +15,8 @@ The conversation is one of three channels an NPC uses:
 | Channel | What it carries | Where it stands |
 | --- | --- | --- |
 | The player | dialogue turns, with a persona and a history behind them | in place |
-| The world | what the application publishes into its sources, and what each NPC perceives of it | planned, v0.4.0 |
-| Other NPCs | shared rooms, and a ledger of who said what | planned, v0.6.0 |
+| The world | what the application publishes into its sources, and what each NPC perceives of it | planned, v0.5.0 |
+| Other NPCs | shared rooms, and a ledger of who said what | planned, v0.7.0 |
 
 - [Development guide](development.html) - build it, test it, and how these pages are built.
 - [Harnesses](harness.html) - the two clients that ship with the library, and what the console

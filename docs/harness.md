@@ -29,7 +29,7 @@ else.
 
 The console application, and the client where the library is meant to be *used* rather than
 demonstrated: a conversation with an NPC, the answer arriving while the model writes it, and
-the keys alive the whole time. It is also where the room of several agents will live (v0.6.0),
+the keys alive the whole time. It is also where the room of several agents will live (v0.7.0),
 and the piece that has to look good enough to show the library off.
 
 It is built, and it is provisional: a harness is where the shape of the library is tried out,

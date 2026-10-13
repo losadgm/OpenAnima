@@ -113,7 +113,7 @@ context is what the senses let through.
     The decorator keeps `RestProvider` free of the policy, but it needs the transport to know
     which failures are worth repeating.
 
-## v0.4.0 - Memory, the world and perception
+## v0.4.0 - Memory and knowledge
 
 - [ ] FIFO short-term memory with a configurable message limit.
   - `history` grows without bound: no window, no truncation, no summarisation, so a long session
@@ -122,10 +122,23 @@ context is what the senses let through.
 - [ ] Dynamic system prompt assembler.
   - `setSystemPrompt()` stores one fixed string, deliberately kept out of the history so the
     persona can change mid-conversation. Nothing assembles it from state or events yet.
+- [ ] Beliefs as data, and a policy that keeps the answer inside them.
+  - A persona is prose, and prose invites invention: state a past in one sentence and the model
+    writes the battle. What an NPC knows goes in as data, with identifiers and apart from the
+    persona, and anything outside that list is not known. Over it, a level per category
+    (`forbid`, `hedge`, `allow`), written into the prompt and checked on the way out, because a
+    prohibition that is not checked is a suggestion. The check is a judgment over a closed set,
+    so it does not have to be an LLM: anything that answers only inside the options it is given
+    can serve, behind one interface, with a narrow question to the model as the default.
 - [ ] Event injection (`NPCBrain::injectEvent`).
   - The world channel in its simplest form: the host application reports what happened around the
     agent, so the agent can react to it instead of only answering questions. It is the pipe the
-    points below are built on.
+    world of `v0.5.0` is built on.
+
+## v0.5.0 - The world and perception
+
+- The world channel: what the application publishes into its sources, and what each NPC makes of
+  it. It is what the milestones after this one assume.
 - [ ] A world that holds its actors.
   - `makeNpc()` hands out a brain on its own today, and the rest of the state stays with the
     application. The world is where the brains, the sources they follow and everything the
@@ -143,22 +156,22 @@ context is what the senses let through.
   - Open question: whether a sense is configuration of the NPC or an interface the host
     implements. The apple above wants the second; the first is enough to start.
 
-## v0.5.0 - State machine and narrative agenda
+## v0.6.0 - State machine and narrative agenda
 
 - [ ] FSM for emotional or alert states that alter the agent's base directives.
 - [ ] Narrative goals queue (temporary instructions injected into the prompt).
 - [ ] Verification logic (mark a goal as met by analysing the agent output).
 
-## v0.6.0 - Multi-agent architecture (pub/sub)
+## v0.7.0 - Multi-agent architecture (pub/sub)
 
-- The other-NPCs channel: several agents in one room, over the subscriptions v0.4.0 leaves in
+- The other-NPCs channel: several agents in one room, over the subscriptions `v0.5.0` leaves in
   place. The room is shared and the knowledge is not: each agent reads what it is subscribed to,
   and perceives it through senses of its own.
 - [ ] `ConversationManager` (virtual room coordinator).
 - [ ] Shared ledger (event and dialogue history for everyone present).
 - [ ] Passive attention heuristic filter to wake only the agents involved.
 
-## v0.7.0 - Native local inference
+## v0.8.0 - Native local inference
 
 - [ ] llama.cpp as an optional build dependency.
   - Note the distinction: `RestProvider` already talks to a llama.cpp *server*. What is missing
@@ -167,7 +180,7 @@ context is what the senses let through.
 - [ ] `LlamaCppProvider` for direct CPU/Vulkan execution.
 - [ ] GBNF grammar support at the tokeniser level, for reliable JSON.
 
-## v0.8.0 - Concurrency safety and scheduler
+## v0.9.0 - Concurrency safety and scheduler
 
 - [ ] Global inference queue (avoid VRAM contention when several agents run at once).
   - Each brain runs its turn on a thread of its own today, which is enough for a client driving
@@ -179,7 +192,7 @@ context is what the senses let through.
     one curl handle per call, `CURLOPT_NOSIGNAL` and a `std::call_once` initialisation.
 - [ ] Barks system (filler lines while inference is slow).
 
-## v0.9.0 - Polish, profiling and examples
+## v0.10.0 - Polish, profiling and examples
 
 - [~] Interactive CLI harness under `examples/`.
   - `examples/cliHarness` is interactive, keeps the conversation across turns, streams the
@@ -224,10 +237,10 @@ context is what the senses let through.
 
 1. **A bounded context** (v0.4.0). The history grows without limit, and the FIFO window is
    already the planned fix. It is the first thing a long session hits.
-2. **The world** (v0.4.0). The library creates worlds in the plan and hands out a brain in the
+2. **The world** (v0.5.0). The library creates worlds in the plan and hands out a brain in the
    code: `makeNpc()` is all of it today, and the sources, the subscriptions and the senses the
    milestones above assume are what turns one brain into a world.
-3. **One queue for every brain** (v0.8.0). Each brain runs its turn on a thread of its own
+3. **One queue for every brain** (v0.9.0). Each brain runs its turn on a thread of its own
    today, which is enough for a client driving one agent and not enough for a room of them
    sharing one machine.
 4. **Drop `NPCBrain::ping()`** before the API freeze. It only proves that the library links.
