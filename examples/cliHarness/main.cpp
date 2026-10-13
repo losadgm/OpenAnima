@@ -6,7 +6,7 @@
 // One include: the umbrella re-exports the whole public API.
 #include "OpenAnima/OpenAnima.h"
 
-#include "dotenv.h"
+#include "common/dotenv.h"
 
 using OpenAnima::Core::NPCBrain;
 using OpenAnima::Provider::RestProviderConfig;

@@ -21,8 +21,9 @@ prints the answer as it arrives, piece by piece.
 `quit` or `exit` ends a session, and so does the end of the input. The environment is the one
 in [the configuration table](index.html#a-request-end-to-end), and `.env` is loaded on its own
 from the working directory or from up to three of its parents, which is what makes the editor
-buttons work with no wiring. The client is the reference for the streamed call: `ask()` with a
-sink, and nothing else.
+buttons work with no wiring. The loader is `examples/common/dotenv`, shared with the terminal
+client. The client is the reference for the streamed call: `ask()` with a sink, and nothing
+else.
 
 ## tuiHarness
 

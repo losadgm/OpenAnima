@@ -17,7 +17,7 @@
 #include "OpenAnima/OpenAnima.h"
 
 #include "app/model.h"
-#include "dotenv.h"
+#include "common/dotenv.h"
 #include "screen/diff.h"
 #include "screen/render.h"
 #include "screen/selection.h"
