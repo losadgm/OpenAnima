@@ -80,6 +80,14 @@ public:
         return 80;
     }
 
+    std::size_t height() const override {
+        CONSOLE_SCREEN_BUFFER_INFO info{};
+        if (GetConsoleScreenBufferInfo(m_output, &info) != 0) {
+            return static_cast<std::size_t>(info.srWindow.Bottom - info.srWindow.Top + 1);
+        }
+        return 24;
+    }
+
     std::optional<Key> readKey(std::chrono::milliseconds timeout) override {
         if (!m_pending.empty()) {
             const auto first = static_cast<unsigned char>(m_pending.front());
@@ -142,6 +150,10 @@ private:
             return Key{Key::Kind::ArrowLeft, static_cast<char>(0)};
         case VK_RIGHT:
             return Key{Key::Kind::ArrowRight, static_cast<char>(0)};
+        case VK_PRIOR:
+            return Key{Key::Kind::PageUp, static_cast<char>(0)};
+        case VK_NEXT:
+            return Key{Key::Kind::PageDown, static_cast<char>(0)};
         default:
             break;
         }

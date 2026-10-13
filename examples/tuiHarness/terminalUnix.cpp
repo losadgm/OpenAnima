@@ -63,6 +63,15 @@ public:
         return 80;
     }
 
+    [[nodiscard]] std::size_t height() const override {
+        winsize size{};
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+        if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &size) == 0 && size.ws_row > 0) {
+            return size.ws_row;
+        }
+        return 24;
+    }
+
     std::optional<Key> readKey(std::chrono::milliseconds timeout) override {
         if (!fill(timeout)) {
             return std::nullopt;
@@ -139,8 +148,7 @@ private:
         const char introducer = m_pending.front();
         if (introducer == '[' || introducer == 'O') {
             m_pending.erase(0, 1);
-            const char final = consumeSequence();
-            return arrow(final);
+            return sequenceKey(consumeSequence());
         }
 
         // Some other escape combination: drop the first byte of it and move on.
@@ -148,32 +156,41 @@ private:
         return Key{Key::Kind::Unknown, static_cast<char>(0)};
     }
 
-    /// Consumes a CSI sequence and returns its final byte.
-    char consumeSequence() {
+    /// Consumes a CSI sequence and returns its bytes, final byte included.
+    std::string consumeSequence() {
+        std::string sequence;
         while (!m_pending.empty()) {
             const auto byte = static_cast<unsigned char>(m_pending.front());
             m_pending.erase(0, 1);
+            sequence += static_cast<char>(byte);
             if (byte >= 0x40 && byte <= 0x7E) {
-                return static_cast<char>(byte);
+                break;
             }
         }
-        return 0;
+        return sequence;
     }
 
-    /// Maps the final byte of a cursor sequence to an arrow key.
-    static Key arrow(char final) {
-        switch (final) {
-        case 'A':
+    /// Maps a cursor sequence to the key it spells.
+    static Key sequenceKey(const std::string& sequence) {
+        if (sequence == "A") {
             return Key{Key::Kind::ArrowUp, static_cast<char>(0)};
-        case 'B':
-            return Key{Key::Kind::ArrowDown, static_cast<char>(0)};
-        case 'C':
-            return Key{Key::Kind::ArrowRight, static_cast<char>(0)};
-        case 'D':
-            return Key{Key::Kind::ArrowLeft, static_cast<char>(0)};
-        default:
-            return Key{Key::Kind::Unknown, static_cast<char>(0)};
         }
+        if (sequence == "B") {
+            return Key{Key::Kind::ArrowDown, static_cast<char>(0)};
+        }
+        if (sequence == "C") {
+            return Key{Key::Kind::ArrowRight, static_cast<char>(0)};
+        }
+        if (sequence == "D") {
+            return Key{Key::Kind::ArrowLeft, static_cast<char>(0)};
+        }
+        if (sequence == "5~") {
+            return Key{Key::Kind::PageUp, static_cast<char>(0)};
+        }
+        if (sequence == "6~") {
+            return Key{Key::Kind::PageDown, static_cast<char>(0)};
+        }
+        return Key{Key::Kind::Unknown, static_cast<char>(0)};
     }
 
     /// Maps a control or printable byte to its key kind.

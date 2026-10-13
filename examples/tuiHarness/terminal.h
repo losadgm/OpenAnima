@@ -29,6 +29,8 @@ struct Key {
         ArrowDown,   ///< Cursor down.
         ArrowLeft,   ///< Cursor left.
         ArrowRight,  ///< Cursor right.
+        PageUp,      ///< One page of transcript up.
+        PageDown,    ///< One page of transcript down.
         CtrlC,       ///< Interrupt.
         CtrlD,       ///< End of input.
         CtrlJ,       ///< Newline without sending.
@@ -59,6 +61,9 @@ public:
     /// @return The width of the terminal in columns, 80 when it cannot be asked.
     [[nodiscard]] virtual std::size_t width() const = 0;
 
+    /// @return The height of the terminal in rows, 24 when it cannot be asked.
+    [[nodiscard]] virtual std::size_t height() const = 0;
+
     /// Waits for a key.
     /// @param timeout Longest wait before giving up.
     /// @return The key, or nothing when the timeout passed.
@@ -67,6 +72,16 @@ public:
     /// Writes text to the terminal.
     /// @param text Text to write.
     virtual void write(std::string_view text) = 0;
+
+    /// Switches to the alternate screen, where the client owns every row.
+    void enterAlternateScreen() {
+        write("\x1b[?1049h");
+    }
+
+    /// Leaves the alternate screen and hands the terminal back to the shell.
+    void leaveAlternateScreen() {
+        write("\x1b[?1049l");
+    }
 };
 
 /// Makes the terminal for this platform, in raw mode.
