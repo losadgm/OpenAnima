@@ -457,7 +457,10 @@ private:
 
     /// Maps a control or printable byte to its key kind.
     static Key::Kind controlOrCharacter(unsigned char first) {
-        if (first >= 0x20 && first < 0x7F) {
+        // Everything above ASCII is a byte of a character the terminal sent as UTF-8, which is
+        // what an accent, a tilde and an enye are. Dropping it is how typing in Spanish stopped
+        // at the keyboard.
+        if (first >= 0x20 && first != 0x7F) {
             return Key::Kind::Character;
         }
         switch (first) {

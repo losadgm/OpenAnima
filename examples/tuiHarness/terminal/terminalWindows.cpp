@@ -249,6 +249,10 @@ private:
     }
 
     /// Builds a printable character key from one UTF-8 byte.
+    ///
+    /// Every byte is one, including the ones above ASCII: an accent and an enye are two of them,
+    /// and the rest of the client puts them back together.
+    /// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     static Key character(unsigned char byte) {
         return Key{Key::Kind::Character, static_cast<char>(byte)};
     }
