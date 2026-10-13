@@ -1,7 +1,8 @@
 /// @file
-/// @brief The screen logic of the terminal client, with the terminal replaced by a width.
+/// @brief The screen logic of the terminal client, with the terminal replaced by a size.
 
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
 #include <string>
 #include <vector>
 
@@ -31,8 +32,8 @@ std::string stripAnsi(const std::string& text) {
     return plain;
 }
 
-OpenAnimaTui::Key characterKey(char character) {
-    return {OpenAnimaTui::Key::Kind::Character, character};
+OpenAnimaTui::Key keyOf(OpenAnimaTui::Key::Kind kind) {
+    return {kind, static_cast<char>(0)};
 }
 
 }  // namespace
@@ -46,9 +47,8 @@ TEST_CASE("wrap breaks at spaces and honours newlines") {
           std::vector<std::string>{"a", "veryl", "ongwo", "rd"});
 }
 
-TEST_CASE("wrap drops a trailing empty line") {
-    CHECK(OpenAnimaTui::wrap("one\n", 10) == std::vector<std::string>{"one"});
-    CHECK(OpenAnimaTui::wrap("", 10) == std::vector<std::string>{""});
+TEST_CASE("wrap does not split a multi-byte character") {
+    CHECK(OpenAnimaTui::wrap("cañón", 3) == std::vector<std::string>{"cañ", "ón"});
 }
 
 TEST_CASE("renderLine puts the speaker first and indents the rest") {
@@ -68,97 +68,108 @@ TEST_CASE("renderLine colours the role") {
     CHECK(user[0].find("\x1b[38;2;128;128;128m") != std::string::npos);  // muted #808080
 }
 
-TEST_CASE("renderFrame draws the quiet line and the prompt when idle") {
+TEST_CASE("renderScreen puts the prompt at the bottom with the caret in it") {
     OpenAnimaTui::ScreenState state;
     state.model = "mock";
-    state.hint = "ask something";
-    state.draft = "hello";
+    state.hint = "ask";
+    state.draft = "hi";
+    state.cursor = 2;
 
-    const std::string frame = OpenAnimaTui::renderFrame(state, 40);
-    const std::string plain = stripAnsi(frame);
-    CHECK(plain == "        mock   ask something\n\u2771 hello");
+    const OpenAnimaTui::RenderResult result = OpenAnimaTui::renderScreen(state, 40, 10);
+    CHECK(stripAnsi(result.text).find("\u2771 hi") != std::string::npos);
+    CHECK(result.caretRow == 9);
+    CHECK(result.caretCol == 4);
 }
 
-TEST_CASE("renderFrame draws the answer and the working line while busy") {
+TEST_CASE("renderScreen shows a message at the top of the viewport") {
     OpenAnimaTui::ScreenState state;
-    state.busy = true;
-    state.answer = "Iron?";
-    state.startedAt = std::chrono::steady_clock::now();
+    state.messages = {{OpenAnimaTui::Role::User, "hello"}};
 
-    const std::string frame = OpenAnimaTui::renderFrame(state, 40);
-    const std::string plain = stripAnsi(frame);
-    CHECK(plain.find("Aldric  Iron?") == 0);
-    CHECK(plain.find("working 0.0s   esc to cancel") != std::string::npos);
-    CHECK(plain.find("\u2771 ") != std::string::npos);
+    const OpenAnimaTui::RenderResult result = OpenAnimaTui::renderScreen(state, 20, 5);
+    CHECK(stripAnsi(result.text).find("you     hello") == 0);
 }
 
-TEST_CASE("renderFrame wraps a long draft into more rows") {
+TEST_CASE("renderScreen shows a system note indented") {
     OpenAnimaTui::ScreenState state;
-    state.draft = "a fairly long question that does not fit in one row";
+    state.messages = {{OpenAnimaTui::Role::System, "a note"}};
 
-    const std::string frame = OpenAnimaTui::renderFrame(state, 20);
-    const std::string plain = stripAnsi(frame);
-    CHECK(plain ==
-          "           \n\u2771 a fairly long ques\n  tion that does not\n   fit in one row");
+    const OpenAnimaTui::RenderResult result = OpenAnimaTui::renderScreen(state, 20, 5);
+    CHECK(stripAnsi(result.text).find("        a note") != std::string::npos);
 }
 
-TEST_CASE("caretOffset is zero at the end of the draft") {
+TEST_CASE("renderScreen scrolls the transcript") {
     OpenAnimaTui::ScreenState state;
-    state.draft = "hello";
-    state.cursor = 5;
+    for (int index = 0; index < 5; ++index) {
+        state.messages.push_back({OpenAnimaTui::Role::User, "m" + std::to_string(index)});
+    }
 
-    const auto [up, left] = OpenAnimaTui::caretOffset(state, 40);
-    CHECK(up == 0);
-    CHECK(left == 0);
+    const OpenAnimaTui::RenderResult bottom = OpenAnimaTui::renderScreen(state, 20, 6);
+    CHECK(stripAnsi(bottom.text).find("you     m1") == 0);
+
+    state.scrollOffset = 1;
+    const OpenAnimaTui::RenderResult scrolled = OpenAnimaTui::renderScreen(state, 20, 6);
+    CHECK(stripAnsi(scrolled.text).find("you     m0") == 0);
 }
 
-TEST_CASE("caretOffset walks back along a wrapped draft") {
+TEST_CASE("renderScreen colours the command token in the prompt") {
     OpenAnimaTui::ScreenState state;
-    state.draft = "abcdefghij";
-    state.cursor = 1;
+    state.draft = "/create a smith";
+    state.cursor = 15;
 
-    const auto [up, left] = OpenAnimaTui::caretOffset(state, 10);
-    CHECK(up == 1);
-    CHECK(left == 1);
+    const OpenAnimaTui::RenderResult result = OpenAnimaTui::renderScreen(state, 40, 10);
+    CHECK(result.text.find("\x1b[38;2;157;124;216m/create\x1b[0m") != std::string::npos);
 }
 
-TEST_CASE("caretOffset reaches the start of a multiline draft") {
+TEST_CASE("renderScreen floats the matching commands above the prompt") {
     OpenAnimaTui::ScreenState state;
-    state.draft = "one\ntwo";
-    state.cursor = 0;
+    state.draft = "/c";
+    state.cursor = 2;
 
-    const auto [up, left] = OpenAnimaTui::caretOffset(state, 40);
-    CHECK(up == 1);
-    CHECK(left == 3);
+    const OpenAnimaTui::RenderResult result = OpenAnimaTui::renderScreen(state, 40, 10);
+    CHECK(stripAnsi(result.text).find("  /create") != std::string::npos);
 }
 
-TEST_CASE("mapKey interrupts with escape or ctrl+c while busy") {
-    const OpenAnimaTui::Key escape{OpenAnimaTui::Key::Kind::Escape, static_cast<char>(0)};
-    const OpenAnimaTui::Key ctrlC{OpenAnimaTui::Key::Kind::CtrlC, static_cast<char>(0)};
-    CHECK(OpenAnimaTui::mapKey(escape, true, false) == OpenAnimaTui::Action::Cancel);
-    CHECK(OpenAnimaTui::mapKey(ctrlC, true, false) == OpenAnimaTui::Action::Cancel);
+TEST_CASE("commandMatches finds what completes the typed prefix") {
+    CHECK(OpenAnimaTui::commandMatches("/", 1).size() == OpenAnimaTui::commands().size());
+    CHECK(OpenAnimaTui::commandMatches("/c", 2) == std::vector<std::string>{"/create"});
+    CHECK(OpenAnimaTui::commandMatches("/h", 2) ==
+          std::vector<std::string>{"/help", "/history clear"});
+    CHECK(OpenAnimaTui::commandMatches("/create a", 8).empty());
+    CHECK(OpenAnimaTui::commandMatches("hello", 5).empty());
+}
+
+TEST_CASE("completeCommand completes the single match and the common prefix") {
+    const auto [single, singleCursor] = OpenAnimaTui::completeCommand("/c", 2);
+    CHECK(single == "/create ");
+    CHECK(singleCursor == 8);
+
+    const auto [many, manyCursor] = OpenAnimaTui::completeCommand("/h", 2);
+    CHECK(many == "/h");
+    CHECK(manyCursor == 2);
+
+    const auto [full, fullCursor] = OpenAnimaTui::completeCommand("/hel", 4);
+    CHECK(full == "/help ");
+    CHECK(fullCursor == 6);
+}
+
+TEST_CASE("mapKey completes with tab inside a command and inserts it elsewhere") {
+    CHECK(OpenAnimaTui::mapKey(keyOf(OpenAnimaTui::Key::Kind::Tab), false, false, true) ==
+          OpenAnimaTui::Action::Complete);
+    CHECK(OpenAnimaTui::mapKey(keyOf(OpenAnimaTui::Key::Kind::Tab), false, false, false) ==
+          OpenAnimaTui::Action::Insert);
+}
+
+TEST_CASE("mapKey scrolls with page up and page down") {
+    CHECK(OpenAnimaTui::mapKey(keyOf(OpenAnimaTui::Key::Kind::PageUp), false, false, false) ==
+          OpenAnimaTui::Action::ScrollUp);
+    CHECK(OpenAnimaTui::mapKey(keyOf(OpenAnimaTui::Key::Kind::PageDown), false, false, false) ==
+          OpenAnimaTui::Action::ScrollDown);
 }
 
 TEST_CASE("mapKey turns ctrl+c into clear or leave depending on the draft") {
-    const OpenAnimaTui::Key ctrlC{OpenAnimaTui::Key::Kind::CtrlC, static_cast<char>(0)};
-    CHECK(OpenAnimaTui::mapKey(ctrlC, false, false) == OpenAnimaTui::Action::ClearDraft);
-    CHECK(OpenAnimaTui::mapKey(ctrlC, false, true) == OpenAnimaTui::Action::Leave);
-}
-
-TEST_CASE("mapKey decodes navigation and editing keys") {
-    CHECK(OpenAnimaTui::mapKey(characterKey('a'), false, true) == OpenAnimaTui::Action::Insert);
-    CHECK(OpenAnimaTui::mapKey({OpenAnimaTui::Key::Kind::ArrowUp, static_cast<char>(0)}, false,
-                               true) == OpenAnimaTui::Action::HistoryPrevious);
-    CHECK(OpenAnimaTui::mapKey({OpenAnimaTui::Key::Kind::ArrowDown, static_cast<char>(0)}, false,
-                               true) == OpenAnimaTui::Action::HistoryNext);
-    CHECK(OpenAnimaTui::mapKey({OpenAnimaTui::Key::Kind::CtrlA, static_cast<char>(0)}, false,
-                               true) == OpenAnimaTui::Action::MoveHome);
-    CHECK(OpenAnimaTui::mapKey({OpenAnimaTui::Key::Kind::CtrlE, static_cast<char>(0)}, false,
-                               true) == OpenAnimaTui::Action::MoveEnd);
-    CHECK(OpenAnimaTui::mapKey({OpenAnimaTui::Key::Kind::CtrlD, static_cast<char>(0)}, false,
-                               true) == OpenAnimaTui::Action::Leave);
-    CHECK(OpenAnimaTui::mapKey({OpenAnimaTui::Key::Kind::CtrlJ, static_cast<char>(0)}, false,
-                               true) == OpenAnimaTui::Action::Newline);
+    const OpenAnimaTui::Key ctrlC = keyOf(OpenAnimaTui::Key::Kind::CtrlC);
+    CHECK(OpenAnimaTui::mapKey(ctrlC, false, false, false) == OpenAnimaTui::Action::ClearDraft);
+    CHECK(OpenAnimaTui::mapKey(ctrlC, false, true, false) == OpenAnimaTui::Action::Leave);
 }
 
 TEST_CASE("elapsedTenths is zero when nothing is running") {

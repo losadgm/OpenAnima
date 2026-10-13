@@ -145,11 +145,13 @@ player works end to end; the other two drive the milestones below.
     answer as it arrives and loads `.env` on its own, but it drives a single agent with no
     world around it and it paints one line at a time.
 - [~] Terminal client under `examples/`.
-  - `examples/tuiHarness`, designed in [the harnesses page](harness.html): a live region at the
-    bottom, with the answer growing in place and the keys still answering while the model
-    writes. Built over its own terminal layer (Unix termios, Windows console) and with the
+  - `examples/tuiHarness`, designed in [the harnesses page](harness.html): a full screen with
+    a conversation of its own to scroll, a prompt pinned at the bottom with its command
+    palette, and a world of NPCs reached by identifier with `/create`, `/enter`, `/npcs` and
+    `/leave`. Built over its own terminal layer (Unix termios, Windows console) and with the
     screen logic testable on its own. What is left is the client test over a pseudo-terminal
-    inside the suite.
+    inside the suite, and letting several NPCs share one conversation, which needs the library
+    to carry it.
 - [ ] Logging hook with levels (Trace, Debug, Warn, Error).
   - The only output today is a stderr note from the harness and the exception messages. A
     library should let the host application decide where the logs go.
