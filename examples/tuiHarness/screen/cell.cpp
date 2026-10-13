@@ -1,7 +1,6 @@
 #include "cell.h"
 
 #include <algorithm>
-#include <cstddef>
 #include <string_view>
 
 namespace OpenAnimaTui::Screen {

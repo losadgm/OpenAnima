@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "screen/text.h"
-#include "tui_test_support.h"
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
 

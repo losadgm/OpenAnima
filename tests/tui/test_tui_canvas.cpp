@@ -2,10 +2,7 @@
 /// @brief The grid the client paints on: clipping, wide characters and combining marks.
 
 #include <catch2/catch_test_macros.hpp>
-#include <cstddef>
-#include <string>
 
-#include "screen/canvas.h"
 #include "screen/cell.h"
 #include "screen/style.h"
 #include "screen/text.h"

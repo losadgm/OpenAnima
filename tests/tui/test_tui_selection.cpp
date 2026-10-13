@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <string>
 
-#include "screen/canvas.h"
 #include "screen/selection.h"
 #include "screen/style.h"
 #include "tui_test_support.h"

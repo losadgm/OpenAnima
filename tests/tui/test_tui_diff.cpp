@@ -9,7 +9,6 @@
 #include <string_view>
 #include <vector>
 
-#include "screen/canvas.h"
 #include "screen/cell.h"
 #include "screen/diff.h"
 #include "screen/style.h"
