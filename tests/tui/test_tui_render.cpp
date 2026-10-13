@@ -189,6 +189,20 @@ TEST_CASE("the speaker of a line is named in the prefix and the text follows it"
     CHECK(rendered.frame.at(4, 8).style.foreground.equals(Palette::text().foreground));
 }
 
+TEST_CASE("a character still arriving leaves the prompt clean") {
+    Model model;
+    type(model, "a");
+    type(model, "\xc3");  // The first byte of an enye, with the one after it still on its way.
+    RenderResult rendered = render(model, 40, 10);
+    CHECK(readRow(rendered.frame, 9).substr(0, 5) == "\u2771 a");
+    CHECK(rendered.frame.at(9, 3).isBlank());
+
+    type(model, "\xb1");
+    rendered = render(model, 40, 10);
+    CHECK(readRow(rendered.frame, 9).substr(0, 7) == "\u2771 a\u00f1");
+    CHECK(rendered.frame.at(9, 3).length == 2);
+}
+
 TEST_CASE("a turn in flight is shown as the answer arrives") {
     Model model;
     submit(model, "/create a smith");

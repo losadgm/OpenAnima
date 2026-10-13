@@ -72,6 +72,19 @@ TEST_CASE("a combining mark joins the character before it") {
     CHECK(canvas.width() == 4);
 }
 
+TEST_CASE("a character still arriving is not painted until it arrives") {
+    Canvas canvas{4, 1};
+    // The first two bytes of an enye, which is what a draft holds between the byte the keyboard
+    // sent and the one after it.
+    canvas.put(0, 0, "a\xc3", Style{});
+    CHECK(readRow(canvas, 0) == "a   ");
+    CHECK(canvas.at(0, 1).isBlank());
+
+    canvas.put(0, 1, "\xc3\xb1", Style{});
+    CHECK(readRow(canvas, 0) == "a\u00f1  ");
+    CHECK(canvas.at(0, 1).length == 2);
+}
+
 TEST_CASE("a fill lays a background down without writing characters") {
     Canvas canvas{5, 1};
     canvas.fill(0, 1, 3, Palette::panel());

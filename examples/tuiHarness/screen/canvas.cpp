@@ -29,6 +29,16 @@ void setBlank(Cell& cell) {
     cell.wide = false;
 }
 
+/// Whether what starts at a position is a character whose remaining bytes have not arrived.
+/// @param text Text being painted.
+/// @param offset Position of the first byte.
+/// @return True for half a character, which is what a draft holds between two keystrokes and
+/// what a streamed answer holds between two pieces.
+bool incompleteAt(std::string_view text, std::size_t offset) {
+    const std::size_t wanted = utf8Length(static_cast<unsigned char>(text[offset]));
+    return wanted > 1 && offset + wanted > text.size();
+}
+
 }  // namespace
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
@@ -104,6 +114,12 @@ void Canvas::put(std::size_t row, std::size_t column, std::string_view text, con
     std::size_t current = column;
     for (std::size_t offset = 0; offset < text.size();) {
         const std::size_t start = offset;
+        // Half a character is not a character yet: painting it would send the bytes to the
+        // terminal, which turns them into a glyph of its own, in a cell the client believes is
+        // blank and so never paints over. It waits for the rest.
+        if (incompleteAt(text, offset)) {
+            return;
+        }
         const std::uint32_t codepoint = decodeCodepoint(text, offset);
         const std::string_view bytes = text.substr(start, offset - start);
 
