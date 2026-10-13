@@ -22,6 +22,7 @@ std::size_t rank(std::size_t row, std::size_t column) {
 
 }  // namespace
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void Selection::begin(std::size_t row, std::size_t column) {
     m_active = true;
     m_anchorRow = row;
@@ -30,6 +31,7 @@ void Selection::begin(std::size_t row, std::size_t column) {
     m_cursorColumn = column;
 }
 
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void Selection::extend(std::size_t row, std::size_t column) {
     if (!m_active) {
         return;

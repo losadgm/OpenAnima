@@ -20,11 +20,15 @@ public:
     /// Starts a selection at a position.
     /// @param row Row where the button went down.
     /// @param column Column where the button went down.
+    // A position on the screen is a row and a column, and they are named at every call site.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     void begin(std::size_t row, std::size_t column);
 
     /// Moves the moving end of the selection.
     /// @param row Row the mouse is at.
     /// @param column Column the mouse is at.
+    // As above: a row and a column, both named where they are used.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
     void extend(std::size_t row, std::size_t column);
 
     /// Forgets the selection.
