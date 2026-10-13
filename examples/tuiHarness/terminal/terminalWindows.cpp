@@ -15,7 +15,6 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
-#include <vector>
 #include <windows.h>
 
 #include "terminal.h"
@@ -62,9 +61,17 @@ public:
             m_savedOutputMode = outputMode;
             (void)SetConsoleMode(m_output, outputMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
         }
+
+        // The client writes UTF-8 and the console reads what it is handed with its own code
+        // page: under the one a legacy console starts with, an enye arrives as two characters.
+        m_savedOutputCodePage = GetConsoleOutputCP();
+        (void)SetConsoleOutputCP(CP_UTF8);
     }
 
     ~WindowsTerminal() override {
+        if (m_savedOutputCodePage != 0) {
+            (void)SetConsoleOutputCP(m_savedOutputCodePage);
+        }
         (void)SetConsoleMode(m_input, m_savedInputMode);
         (void)SetConsoleMode(m_output, m_savedOutputMode);
     }
@@ -146,6 +153,43 @@ public:
 
     [[nodiscard]] bool hasPending() const override {
         return !m_out.empty();
+    }
+
+    /// Puts a text in the Windows clipboard, which is the one the user can paste from
+    /// everywhere else.
+    /// @param text Text to copy, which is dropped when there is nothing to put.
+    void copyToClipboard(std::string_view text) override {
+        const std::wstring wide = wideOf(text);
+        if (wide.empty()) {
+            return;
+        }
+        if (OpenClipboard(nullptr) == 0) {
+            return;
+        }
+        if (EmptyClipboard() == 0) {
+            (void)CloseClipboard();
+            return;
+        }
+        // The clipboard takes the memory and frees it, which is why it has to be movable and why
+        // it is ours to free when it is refused.
+        const std::size_t bytes = (wide.size() + 1) * sizeof(wchar_t);
+        HGLOBAL memory = GlobalAlloc(GMEM_MOVEABLE, bytes);
+        if (memory == nullptr) {
+            (void)CloseClipboard();
+            return;
+        }
+        void* target = GlobalLock(memory);
+        if (target == nullptr) {
+            (void)GlobalFree(memory);
+            (void)CloseClipboard();
+            return;
+        }
+        std::memcpy(target, wide.c_str(), bytes);
+        (void)GlobalUnlock(memory);
+        if (SetClipboardData(CF_UNICODETEXT, memory) == nullptr) {
+            (void)GlobalFree(memory);
+        }
+        (void)CloseClipboard();
     }
 
 private:
@@ -244,14 +288,13 @@ private:
         }
 
         if (record.uChar.UnicodeChar != 0 && record.uChar.UnicodeChar >= 0x20) {
-            const wchar_t character[2] = {record.uChar.UnicodeChar, L'\0'};
-            char utf8[4] = {};
-            const int bytes = WideCharToMultiByte(CP_UTF8, 0, character, 1, utf8,
-                                                  static_cast<int>(sizeof(utf8)), nullptr, nullptr);
-            m_pending.assign(utf8, utf8 + bytes);
-            const auto first = static_cast<unsigned char>(m_pending.front());
-            m_pending.erase(0, 1);
-            return character(first);
+            const std::string bytes = utf8Of(record.uChar.UnicodeChar);
+            if (!bytes.empty()) {
+                m_pending = bytes;
+                const auto first = static_cast<unsigned char>(m_pending.front());
+                m_pending.erase(0, 1);
+                return character(first);
+            }
         }
 
         return Key{Key::Kind::Unknown, static_cast<char>(0)};
@@ -292,10 +335,44 @@ private:
         return Key{Key::Kind::Character, static_cast<char>(byte)};
     }
 
+    /// The UTF-8 bytes of one wide character, which is what the rest of the client reads.
+    /// @param wide Character the console reported, in UTF-16.
+    /// @return The bytes, empty when the console handed over nothing usable.
+    [[nodiscard]] static std::string utf8Of(wchar_t wide) {
+        if (wide < 0x20) {
+            return {};
+        }
+        const wchar_t text[2] = {wide, L'\0'};
+        char bytes[4] = {};
+        const int length = WideCharToMultiByte(CP_UTF8, 0, text, 1, bytes,
+                                               static_cast<int>(sizeof(bytes)), nullptr, nullptr);
+        return length > 0 ? std::string(bytes, bytes + length) : std::string{};
+    }
+
+    /// The UTF-16 form of a text, which is what the wide Windows calls take.
+    /// @param text Text to convert, in UTF-8.
+    /// @return The text, empty when there is nothing that converts.
+    [[nodiscard]] static std::wstring wideOf(std::string_view text) {
+        if (text.empty()) {
+            return {};
+        }
+        const int length =
+            MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()), nullptr, 0);
+        if (length <= 0) {
+            return {};
+        }
+        std::wstring wide(static_cast<std::size_t>(length), L'\0');
+        (void)MultiByteToWideChar(CP_UTF8, 0, text.data(), static_cast<int>(text.size()),
+                                  wide.data(), length);
+        return wide;
+    }
+
     HANDLE m_input{INVALID_HANDLE_VALUE};
     HANDLE m_output{INVALID_HANDLE_VALUE};
     DWORD m_savedInputMode{0};
     DWORD m_savedOutputMode{0};
+    /// Output code page the console had, so it is handed back the way it was.
+    UINT m_savedOutputCodePage{0};
     /// UTF-8 bytes of a wide character not yet handed over, one byte per readKey.
     std::string m_pending;
 };
