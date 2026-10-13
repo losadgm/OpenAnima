@@ -96,7 +96,7 @@ the accent colour, and the list is cut rather than pushed around when the window
 | Page up, Page down | Scrolls the conversation |
 | Wheel | Scrolls the conversation, three rows a notch |
 | Esc, Ctrl+C | Cancels the turn in flight, keeping what it had produced |
-| Drag over the conversation | Picks out those cells, painted reversed |
+| Drag over the conversation | Picks out those cells, painted reversed as the pointer moves |
 | Ctrl+C with something picked out | Copies it, and drops the picking |
 | Ctrl+C with nothing in flight or picked out | Clears the draft, and leaves when it is already empty |
 | Ctrl+V | Types what was copied last |
@@ -104,6 +104,11 @@ the accent colour, and the list is cut rather than pushed around when the window
 
 A tab is never written into the draft. It counts as one column to the client and as up to
 eight to the terminal, and the two disagreeing is what tore the row apart.
+
+The picking out follows the button for as long as it is held: the cells are painted as the
+pointer passes over them, the paint grows and shrinks with it, and the last one stays painted
+when the button comes back up. Everything the conversation holds can be picked out, the prompt,
+the panels and the hints included, because what is read back is what was painted.
 
 Anything a keyboard can send reaches the draft as bytes, so an enye, an accented vowel or a
 combining mark typed after a letter lands in the same cell as the letter it belongs to.

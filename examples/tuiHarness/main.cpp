@@ -127,6 +127,10 @@ bool handleScreenKey(const Key& key, OpenAnimaTui::Screen::Selection& selection,
         selection.begin(key.row, key.column);
         return true;
     case Key::Kind::MouseDrag:
+        // Dragging back over where the button went down is part of a drag, and the paint
+        // follows it down to the one cell it covers.
+        selection.extend(key.row, key.column);
+        return true;
     case Key::Kind::MouseRelease:
         selection.extend(key.row, key.column);
         // A click that went nowhere picks nothing out: there is no selection to copy or to show.

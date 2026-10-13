@@ -104,21 +104,22 @@ public:
 
     /// Switches to the alternate screen, where the client owns every row, and asks the terminal
     /// for the keyboard and the mouse it can report: the enhanced keyboard where it exists, one
-    /// event per paste, and the wheel as a wheel instead of the arrow keys the terminal would
-    /// otherwise make of it. The caret is left where the client puts it.
+    /// event per paste, the wheel as a wheel instead of the arrow keys the terminal would
+    /// otherwise make of it, and the pointer moving while a button is held, which is what
+    /// picking text out follows. The caret is left where the client puts it.
     ///
     /// Asking for the mouse means the terminal stops handling the wheel and the selection
     /// itself: it is the price of the wheel scrolling the conversation rather than the
     /// terminal's own scrollback, which has nothing in it while the alternate screen is up.
     /// Holding shift still selects text in most terminals.
     void enterAlternateScreen() {
-        write("\x1b[?1049h\x1b[>1u\x1b[?2004h\x1b[?1000h\x1b[?1006h");
+        write("\x1b[?1049h\x1b[>1u\x1b[?2004h\x1b[?1002h\x1b[?1006h");
     }
 
     /// Leaves the alternate screen and hands the terminal back to the shell, with the keyboard
     /// and the mouse reported the way they were.
     void leaveAlternateScreen() {
-        write("\x1b[<u\x1b[?2004l\x1b[?1006l\x1b[?1000l\x1b[?1049l");
+        write("\x1b[<u\x1b[?2004l\x1b[?1006l\x1b[?1002l\x1b[?1049l");
     }
 };
 

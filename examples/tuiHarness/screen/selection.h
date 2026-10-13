@@ -34,10 +34,11 @@ public:
     /// Forgets the selection.
     void clear();
 
-    /// @return Whether there is a selection, empty or not.
+    /// @return Whether the mouse is holding something picked out, a single cell included.
     [[nodiscard]] bool active() const;
 
-    /// @return Whether the selection covers nothing, which is what a click leaves behind.
+    /// @return Whether there is nothing worth taking: a selection the mouse never left, which is
+    /// what a click leaves behind, and one that was never started.
     [[nodiscard]] bool empty() const;
 
     /// @param row Row to look at.

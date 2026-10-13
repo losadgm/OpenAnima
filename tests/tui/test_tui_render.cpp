@@ -10,6 +10,7 @@
 
 #include "app/model.h"
 #include "screen/render.h"
+#include "screen/selection.h"
 #include "screen/text.h"
 #include "tui_test_support.h"
 
@@ -22,6 +23,7 @@ using OpenAnimaTui::App::Effect;
 using OpenAnimaTui::App::Model;
 using OpenAnimaTui::Screen::render;
 using OpenAnimaTui::Screen::RenderResult;
+using OpenAnimaTui::Screen::Selection;
 using OpenAnimaTui::Screen::Metrics::MaxHints;
 using namespace OpenAnimaTui::Tests;
 
@@ -196,6 +198,27 @@ TEST_CASE("a turn in flight is shown as the answer arrives") {
     const std::string screen = readAll(render(model, 40, 12).frame);
     CHECK(screen.find("waiting") != std::string::npos);
     CHECK(screen.find("working") != std::string::npos);
+}
+
+TEST_CASE("what the mouse is holding is painted, down to the cell it went down on") {
+    Model model;
+    type(model, "hola");
+
+    Selection selection;
+    selection.begin(9, 2);
+    selection.extend(9, 5);
+    RenderResult rendered = render(model, 40, 10, selection);
+    CHECK(rendered.frame.at(9, 2).style.reverse);
+    CHECK(rendered.frame.at(9, 5).style.reverse);
+    CHECK_FALSE(rendered.frame.at(9, 1).style.reverse);
+    CHECK_FALSE(rendered.frame.at(9, 6).style.reverse);
+
+    // A drag that comes back over where the button went down is still a drag, and the one
+    // cell it covers is still painted.
+    selection.extend(9, 2);
+    rendered = render(model, 40, 10, selection);
+    CHECK(rendered.frame.at(9, 2).style.reverse);
+    CHECK_FALSE(rendered.frame.at(9, 3).style.reverse);
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

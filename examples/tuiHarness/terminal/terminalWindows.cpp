@@ -47,9 +47,11 @@ public:
         m_savedInputMode = inputMode;
 
         const DWORD rawInput =
-            inputMode &
-            ~static_cast<DWORD>(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT | ENABLE_PROCESSED_INPUT);
-        if (SetConsoleMode(m_input, rawInput | ENABLE_MOUSE_INPUT) == 0) {
+            inputMode & ~static_cast<DWORD>(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT |
+                                            ENABLE_PROCESSED_INPUT | ENABLE_QUICK_EDIT_MODE);
+        // The console keeps the mouse to itself while quick edit is on, and the button flags are
+        // only read when the extended flags are asked for.
+        if (SetConsoleMode(m_input, rawInput | ENABLE_EXTENDED_FLAGS | ENABLE_MOUSE_INPUT) == 0) {
             throw std::runtime_error("SetConsoleMode failed");
         }
 
@@ -164,6 +166,15 @@ private:
             return std::nullopt;
         }
         if (record.dwEventFlags == MOUSE_MOVED) {
+            // Motion arrives whether or not a button is down, and only a button being held is a
+            // drag: otherwise the picking out would follow the pointer around the screen.
+            constexpr DWORD AnyButton = FROM_LEFT_1ST_BUTTON_PRESSED |
+                                        FROM_LEFT_2ND_BUTTON_PRESSED |
+                                        FROM_LEFT_3RD_BUTTON_PRESSED |
+                                        FROM_LEFT_4TH_BUTTON_PRESSED | RIGHTMOST_BUTTON_PRESSED;
+            if ((record.dwButtonState & AnyButton) == 0) {
+                return std::nullopt;
+            }
             return positioned(Key::Kind::MouseDrag, record);
         }
         if (record.dwEventFlags == MOUSE_HWHEELED || record.dwEventFlags == DOUBLE_CLICK) {

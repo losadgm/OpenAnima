@@ -8,7 +8,6 @@
 #include <utility>
 #include <vector>
 
-#include "app/commands.h"
 #include "canvas.h"
 #include "cell.h"
 #include "selection.h"
@@ -179,11 +178,13 @@ std::string statusRow(const Model& model) {
 }
 
 /// Paint what the mouse picked out, over whatever the frame holds there: a selection is about the
-/// screen, not about the conversation behind it.
+/// screen, not about the conversation behind it. A drag that is down to one cell still shows,
+/// which is why this asks whether the mouse is holding something and not whether there is
+/// something worth copying.
 /// @param frame Frame to paint on.
 /// @param selection Cells the mouse picked out.
 void pickOutSelection(Canvas& frame, const Selection& selection) {
-    if (selection.empty()) {
+    if (!selection.active()) {
         return;
     }
     const std::size_t last = std::min(selection.lastRow(), frame.height() - 1);
