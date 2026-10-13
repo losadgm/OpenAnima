@@ -18,6 +18,7 @@
 
 #include "app/model.h"
 #include "dotenv.h"
+#include "screen/diff.h"
 #include "screen/render.h"
 #include "terminal/terminal.h"
 
@@ -101,12 +102,19 @@ int main() {
     std::map<std::size_t, NPCBrain> brains;
     Model model;
     model.modelName = config.model;
+    OpenAnimaTui::Screen::FrameWriter writer;
 
     RequestId turn{0};
     bool dirty = true;
     std::size_t drawnTenths = 0;
+    std::string frame;
 
     while (model.running) {
+        // What the terminal has not taken yet goes first: while something is still on its way
+        // there is no point in deciding what the screen looks like next, and saying it twice
+        // would only queue another frame behind the one that has not arrived.
+        const bool drained = terminal->flush();
+
         if (const auto key = terminal->readKey(std::chrono::milliseconds{20})) {
             runEffects(OpenAnimaTui::App::update(model, *key, terminal->height() / 2), brains,
                        config, turn);
@@ -122,17 +130,20 @@ int main() {
             dirty = true;
         }
 
-        if (dirty) {
+        if (dirty && drained) {
             const OpenAnimaTui::Screen::RenderResult rendered =
                 OpenAnimaTui::Screen::render(model, terminal->width(), terminal->height());
-            terminal->write("\x1b[H" + rendered.text);
-            terminal->write("\x1b[" + std::to_string(rendered.caretRow + 1) + ";" +
-                            std::to_string(rendered.caretCol + 1) + "H");
+            writer.setCaret(rendered.caretRow, rendered.caretColumn);
+            frame.clear();
+            writer.emit(rendered.frame, frame);
+            terminal->write(frame);
             drawnTenths = OpenAnimaTui::App::elapsedTenths(model);
             dirty = false;
         }
     }
 
+    terminal->flush();
     terminal->leaveAlternateScreen();
+    terminal->flush();
     return EXIT_SUCCESS;
 }

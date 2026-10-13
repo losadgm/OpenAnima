@@ -115,12 +115,34 @@ public:
     }
 
     void write(std::string_view text) override {
-        const int written =
-            _write(_fileno(stdout), text.data(), static_cast<unsigned>(text.size()));
-        (void)written;
+        if (text.empty()) {
+            return;
+        }
+        // The console API takes a string at a time, so what does not fit waits here rather than
+        // holding up the loop that reads the keyboard.
+        m_out.append(text);
+        (void)flush();
+    }
+
+    bool flush() override {
+        while (!m_out.empty()) {
+            const int written =
+                _write(_fileno(stdout), m_out.data(), static_cast<unsigned>(m_out.size()));
+            if (written <= 0) {
+                return false;
+            }
+            m_out.erase(0, static_cast<std::size_t>(written));
+        }
+        return true;
+    }
+
+    [[nodiscard]] bool hasPending() const override {
+        return !m_out.empty();
     }
 
 private:
+    /// Bytes the console has not taken yet.
+    std::string m_out;
     /// Turns one key event into a key, spelling printable characters as UTF-8 bytes in the
     /// pending buffer, one byte per press, the way the Unix side delivers them.
     std::optional<Key> translate(const KEY_EVENT_RECORD& record) {

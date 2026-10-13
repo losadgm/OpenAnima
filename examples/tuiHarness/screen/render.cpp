@@ -2,11 +2,14 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
 #include "app/commands.h"
+#include "canvas.h"
 #include "style.h"
 #include "text.h"
 
@@ -17,18 +20,25 @@ namespace {
 using App::Message;
 using App::Model;
 using App::Role;
+using Metrics::HintIndent;
+using Metrics::MaxHints;
+using Metrics::PrefixWidth;
+using Metrics::PromptWidth;
 
-/// The draft as display rows: the body of each, the position of every character index, and
-/// the character range each row covers. Columns are code points, so accented input does not
-/// push the caret or the wrapping out of step.
+/// The draft as display rows: the text of each, where every byte of it lands, and the bytes
+/// each row covers. Columns are measured in what the terminal shows, so a wide character takes
+/// the two it takes and a combining mark takes none.
 struct DraftLayout {
-    std::vector<std::string> rows;                               ///< Body text per row.
-    std::vector<std::pair<std::size_t, std::size_t>> positions;  ///< Char -> (row, column).
-    std::vector<std::pair<std::size_t, std::size_t>> ranges;     ///< Row -> (first, last) char.
+    std::vector<std::string> rows;                               ///< Text per row.
+    std::vector<std::pair<std::size_t, std::size_t>> positions;  ///< Byte -> (row, column).
+    std::vector<std::pair<std::size_t, std::size_t>> ranges;     ///< Row -> (first, last) byte.
 };
 
-/// Splits the draft into rows that never exceed the width, at the character level.
-DraftLayout layoutDraft(const std::string& draft, std::size_t width) {
+/// Splits the draft into rows that never exceed the width.
+/// @param draft Draft as typed.
+/// @param width Columns available, prompt marker included.
+/// @return The rows and where the bytes of the draft land.
+DraftLayout layoutDraft(std::string_view draft, std::size_t width) {
     const std::size_t bodyWidth = width > PromptWidth ? width - PromptWidth : 1;
 
     DraftLayout layout;
@@ -37,28 +47,30 @@ DraftLayout layoutDraft(const std::string& draft, std::size_t width) {
     std::size_t rowColumns = 0;
     std::size_t rowStart = 0;
 
-    for (std::size_t index = 0; index < draft.size();) {
-        const std::size_t length = utf8Length(static_cast<unsigned char>(draft[index]));
-        if (draft[index] == '\n') {
-            layout.ranges.emplace_back(rowStart, index);
+    for (std::size_t offset = 0; offset < draft.size();) {
+        const std::size_t start = offset;
+        const std::uint32_t codepoint = decodeCodepoint(draft, offset);
+        const std::string_view bytes = draft.substr(start, offset - start);
+        const std::size_t columns = codepoint == '\n' ? 1 : glyphColumns(codepoint);
+
+        if (codepoint == '\n') {
+            layout.ranges.emplace_back(rowStart, start);
             layout.rows.emplace_back();
             rowColumns = 0;
-            rowStart = index + 1;
-            index += 1;
-        } else if (rowColumns >= bodyWidth) {
-            layout.ranges.emplace_back(rowStart, index);
+            rowStart = offset;
+        } else if (rowColumns + columns > bodyWidth) {
+            layout.ranges.emplace_back(rowStart, start);
             layout.rows.emplace_back();
             rowColumns = 0;
-            rowStart = index;
-            continue;
-        } else {
-            layout.rows.back() += draft.substr(index, length);
-            ++rowColumns;
-            index += length;
+            rowStart = start;
         }
-        // The caret is moved byte by byte, so every byte of a character points at the column
-        // the whole character ends on: the caret never sits inside one.
-        for (std::size_t byte = 0; byte < length; ++byte) {
+        if (codepoint != '\n') {
+            layout.rows.back() += bytes;
+            rowColumns += columns;
+        }
+        // The caret is moved byte by byte, so every byte of a character points at the column the
+        // whole character ends on: the caret never sits inside one.
+        for (std::size_t index = start; index < offset; ++index) {
             layout.positions.emplace_back(layout.rows.size() - 1, rowColumns);
         }
     }
@@ -67,139 +79,125 @@ DraftLayout layoutDraft(const std::string& draft, std::size_t width) {
 }
 
 /// How long the command token is: the leading word when the draft is a command.
-std::size_t commandTokenLength(const std::string& draft) {
+/// @param draft Draft as typed.
+/// @return Bytes of the token, zero when the draft is not a command.
+std::size_t commandTokenLength(std::string_view draft) {
     if (draft.empty() || draft[0] != '/') {
         return 0;
     }
     const std::size_t space = draft.find(' ');
-    return space == std::string::npos ? draft.size() : space;
-}
-
-/// Pads a row and paints it over a panel background.
-std::string paint(const std::string& content, std::size_t width, const char* background) {
-    return std::string{background} + padRow(content, width) + Reset;
+    return space == std::string_view::npos ? draft.size() : space;
 }
 
 /// Pads a speaker name into the prefix it is shown under.
+/// @param speaker Name to show.
+/// @return The prefix, at least `PrefixWidth` columns wide.
 std::string prefix(const std::string& speaker) {
     std::string text = speaker;
     text.resize(std::max(PrefixWidth, speaker.size() + 2), ' ');
     return text;
 }
 
-/// Who is shown as speaking a line: the name of the prefix and the colour it is painted with.
-struct Speaker {
-    std::string name;  ///< Shown at the start of the first row.
-    const char* tint;  ///< SGR sequence for the prefix.
+/// One row of the conversation, before it is painted.
+struct TranscriptRow {
+    std::string prefix;  ///< Who is speaking, padded to `PrefixWidth` columns.
+    std::string body;    ///< What they say.
+    Style prefixStyle;   ///< How the name is painted.
+    Style bodyStyle;     ///< How the text is painted.
 };
 
-/// Renders one committed line: the speaker prefix and the wrapped body.
-std::vector<std::string> renderLine(const Speaker& speaker, const std::string& text,
-                                    std::size_t width) {
-    const std::size_t bodyWidth = width > PrefixWidth ? width - PrefixWidth : 1;
-    const std::vector<std::string> wrapped = wrap(text, bodyWidth);
-
-    std::vector<std::string> lines;
+/// Adds the rows of one message, wrapped to the body width.
+/// @param rows Rows collected so far, appended to.
+/// @param message Message to lay out.
+/// @param speaker Name shown at the start of the first row.
+/// @param nameStyle Style of that name.
+/// @param bodyStyle Style of the text.
+/// @param width Columns available for the body.
+void appendMessage(std::vector<TranscriptRow>& rows, const Message& message,
+                   const std::string& speaker, const Style& nameStyle, const Style& bodyStyle,
+                   std::size_t width) {
+    const std::vector<std::string> wrapped = wrap(message.text, width);
     for (std::size_t index = 0; index < wrapped.size(); ++index) {
-        lines.push_back(index == 0 ? std::string{speaker.tint} + prefix(speaker.name) + Reset
-                                   : std::string(PrefixWidth, ' '));
-        lines.back() += wrapped[index];
+        rows.push_back({index == 0 ? prefix(speaker) : std::string(PrefixWidth, ' '),
+                        wrapped[index], nameStyle, bodyStyle});
     }
-    return lines;
 }
 
-/// How the NPC being talked to is shown, or a stand-in when there is none.
-std::string npcLabel(const Model& model) {
-    return model.world.active.has_value() ? "npc " + std::to_string(*model.world.active) : "npc";
-}
-
-/// The name and colour of the one speaking a message.
-Speaker speakerOf(const Model& model, Role role) {
-    return role == Role::User ? Speaker{"you", Muted} : Speaker{npcLabel(model), Primary};
+/// Adds a note, which belongs to no speaker and is shown quietly.
+/// @param rows Rows collected so far, appended to.
+/// @param text Note to lay out.
+/// @param width Columns available for the body.
+void appendNote(std::vector<TranscriptRow>& rows, const std::string& text, std::size_t width) {
+    for (const std::string& line : wrap(text, width)) {
+        rows.push_back({std::string(PrefixWidth, ' '), line, Palette::muted(), Palette::muted()});
+    }
 }
 
 /// The conversation as display rows: finished turns first, the in-flight answer last.
-std::vector<std::string> transcriptLines(const Model& model, std::size_t width) {
-    std::vector<std::string> lines;
+/// @param model Model to show.
+/// @param width Columns available.
+/// @return One entry per row.
+std::vector<TranscriptRow> transcriptRows(const Model& model, std::size_t width) {
+    const std::size_t bodyWidth = width > PrefixWidth ? width - PrefixWidth : 1;
+    const std::string npc =
+        model.world.active.has_value() ? "npc " + std::to_string(*model.world.active) : "npc";
+
+    std::vector<TranscriptRow> rows;
     for (const Message& message : model.messages) {
         if (message.role == Role::System) {
-            for (const std::string& line :
-                 wrap(message.text, width > PrefixWidth ? width - PrefixWidth : 1)) {
-                lines.push_back(Muted + std::string(PrefixWidth, ' ') + line + Reset);
-            }
+            appendNote(rows, message.text, bodyWidth);
             continue;
         }
-        for (std::string& line : renderLine(speakerOf(model, message.role), message.text, width)) {
-            lines.push_back(std::move(line));
-        }
+        const bool fromUser = message.role == Role::User;
+        appendMessage(rows, message, fromUser ? "you" : npc,
+                      fromUser ? Palette::muted() : Palette::primary(), Palette::text(), bodyWidth);
     }
     if (model.busy || !model.answer.empty()) {
-        const Speaker speaker{npcLabel(model), Primary};
-        for (std::string& line :
-             renderLine(speaker, model.answer.empty() ? "..." : model.answer, width)) {
-            lines.push_back(std::move(line));
-        }
+        const Message answer{Role::Npc, model.answer.empty() ? "..." : model.answer};
+        appendMessage(rows, answer, npc, Palette::primary(), Palette::text(), bodyWidth);
     }
-    return lines;
+    return rows;
 }
 
 /// The one status row: what is working while a turn runs, or the model and what can be done.
-std::string statusLine(const Model& model) {
+/// @param model Model to show.
+/// @return The row, painted later.
+std::string statusRow(const Model& model) {
     if (model.busy) {
         const std::size_t tenths = App::elapsedTenths(model);
-        const std::size_t spinner = tenths % SpinnerFrames.size();
+        const std::size_t frame = tenths % Glyphs::Spinner.size();
         const std::string tail = model.cancelling ? "   cancelling" : "   esc to cancel";
-        return std::string(PrefixWidth - 1, ' ') + Accent + SpinnerFrames.at(spinner) +
-               ForegroundReset + ' ' + Muted + "working " + std::to_string(tenths / 10) + "." +
-               std::to_string(tenths % 10) + "s" + tail;
+        return std::string(PrefixWidth - 1, ' ') + Glyphs::Spinner.at(frame) + " " + "working " +
+               std::to_string(tenths / 10) + "." + std::to_string(tenths % 10) + "s" + tail;
     }
     const char* hint = model.world.active.has_value()
                            ? "ask something   /help for keys"
                            : "no npc   /create to make one   /help for keys";
-    return std::string(PrefixWidth, ' ') + Muted + model.modelName + "   " + hint;
-}
-
-/// The prompt as display rows, with the command token in its own colour.
-std::vector<std::string> promptRows(const std::string& draft, const DraftLayout& layout) {
-    const std::size_t commandLength = commandTokenLength(draft);
-    std::vector<std::string> rows;
-    for (std::size_t row = 0; row < layout.rows.size(); ++row) {
-        const std::size_t start = layout.ranges[row].first;
-        std::string body;
-        const std::size_t coloured =
-            commandLength > start ? std::min(commandLength - start, layout.rows[row].size()) : 0;
-        if (coloured > 0) {
-            body = std::string{Accent} + layout.rows[row].substr(0, coloured) + ForegroundReset +
-                   layout.rows[row].substr(coloured);
-        } else {
-            body = layout.rows[row];
-        }
-        rows.push_back(row == 0 ? std::string{Accent} + PromptMarker + " " + ForegroundReset + body
-                                : std::string(PromptWidth, ' ') + body);
-    }
-    return rows;
+    return std::string(PrefixWidth, ' ') + model.modelName + "   " + hint;
 }
 
 }  // namespace
 
 RenderResult render(const Model& model, std::size_t width, std::size_t height) {
-    const std::vector<std::string> transcript = transcriptLines(model, width);
+    RenderResult result{Canvas{width, height}, 0, 0};
+    Canvas& frame = result.frame;
+    if (width == 0 || height == 0) {
+        return result;
+    }
 
-    const DraftLayout promptLayout = layoutDraft(model.draft, width);
-    const std::vector<std::string> prompt = promptRows(model.draft, promptLayout);
+    const std::vector<TranscriptRow> transcript = transcriptRows(model, width);
+    const DraftLayout prompt = layoutDraft(model.draft, width);
 
     std::vector<std::string> hints = App::hintsFor(model);
     if (hints.size() > MaxHints) {
         hints.resize(MaxHints);
     }
 
-    const bool showStatus = height > prompt.size() + hints.size();
-    const std::size_t bottomRows = prompt.size() + hints.size() + (showStatus ? 1 : 0);
+    const bool withStatus = height > prompt.rows.size() + hints.size();
+    const std::size_t bottomRows = prompt.rows.size() + hints.size() + (withStatus ? 1 : 0);
     const std::size_t viewRows = height > bottomRows ? height - bottomRows : 0;
 
     // The viewport of the conversation, scrolled by the model.
-    std::vector<std::string> screen;
-    screen.reserve(height);
     const std::size_t total = transcript.size();
     std::size_t start = 0;
     if (total > viewRows) {
@@ -207,38 +205,56 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height) {
         start = total - viewRows - offset;
     }
     for (std::size_t row = 0; row < viewRows; ++row) {
-        screen.push_back(row < total ? padRow(transcript[start + row], width)
-                                     : std::string(width, ' '));
+        if (row < total) {
+            const TranscriptRow& line = transcript[start + row];
+            frame.put(row, 0, line.prefix, line.prefixStyle);
+            frame.put(row, PrefixWidth, line.body, line.bodyStyle);
+        }
     }
 
-    // The hints float over the conversation, on their own raised panel.
+    // The hints float over the conversation, on their own panel.
+    std::size_t row = viewRows;
     const std::size_t selected = hints.empty() ? 0 : std::min(model.hintIndex, hints.size() - 1);
     for (std::size_t index = 0; index < hints.size(); ++index) {
-        const std::string content = std::string("  ") + (index == selected ? Accent : Muted) +
-                                    hints[index] + ForegroundReset;
-        screen.push_back(paint(content, width, Raised));
+        const Style style = (index == selected ? Palette::accent() : Palette::muted())
+                                .withBackground(Palette::raisedColor());
+        frame.fill(row, 0, width, Palette::raised());
+        frame.put(row, HintIndent, hints[index], style);
+        ++row;
     }
 
-    if (showStatus) {
-        screen.push_back(paint(statusLine(model), width, Panel));
+    if (withStatus) {
+        frame.fill(row, 0, width, Palette::panel());
+        frame.put(row, 0, statusRow(model), Palette::muted().withBackground(Palette::panelColor()));
+        ++row;
     }
 
-    for (const std::string& row : prompt) {
-        screen.push_back(paint(row, width, Panel));
-    }
-
-    RenderResult result;
-    result.text.reserve(height * (width + 1));
-    for (std::size_t row = 0; row < screen.size(); ++row) {
-        if (row != 0) {
-            result.text += '\n';
+    // The prompt, which is the part that stays put while the conversation moves.
+    const std::size_t commandLength = commandTokenLength(model.draft);
+    for (std::size_t index = 0; index < prompt.rows.size(); ++index) {
+        frame.fill(row, 0, width, Palette::panel());
+        const std::size_t column = PromptWidth;
+        if (index == 0) {
+            frame.put(row, 0, Glyphs::PromptMarker,
+                      Palette::accent().withBackground(Palette::panelColor()));
         }
-        result.text += screen[row];
+
+        const std::size_t rangeStart = prompt.ranges[index].first;
+        const std::string& text = prompt.rows[index];
+        const std::size_t token =
+            commandLength > rangeStart ? std::min(commandLength - rangeStart, text.size()) : 0;
+        if (token > 0) {
+            frame.put(row, column, std::string_view{text}.substr(0, token),
+                      Palette::accent().withBackground(Palette::panelColor()));
+        }
+        frame.put(row, column + token, std::string_view{text}.substr(token),
+                  Palette::text().withBackground(Palette::panelColor()));
+        ++row;
     }
-    const auto [caretPromptRow, caretBodyCol] =
-        promptLayout.positions.at(std::min(model.cursor, model.draft.size()));
-    result.caretRow = viewRows + hints.size() + (showStatus ? 1 : 0) + caretPromptRow;
-    result.caretCol = PromptWidth + caretBodyCol;
+
+    const auto position = prompt.positions.at(std::min(model.cursor, model.draft.size()));
+    result.caretRow = viewRows + hints.size() + (withStatus ? 1 : 0) + position.first;
+    result.caretColumn = PromptWidth + position.second;
     return result;
 }
 

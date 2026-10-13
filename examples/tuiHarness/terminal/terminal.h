@@ -70,18 +70,33 @@ public:
     /// @return The key, or nothing when the timeout passed.
     virtual std::optional<Key> readKey(std::chrono::milliseconds timeout) = 0;
 
-    /// Writes text to the terminal.
+    /// Hands text to the terminal.
+    ///
+    /// What was written may not have left the process when this returns: a terminal that is not
+    /// reading fast enough would otherwise block the client, and a client blocked on writing is a
+    /// client that has stopped reading the keyboard. What is left over is kept and sent by
+    /// `flush`, and `hasPending` says whether there is any.
     /// @param text Text to write.
     virtual void write(std::string_view text) = 0;
 
-    /// Switches to the alternate screen, where the client owns every row.
+    /// Tries to send what is still waiting for the terminal.
+    /// @return Whether everything written so far has left the process.
+    virtual bool flush() = 0;
+
+    /// @return Whether something written has not left the process yet.
+    [[nodiscard]] virtual bool hasPending() const = 0;
+
+    /// Switches to the alternate screen, where the client owns every row, and asks the terminal
+    /// for the keyboard it can report: the enhanced protocol where it exists, one event per
+    /// paste, and the caret where the client puts it.
     void enterAlternateScreen() {
-        write("\x1b[?1049h");
+        write("\x1b[?1049h\x1b[>1u\x1b[?2004h");
     }
 
-    /// Leaves the alternate screen and hands the terminal back to the shell.
+    /// Leaves the alternate screen and hands the terminal back to the shell, with the keyboard
+    /// reported the way it was.
     void leaveAlternateScreen() {
-        write("\x1b[?1049l");
+        write("\x1b[<u\x1b[?2004l\x1b[?1049l");
     }
 };
 

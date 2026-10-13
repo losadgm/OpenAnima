@@ -5,6 +5,7 @@
 #include <array>
 #include <cerrno>
 #include <cstring>
+#include <fcntl.h>
 #include <memory>
 #include <poll.h>
 #include <stdexcept>
@@ -41,10 +42,24 @@ public:
             throw std::runtime_error(std::string{"tcsetattr: "} + std::strerror(errno));
         }
         m_active = true;
+
+        // Writing never waits: a terminal that has stopped reading must not be able to freeze the
+        // client, which would leave the keyboard unread until it caught up.
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+        m_savedOutputFlags = fcntl(STDOUT_FILENO, F_GETFL, 0);
+        if (m_savedOutputFlags >= 0) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+            (void)fcntl(STDOUT_FILENO, F_SETFL, m_savedOutputFlags | O_NONBLOCK);
+        }
     }
 
     ~UnixTerminal() override {
         if (m_active) {
+            (void)flush();
+            if (m_savedOutputFlags >= 0) {
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg)
+                (void)fcntl(STDOUT_FILENO, F_SETFL, m_savedOutputFlags);
+            }
             tcsetattr(STDIN_FILENO, TCSANOW, &m_saved);
         }
     }
@@ -83,15 +98,29 @@ public:
     }
 
     void write(std::string_view text) override {
-        std::size_t written = 0;
-        while (written < text.size()) {
-            const ssize_t chunk =
-                ::write(STDOUT_FILENO, text.data() + written, text.size() - written);
-            if (chunk <= 0) {
-                return;
+        m_out.append(text);
+        (void)flush();
+    }
+
+    bool flush() override {
+        while (!m_out.empty()) {
+            const ssize_t chunk = ::write(STDOUT_FILENO, m_out.data(), m_out.size());
+            if (chunk > 0) {
+                m_out.erase(0, static_cast<std::size_t>(chunk));
+                continue;
             }
-            written += static_cast<std::size_t>(chunk);
+            if (chunk < 0 && errno == EINTR) {
+                continue;
+            }
+            // A terminal that is not reading fast enough, or that has gone away. Either way what
+            // is left stays here and the client keeps reading the keyboard.
+            return false;
         }
+        return true;
+    }
+
+    [[nodiscard]] bool hasPending() const override {
+        return !m_out.empty();
     }
 
 private:
@@ -235,9 +264,12 @@ private:
 
     termios m_saved{};
     bool m_active{false};
+    int m_savedOutputFlags{0};
     /// Bytes read but not turned into keys yet: a read hands over everything that is
     /// waiting, and a paste or a fast typist hands over several.
     std::string m_pending;
+    /// Bytes the terminal has not taken yet, which is why writing never waits for it.
+    std::string m_out;
 };
 
 }  // namespace

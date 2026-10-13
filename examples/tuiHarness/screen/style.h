@@ -1,35 +1,127 @@
 /// @file
-/// @brief The palette and the glyphs, borrowed from the OpenCode dark theme.
+/// @brief Colour and style as values, so what the terminal has been told can be compared.
 
 #pragma once
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 namespace OpenAnimaTui::Screen {
 
-/// The OpenCode dark palette, taken from its theme.json, as 24-bit SGR.
-constexpr const char* Accent = "\x1b[38;2;157;124;216m";   // #9d7cd8
-constexpr const char* Primary = "\x1b[38;2;250;178;131m";  // #fab283
-constexpr const char* Muted = "\x1b[38;2;128;128;128m";    // #808080
+/// A colour the terminal can paint: its own default, a palette index, or 24-bit RGB.
+struct Color {
+    /// Which of the three ways the colour is given.
+    enum class Kind : std::uint8_t { Default, Indexed, Rgb };
 
-/// Panel backgrounds, so the prompt reads as a box floating over the conversation.
-constexpr const char* Panel = "\x1b[48;2;20;20;20m";   // #141414
-constexpr const char* Raised = "\x1b[48;2;30;30;30m";  // #1e1e1e
+    Kind kind{Kind::Default};  ///< How to read the fields below.
+    std::uint8_t index{0};     ///< Palette entry, for Kind::Indexed.
+    std::uint8_t red{0};       ///< Red channel, for Kind::Rgb.
+    std::uint8_t green{0};     ///< Green channel, for Kind::Rgb.
+    std::uint8_t blue{0};      ///< Blue channel, for Kind::Rgb.
 
-/// Ends a colour, and ends a foreground colour only, which keeps a panel background.
-constexpr const char* Reset = "\x1b[0m";
-constexpr const char* ForegroundReset = "\x1b[39m";
+    /// @return The colour the terminal uses when nothing is asked for.
+    [[nodiscard]] static Color defaultValue();
 
-/// The prompt marker, as OpenCode draws its prompts, and the dots it spins while working.
-constexpr const char* PromptMarker = "\u2771";
-constexpr std::array<const char*, 10> SpinnerFrames = {
-    "\u280B", "\u2819", "\u2839", "\u2838", "\u283C",
-    "\u2834", "\u2826", "\u2827", "\u2807", "\u280F",
+    /// @param index Palette entry, 0 to 255.
+    /// @return That palette entry.
+    [[nodiscard]] static Color indexed(std::uint8_t index);
+
+    /// @param red Red channel.
+    /// @param green Green channel.
+    /// @param blue Blue channel.
+    /// @return That 24-bit colour.
+    // A colour is three channels in the order everything in the world spells them.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    [[nodiscard]] static Color rgb(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
+
+    /// @param other Colour to compare with.
+    /// @return Whether both name the same colour.
+    [[nodiscard]] bool equals(const Color& other) const;
 };
 
-constexpr std::size_t PrefixWidth = 8;  ///< Width every speaker prefix is padded to.
-constexpr std::size_t PromptWidth = 2;  ///< Width of the prompt marker, one glyph plus a space.
-constexpr std::size_t MaxHints = 6;     ///< Commands shown while one is being typed.
+/// How a cell is painted: a foreground, a background and the display attributes.
+///
+/// It is a value on purpose. The frame writer keeps the style the terminal is in, compares it
+/// with the one a cell asks for, and only speaks when they differ, which is where most of the
+/// bytes and most of the flicker go away.
+struct Style {
+    Color foreground{};     ///< Colour of the glyph.
+    Color background{};     ///< Colour behind the glyph.
+    bool bold{false};       ///< Heavier, and some terminals use the bright palette entry.
+    bool dim{false};        ///< Fainter.
+    bool italic{false};     ///< Slanted.
+    bool underline{false};  ///< Underlined.
+    bool reverse{false};    ///< Foreground and background swapped.
+
+    /// @param colour Colour of the glyph.
+    /// @return A copy painted with that foreground.
+    [[nodiscard]] Style withForeground(const Color& colour) const;
+
+    /// @param colour Colour behind the glyph.
+    /// @return A copy painted on that background.
+    [[nodiscard]] Style withBackground(const Color& colour) const;
+
+    /// @param value Whether the style is bold.
+    /// @return A copy with that attribute set.
+    [[nodiscard]] Style withBold(bool value = true) const;
+
+    /// @param value Whether the style is dim.
+    /// @return A copy with that attribute set.
+    [[nodiscard]] Style withDim(bool value = true) const;
+
+    /// @param value Whether the style is reversed.
+    /// @return A copy with that attribute set.
+    [[nodiscard]] Style withReverse(bool value = true) const;
+
+    /// @return Whether the style asks for nothing, which is what a reset leaves behind.
+    [[nodiscard]] bool isDefault() const;
+
+    /// @param other Style to compare with.
+    /// @return Whether both paint a cell the same way.
+    [[nodiscard]] bool equals(const Style& other) const;
+};
+
+/// The characters the client draws, which is the one place a glyph is spelled out.
+namespace Glyphs {
+
+/// The chevron that marks the line being typed in.
+inline constexpr const char* PromptMarker = "\u2771";
+
+/// The braille frames the spinner goes through while a turn is in flight.
+inline constexpr std::array<const char*, 10> Spinner = {"\u280B", "\u2819", "\u2839", "\u2838",
+                                                        "\u283C", "\u2834", "\u2826", "\u2827",
+                                                        "\u2807", "\u280F"};
+
+}  // namespace Glyphs
+
+/// The palette of the client, taken from the OpenCode theme.
+namespace Palette {
+
+/// @return The colour of ordinary text.
+[[nodiscard]] Style text();
+
+/// @return The colour of the quiet text: notes, hints, the status line.
+[[nodiscard]] Style muted();
+
+/// @return The colour of the prompt marker, the spinner and the selected hint.
+[[nodiscard]] Style accent();
+
+/// @return The colour of whoever is answering.
+[[nodiscard]] Style primary();
+
+/// @return The panel the prompt and the status line sit on.
+[[nodiscard]] Style panel();
+
+/// @return The panel the command hints float on.
+[[nodiscard]] Style raised();
+
+/// @return The background colour of the panel, to lay under a glyph of another style.
+[[nodiscard]] Color panelColor();
+
+/// @return The background colour of the floating hints.
+[[nodiscard]] Color raisedColor();
+
+}  // namespace Palette
 
 }  // namespace OpenAnimaTui::Screen

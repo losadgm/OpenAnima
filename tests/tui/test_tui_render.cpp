@@ -1,5 +1,5 @@
 /// @file
-/// @brief What the screen looks like: panels, hints, viewport and caret.
+/// @brief What the client shows: the conversation, the hints, the status and the prompt.
 
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
@@ -10,32 +10,22 @@
 
 #include "app/model.h"
 #include "screen/render.h"
-#include "screen/style.h"
 #include "screen/text.h"
+#include "tui_test_support.h"
+
+// NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
 
 namespace {
 
 using OpenAnimaTui::Key;
+using OpenAnimaTui::App::Effect;
 using OpenAnimaTui::App::Model;
 using OpenAnimaTui::Screen::render;
 using OpenAnimaTui::Screen::RenderResult;
-using OpenAnimaTui::Screen::visibleColumns;
+using OpenAnimaTui::Screen::Metrics::MaxHints;
+using namespace OpenAnimaTui::Tests;
 
 constexpr std::size_t ScrollStep = 5;
-
-std::vector<std::string> splitLines(const std::string& text) {
-    std::vector<std::string> lines;
-    std::size_t start = 0;
-    while (true) {
-        const std::size_t end = text.find('\n', start);
-        if (end == std::string::npos) {
-            lines.push_back(text.substr(start));
-            return lines;
-        }
-        lines.push_back(text.substr(start, end - start));
-        start = end + 1;
-    }
-}
 
 void type(Model& model, const std::string& text) {
     for (const char value : text) {
@@ -43,7 +33,7 @@ void type(Model& model, const std::string& text) {
     }
 }
 
-std::vector<OpenAnimaTui::App::Effect> press(Model& model, const Key::Kind kind) {
+std::vector<Effect> press(Model& model, const Key::Kind kind) {
     return OpenAnimaTui::App::update(model, Key{kind, 0}, ScrollStep);
 }
 
@@ -53,16 +43,16 @@ void submit(Model& model, const std::string& text) {
 }
 
 void answer(Model& model, const std::string& text) {
-    OpenAnima::Core::Event event;
-    event.kind = OpenAnima::Core::EventKind::Finished;
-    event.completion.text = text;
-    event.completion.finishReason = OpenAnima::Core::FinishReason::Stop;
-    (void)OpenAnimaTui::App::update(model, Key{Key::Kind::None, 0}, ScrollStep);
     OpenAnima::Core::Event piece;
     piece.kind = OpenAnima::Core::EventKind::Delta;
     piece.text = text;
     (void)OpenAnimaTui::App::applyEvent(model, piece);
-    (void)OpenAnimaTui::App::applyEvent(model, event);
+
+    OpenAnima::Core::Event done;
+    done.kind = OpenAnima::Core::EventKind::Finished;
+    done.completion.text = text;
+    done.completion.finishReason = OpenAnima::Core::FinishReason::Stop;
+    (void)OpenAnimaTui::App::applyEvent(model, done);
 }
 
 /// A conversation with eight turns in it, so that it does not fit on a short screen.
@@ -76,59 +66,70 @@ Model longConversation() {
     return model;
 }
 
+/// The rows of the screen painted over the raised panel.
+std::vector<std::size_t> raisedRows(const RenderResult& rendered) {
+    std::vector<std::size_t> rows;
+    for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
+        if (rendered.frame.at(row, 0).style.background.equals(Palette::raisedColor())) {
+            rows.push_back(row);
+        }
+    }
+    return rows;
+}
+
 }  // namespace
 
-// NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
-
-TEST_CASE("every row is exactly as wide as the terminal") {
+TEST_CASE("no row of the screen is wider than the terminal") {
     Model model;
     type(model, "hello");
-    const RenderResult result = render(model, 24, 6);
-    for (const std::string& line : splitLines(result.text)) {
-        CHECK(visibleColumns(line) == 24);
+    const RenderResult rendered = render(model, 24, 6);
+    CHECK(rendered.frame.width() == 24);
+    CHECK(rendered.frame.height() == 6);
+    for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
+        CHECK(OpenAnimaTui::Screen::measure(readRow(rendered.frame, row)) == 24);
     }
 }
 
-TEST_CASE("the prompt floats on its own panel, with the caret in it") {
+TEST_CASE("the prompt sits on its own panel, with the caret in it") {
     Model model;
-    type(model, "cañ");
-    const RenderResult result = render(model, 40, 10);
-    const std::vector<std::string> lines = splitLines(result.text);
+    type(model, "ca\u00f1");
+    const RenderResult rendered = render(model, 40, 10);
 
-    REQUIRE(lines.size() == 10);
-    CHECK(lines.back().find(OpenAnimaTui::Screen::Panel) == 0);
-    CHECK(lines.back().find(OpenAnimaTui::Screen::PromptMarker) != std::string::npos);
-    CHECK(result.caretRow == 9);
-    CHECK(result.caretCol == 2 + 3);
+    const OpenAnimaTui::Screen::Cell& marker = rendered.frame.at(9, 0);
+    CHECK(std::string(marker.glyph.data(), marker.length) == "\u2771");
+    CHECK(marker.style.foreground.equals(Palette::accent().foreground));
+    CHECK(marker.style.background.equals(Palette::panelColor()));
+    CHECK(rendered.frame.at(9, 1).style.equals(Palette::panel()));
+    CHECK(rendered.caretRow == 9);
+    CHECK(rendered.caretColumn == 2 + 3);
 }
 
 TEST_CASE("a long prompt wraps and the caret follows it down") {
     Model model;
     type(model, std::string(30, 'x'));
-    const RenderResult result = render(model, 20, 12);
-    CHECK(result.caretRow == 11);
-    CHECK(result.caretCol == 2 + (30 - (20 - 2)));
+    const RenderResult rendered = render(model, 20, 12);
+    CHECK(rendered.caretRow == 11);
+    CHECK(rendered.caretColumn == 2 + (30 - (20 - 2)));
 }
 
 TEST_CASE("the conversation is a viewport over the turns") {
     Model model = longConversation();
-    const std::string full = render(model, 40, 100).text;
-    CHECK(full.find("m0") != std::string::npos);
-    CHECK(full.find("a7") != std::string::npos);
+    CHECK(readAll(render(model, 40, 100).frame).find("m0") != std::string::npos);
+    CHECK(readAll(render(model, 40, 100).frame).find("a7") != std::string::npos);
 
-    const std::string tail = render(model, 40, 8).text;
+    const std::string tail = readAll(render(model, 40, 8).frame);
     CHECK(tail.find("m0") == std::string::npos);
     CHECK(tail.find("a7") != std::string::npos);
 
     (void)press(model, Key::Kind::PageUp);
-    const std::string scrolled = render(model, 40, 8).text;
+    const std::string scrolled = readAll(render(model, 40, 8).frame);
     CHECK(scrolled.find("m3") != std::string::npos);
     CHECK(scrolled.find("a7") == std::string::npos);
 
     for (int step = 0; step < 2; ++step) {
         (void)press(model, Key::Kind::PageUp);
     }
-    const std::string top = render(model, 40, 8).text;
+    const std::string top = readAll(render(model, 40, 8).frame);
     CHECK(top.find("m0") != std::string::npos);
     CHECK(top.find("a4") == std::string::npos);
 }
@@ -136,48 +137,65 @@ TEST_CASE("the conversation is a viewport over the turns") {
 TEST_CASE("the hints float over the conversation and the selected one stands out") {
     Model model;
     type(model, "/");
-    RenderResult result = render(model, 40, 12);
+    RenderResult rendered = render(model, 40, 12);
 
-    std::vector<std::string> hintRows;
-    for (const std::string& line : splitLines(result.text)) {
-        if (line.rfind(OpenAnimaTui::Screen::Raised, 0) == 0) {
-            hintRows.push_back(line);
-        }
-    }
-    REQUIRE(hintRows.size() == OpenAnimaTui::Screen::MaxHints);
-    CHECK(hintRows[0].find(std::string{OpenAnimaTui::Screen::Accent} + "/create") !=
-          std::string::npos);
-    CHECK(hintRows[1].find(std::string{OpenAnimaTui::Screen::Accent} + "/enter") ==
-          std::string::npos);
+    std::vector<std::size_t> rows = raisedRows(rendered);
+    REQUIRE(rows.size() == MaxHints);
+    CHECK(readRow(rendered.frame, rows[0]).find("/create") != std::string::npos);
+    CHECK(rendered.frame.at(rows[0], 2).style.foreground.equals(Palette::accent().foreground));
+    CHECK(rendered.frame.at(rows[1], 2).style.foreground.equals(Palette::muted().foreground));
 
     (void)press(model, Key::Kind::ArrowDown);
-    result = render(model, 40, 12);
-    hintRows.clear();
-    for (const std::string& line : splitLines(result.text)) {
-        if (line.rfind(OpenAnimaTui::Screen::Raised, 0) == 0) {
-            hintRows.push_back(line);
-        }
-    }
-    REQUIRE(hintRows.size() == OpenAnimaTui::Screen::MaxHints);
-    CHECK(hintRows[1].find(std::string{OpenAnimaTui::Screen::Accent} + "/enter") !=
-          std::string::npos);
-    CHECK(hintRows[0].find(std::string{OpenAnimaTui::Screen::Accent} + "/create") ==
-          std::string::npos);
+    rendered = render(model, 40, 12);
+    rows = raisedRows(rendered);
+    REQUIRE(rows.size() == MaxHints);
+    CHECK(rendered.frame.at(rows[1], 2).style.foreground.equals(Palette::accent().foreground));
+    CHECK(rendered.frame.at(rows[0], 2).style.foreground.equals(Palette::muted().foreground));
 }
 
 TEST_CASE("the status row changes once there is an npc to talk to") {
     Model model;
-    CHECK(render(model, 40, 10).text.find("no npc") != std::string::npos);
+    CHECK(readAll(render(model, 40, 10).frame).find("no npc") != std::string::npos);
     submit(model, "/create a smith");
-    CHECK(render(model, 40, 10).text.find("ask something") != std::string::npos);
+    CHECK(readAll(render(model, 40, 10).frame).find("ask something") != std::string::npos);
 }
 
 TEST_CASE("a note from the world is indented and quiet") {
     Model model;
     submit(model, "/create a smith");
-    const std::string text = render(model, 40, 10).text;
-    CHECK(text.find(std::string{OpenAnimaTui::Screen::Muted} + std::string(8, ' ') + "created") !=
-          std::string::npos);
+    const RenderResult rendered = render(model, 40, 10);
+    CHECK(readRow(rendered.frame, 0).substr(0, 8) == "        ");
+    CHECK(readRow(rendered.frame, 0).find("created npc 1") != std::string::npos);
+    CHECK(rendered.frame.at(0, 8).style.equals(Palette::muted()));
+}
+
+TEST_CASE("the speaker of a line is named in the prefix and the text follows it") {
+    Model model;
+    submit(model, "/create a smith");
+    submit(model, "hello there");
+    answer(model, "well met");
+    const RenderResult rendered = render(model, 40, 10);
+
+    CHECK(readRow(rendered.frame, 1).substr(0, 8) == "you     ");
+    CHECK(readRow(rendered.frame, 1).substr(8).find("hello there") == 0);
+    CHECK(readRow(rendered.frame, 2).substr(0, 8) == "npc 1   ");
+    CHECK(readRow(rendered.frame, 2).substr(8).find("well met") == 0);
+    CHECK(rendered.frame.at(2, 0).style.foreground.equals(Palette::primary().foreground));
+    CHECK(rendered.frame.at(2, 8).style.foreground.equals(Palette::text().foreground));
+}
+
+TEST_CASE("a turn in flight is shown as the answer arrives") {
+    Model model;
+    submit(model, "/create a smith");
+    submit(model, "hello");
+    OpenAnima::Core::Event piece;
+    piece.kind = OpenAnima::Core::EventKind::Delta;
+    piece.text = "waiting";
+    (void)OpenAnimaTui::App::applyEvent(model, piece);
+
+    const std::string screen = readAll(render(model, 40, 12).frame);
+    CHECK(screen.find("waiting") != std::string::npos);
+    CHECK(screen.find("working") != std::string::npos);
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

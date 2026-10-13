@@ -22,7 +22,11 @@ add_executable(open_anima_tui
     tuiHarness/main.cpp
     tuiHarness/app/commands.cpp
     tuiHarness/app/model.cpp
+    tuiHarness/screen/canvas.cpp
+    tuiHarness/screen/cell.cpp
+    tuiHarness/screen/diff.cpp
     tuiHarness/screen/render.cpp
+    tuiHarness/screen/style.cpp
     tuiHarness/screen/text.cpp
     tuiHarness/terminal/terminalUnix.cpp
     tuiHarness/terminal/terminalWindows.cpp

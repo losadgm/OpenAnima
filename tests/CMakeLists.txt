@@ -6,13 +6,19 @@ add_executable(open_anima_tests
     Provider/test_rest_provider_config.cpp
     Provider/test_rest_provider.cpp
     Provider/test_sse_reader.cpp
+    tui/test_tui_canvas.cpp
     tui/test_tui_commands.cpp
+    tui/test_tui_diff.cpp
     tui/test_tui_model.cpp
     tui/test_tui_render.cpp
     tui/test_tui_text.cpp
     ../examples/tuiHarness/app/commands.cpp
     ../examples/tuiHarness/app/model.cpp
+    ../examples/tuiHarness/screen/canvas.cpp
+    ../examples/tuiHarness/screen/cell.cpp
+    ../examples/tuiHarness/screen/diff.cpp
     ../examples/tuiHarness/screen/render.cpp
+    ../examples/tuiHarness/screen/style.cpp
     ../examples/tuiHarness/screen/text.cpp
     test_facade.cpp
     support/fake_http_transport.h

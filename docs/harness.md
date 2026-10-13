@@ -131,17 +131,33 @@ for the answer, and says so.
   Unix (termios), and the console API with virtual terminal sequences on Windows. Windows is a
   target from the start rather than a port to attempt later. It is `terminal/terminal.h` with
   `terminal/terminalUnix.cpp` and `terminal/terminalWindows.cpp`, and it is where keys, the
-  size of the window and the alternate screen come from.
+  size of the window, the alternate screen and writing to the terminal come from. Writing never
+  waits for the terminal: what does not fit is kept and sent on the next turn of the loop, so a
+  terminal that has stopped reading cannot freeze the client and leave the keyboard unread.
 - **The rest is a functional core and an imperative shell.** Under `app/` the model, the
   commands and the keys are pure: `update(model, key)` returns what to do as a list of
   effects, and `applyEvent(model, event)` folds what came back from the provider into the same
-  model. Under `screen/` the rendering is pure too: `render(model, width, height)` returns the
-  rows, the position of the caret and nothing else. `main.cpp` is the shell, and it is the
-  only place that knows about files, sockets and clocks: it runs the effects against the
-  brains, drains the events, and paints.
+  model. Under `screen/` the rendering is pure too: cells into a canvas, and the canvas into
+  rows. `main.cpp` is the shell, and it is the only place that knows about files, sockets and
+  clocks: it runs the effects against the brains, drains the events, and writes a frame when
+  something changed and the one before it has arrived.
+- **The screen is a grid of cells, not a string of escapes.** A style is a value (a colour, a
+  background, the attributes) and a cell holds a character and the style it is painted with,
+  so two frames can be compared before anything is written. Text is placed by columns: a wide
+  character takes two cells and is never split, a combining mark joins the letter before it,
+  and a row that would not fit is cut rather than left to wrap on its own.
+- **A frame costs what changed in it.** The writer keeps the frame the terminal is showing,
+  compares it with the next one and speaks only about the difference: a row that did not change
+  is not written, a cell that did not change is not written, the cursor is not moved to where
+  it already is, and a style is only sent when it differs from the one in force. A screen that
+  looks the same as the last one costs nothing, and an answer arriving word by word costs a
+  handful of bytes per word instead of the whole screen: measured at 56 bytes a frame against
+  the 3360 a full repaint would take.
 - **The draw loop is driven by the events of a turn.** `askAsync()` and `poll()` already hand
   the text over as it arrives, so the screen changes when something happens and the loop never
-  blocks. `cancel()` is what the interrupting keys ask for, through an effect.
+  blocks. `cancel()` is what the interrupting keys ask for, through an effect. While a frame is
+  still on its way, the model keeps advancing and no new frame is composed: the next one drawn
+  is the latest state, not the one after the one nobody has seen.
 - **The world lives in the shell.** Each NPC is a `NPCBrain` with a persona and its own
   transcript; the model holds the ids, the transcripts and which one is being talked to. The
   library does not need to know that several NPCs exist until they have to speak to each
@@ -154,15 +170,17 @@ for the answer, and says so.
 | Where | What is in it |
 | --- | --- |
 | `app/` | The model, the commands and the keys: what a key does, and what to ask the shell for |
-| `screen/` | Text, colours and the render of a model into rows |
-| `terminal/` | Raw mode, ANSI sequences, key decoding and the size of the window |
-| `main.cpp` | The shell: brains, effects, events, and the paint loop |
+| `screen/` | The canvas, the cells, the colours, the text measurement and the frame writer |
+| `terminal/` | Raw mode, key decoding, the size of the window and writing without waiting |
+| `main.cpp` | The shell: brains, effects, events, and the loop that decides when to draw |
 
 ### How it is checked
 
-- The pieces: `tests/tui/` covers the text (columns, wrapping, cutting), the commands
-  (matching and completing), the model (every key, the world, the events) and the screen
-  (panels, hints, viewport, caret). No terminal is involved.
+- The pieces: `tests/tui/` covers the text (columns, wrapping, cutting), the canvas (clipping,
+  wide characters, combining marks), the frame writer (what it sends, and whether a terminal
+  that applies it ends up showing the frame it came from), the commands (matching and
+  completing), the model (every key, the world, the events) and the screen (panels, hints,
+  viewport, caret). No terminal is involved.
 - The client itself: driven over a pseudo-terminal, sending keys and reading what comes back,
   with a throwaway server that streams the answer word by word. PTY on Unix and ConPTY on
   Windows is where this is going, so the same test runs on all three platforms.
@@ -181,5 +199,16 @@ for the answer, and says so.
 
 Steps 1 to 3 are done, and the piece tests of step 4 are in the suite. What is left is the
 in-suite client test over a pseudo-terminal, so the client itself is exercised by the same
-command that runs the rest. The client is painted whole on every change, which is fine for a
-conversation and something to revisit when the screen grows.
+command that runs the rest.
+
+What comes next, in the order it will be felt:
+
+1. A measured layout: today the rows of the screen are placed by arithmetic on the height and
+   the width, which is what makes a narrow window and a resize the places where the client can
+   still be surprised. The screen is going to describe itself as a tree of boxes with sizes to
+   honour, measure it and then paint it, so that what is asked for and what is shown cannot
+   drift apart.
+2. A keyboard that says what it is: the enhanced protocol (kitty) where the terminal speaks it,
+   so Ctrl+Enter, Shift+Enter and a bare Escape arrive as themselves instead of being guessed
+   from escape sequences, and one event per paste instead of a key per line.
+3. The mouse wheel over the conversation, which is a scroll of its own and asks for it.
