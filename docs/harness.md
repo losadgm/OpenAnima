@@ -51,6 +51,7 @@ what is happening and what can be pressed.
 
 ```
   you     Do you have any iron daggers?
+
   npc 1   Three of them, and none of them cheap.
           The last one I sold went to a guard who
           never came back for it. Aye, that one
@@ -67,6 +68,9 @@ what is happening and what can be pressed.
 
 The commands are listed while one is being typed, up to six of them, with the selected one in
 the accent colour, and the list is cut rather than pushed around when the window is short.
+
+The blank row between a prompt and its answer separates the turns, so a conversation reads
+as question and answer instead of as one block of text.
 
 - The client owns the screen: it runs in the alternate screen, paints the whole window on a
   change, and hands the terminal back on the way out.

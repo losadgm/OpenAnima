@@ -125,10 +125,10 @@ TEST_CASE("the conversation is a viewport over the turns") {
 
     (void)press(model, Key::Kind::PageUp);
     const std::string scrolled = readAll(render(model, 40, 8).frame);
-    CHECK(scrolled.find("m3") != std::string::npos);
+    CHECK(scrolled.find("m5") != std::string::npos);
     CHECK(scrolled.find("a7") == std::string::npos);
 
-    for (int step = 0; step < 2; ++step) {
+    for (int step = 0; step < 3; ++step) {
         (void)press(model, Key::Kind::PageUp);
     }
     const std::string top = readAll(render(model, 40, 8).frame);
@@ -180,10 +180,12 @@ TEST_CASE("the speaker of a line is named in the prefix and the text follows it"
 
     CHECK(readRow(rendered.frame, 1).substr(0, 8) == "you     ");
     CHECK(readRow(rendered.frame, 1).substr(8).find("hello there") == 0);
-    CHECK(readRow(rendered.frame, 2).substr(0, 8) == "npc 1   ");
-    CHECK(readRow(rendered.frame, 2).substr(8).find("well met") == 0);
-    CHECK(rendered.frame.at(2, 0).style.foreground.equals(Palette::primary().foreground));
-    CHECK(rendered.frame.at(2, 8).style.foreground.equals(Palette::text().foreground));
+    // The blank row that keeps the answer from running into the prompt.
+    CHECK(readRow(rendered.frame, 2) == std::string(40, ' '));
+    CHECK(readRow(rendered.frame, 3).substr(0, 8) == "npc 1   ");
+    CHECK(readRow(rendered.frame, 3).substr(8).find("well met") == 0);
+    CHECK(rendered.frame.at(3, 0).style.foreground.equals(Palette::primary().foreground));
+    CHECK(rendered.frame.at(3, 8).style.foreground.equals(Palette::text().foreground));
 }
 
 TEST_CASE("a turn in flight is shown as the answer arrives") {

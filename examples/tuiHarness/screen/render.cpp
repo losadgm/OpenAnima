@@ -134,6 +134,12 @@ void appendNote(std::vector<TranscriptRow>& rows, const std::string& text, std::
     }
 }
 
+/// Adds the blank row that keeps a prompt from running into the answer it got.
+/// @param rows Rows collected so far, appended to.
+void appendGap(std::vector<TranscriptRow>& rows) {
+    rows.push_back({std::string(PrefixWidth, ' '), {}, Palette::text(), Palette::text()});
+}
+
 /// The conversation as display rows: finished turns first, the in-flight answer last.
 /// @param model Model to show.
 /// @param width Columns available.
@@ -144,16 +150,25 @@ std::vector<TranscriptRow> transcriptRows(const Model& model, std::size_t width)
         model.world.active.has_value() ? "npc " + std::to_string(*model.world.active) : "npc";
 
     std::vector<TranscriptRow> rows;
+    bool afterPrompt = false;
     for (const Message& message : model.messages) {
         if (message.role == Role::System) {
             appendNote(rows, message.text, bodyWidth);
+            afterPrompt = false;
             continue;
         }
         const bool fromUser = message.role == Role::User;
+        if (!fromUser && afterPrompt) {
+            appendGap(rows);
+        }
         appendMessage(rows, message, fromUser ? "you" : npc,
                       fromUser ? Palette::muted() : Palette::primary(), Palette::text(), bodyWidth);
+        afterPrompt = fromUser;
     }
     if (model.busy || !model.answer.empty()) {
+        if (afterPrompt) {
+            appendGap(rows);
+        }
         const Message answer{Role::Npc, model.answer.empty() ? "..." : model.answer};
         appendMessage(rows, answer, npc, Palette::primary(), Palette::text(), bodyWidth);
     }
