@@ -110,13 +110,13 @@ two disagree, the roadmap wins and the issue is edited.
 gh config get git_protocol
 
 # There is no `gh milestone`: the API is the way.
-gh api repos/{owner}/{repo}/milestones -f title='v0.9.0 - Polish, profiling and examples'
+gh api repos/{owner}/{repo}/milestones -f title='v0.10.0 - Polish, profiling and examples'
 gh api "repos/{owner}/{repo}/milestones?state=all" --paginate \
     --jq '.[] | "\(.title): \(.open_issues) open / \(.closed_issues) closed"'
 
 # One issue per point, in its stage. The body is the roadmap note, so it goes in a file.
 gh issue create --title 'Terminal client under examples/' --body-file /tmp/body.md \
-    --milestone 'v0.9.0 - Polish, profiling and examples'
+    --milestone 'v0.10.0 - Polish, profiling and examples'
 gh issue close <url>
 
 # Labels add, never replace: the ones already there stay.
