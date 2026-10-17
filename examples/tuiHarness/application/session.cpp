@@ -5,7 +5,7 @@
 #include <cstddef>
 #include <string>
 
-#include "OpenAnima/OpenAnima.h"
+#include "OpenAnima/Provider/RestProviderConfig.h"
 
 #include "application/brains.h"
 #include "application/interaction.h"

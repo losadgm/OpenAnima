@@ -6,13 +6,12 @@
 #include <cstddef>
 #include <string>
 
-#include "OpenAnima/OpenAnima.h"
+#include "OpenAnima/Provider/RestProviderConfig.h"
 
 #include "application/brains.h"
 #include "application/interaction.h"
 #include "domain/model.h"
 #include "presentation/diff.h"
-#include "presentation/render.h"
 #include "terminal/terminal.h"
 
 namespace OpenAnimaTui::Application {

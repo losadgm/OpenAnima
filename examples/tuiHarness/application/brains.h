@@ -7,7 +7,8 @@
 #include <map>
 #include <vector>
 
-#include "OpenAnima/OpenAnima.h"
+#include "OpenAnima/Core/NPCBrain.h"
+#include "OpenAnima/Provider/RestProviderConfig.h"
 
 #include "domain/model.h"
 

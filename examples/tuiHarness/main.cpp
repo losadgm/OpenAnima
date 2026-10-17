@@ -11,7 +11,8 @@
 #include <memory>
 #include <string>
 
-#include "OpenAnima/OpenAnima.h"
+#include "OpenAnima/Errors.h"
+#include "OpenAnima/Provider/RestProviderConfig.h"
 
 #include "application/session.h"
 #include "common/apiSettings.h"
