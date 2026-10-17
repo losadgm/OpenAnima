@@ -11,7 +11,8 @@ both are meant to be read as much as run.
 ## cliHarness
 
 The command-line client. Every setting is an option, the npcs are created from the command
-line or from a command, and the answer is printed while the model writes it.
+line or from a command, and the turn is printed once it is over, in the order the reply
+contract defines it.
 
 ```bash
 ./build/examples/open_anima_cli --help                    # the manual
@@ -38,9 +39,10 @@ line or from a command, and the answer is printed while the model writes it.
 
 The settings are read by `examples/common/apiSettings`, shared with the terminal client under
 its own prefix, and the loader for `.env` is `examples/common/dotenv`. The client is the
-reference for the asynchronous turn: `askTurnAsync()` with `poll()`, the dialogue arriving as
-it is written, `cancel()` wired to ctrl-c, and the whole document available when the turn is
-over.
+reference for the asynchronous turn: `askTurnAsync()` with `poll()`, `cancel()` wired to
+ctrl-c, and the whole document available when the turn is over. The dialogue is written once
+the turn is finished rather than while it arrives, so that the reasoning keeps its place above
+the words it leads to; nothing else is lost, because the answer is kept whole either way.
 
 ## tuiHarness
 

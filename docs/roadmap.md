@@ -197,9 +197,11 @@ context is what the senses let through.
 ## v0.10.0 - Polish, profiling and examples
 
 - [~] Interactive CLI harness under `examples/`.
-  - `examples/cliHarness` is interactive, keeps the conversation across turns, streams the
-    answer as it arrives and loads `.env` on its own, but it drives a single agent with no
-    world around it and it paints one line at a time.
+  - `examples/cliHarness` takes every setting as an option, with its own variables and `.env`
+    as the fallback, keeps one conversation per NPC across turns (`/create`, `/enter`, `/npcs`,
+    `/leave`, `/clear`), and prints the turn in the order of the reply contract, with the raw
+    document behind `--raw` or `/raw`. What is left is a case in the suite that drives the
+    binary itself.
 - [~] Terminal client under `examples/`.
   - `examples/tuiHarness`, designed in [the harnesses page](harness.html): a full screen with
     a conversation of its own to scroll, a prompt pinned at the bottom with its command

@@ -91,12 +91,34 @@ RestProviderConfig readConfiguration(const Options& options) {
     return config;
 }
 
-/// Prints what comes after the dialogue: why the turn ended, what the npc thought, what it
-/// asks the host to do, and the document as it arrived when the client asked for it.
+/// Prints the turn in the order the reply contract defines it: what the npc thought, what it
+/// says, what it asks the host to do, and the document as it arrived when it was asked for.
+///
+/// The dialogue is written once the turn is over rather than while it arrives, so that the
+/// thoughts are not printed after the words they came before.
 /// @param event Finished event of the turn.
 /// @param raw Whether to print the document.
 void printTurnEnd(const Event& event, bool raw) {
-    std::cout << '\n';
+    const NpcReply* reply = event.reply.has_value() ? &*event.reply : nullptr;
+
+    if (reply == nullptr) {
+        std::cout << event.completion.text << '\n';
+    } else {
+        if (!reply->reasoning.empty()) {
+            std::cout << "[reasoning] " << reply->reasoning << '\n';
+        }
+        if (!reply->dialogue.empty()) {
+            std::cout << reply->dialogue << '\n';
+        }
+        for (const NpcAction& action : reply->actions) {
+            std::cout << '[' << action.name << ']';
+            if (!action.arguments.empty()) {
+                std::cout << ' ' << action.arguments.dump();
+            }
+            std::cout << '\n';
+        }
+    }
+
     if (event.completion.finishReason == FinishReason::Cancelled) {
         std::cout << "(turn stopped, what it said was kept)\n";
     } else if (event.completion.finishReason == FinishReason::Length) {
@@ -105,33 +127,18 @@ void printTurnEnd(const Event& event, bool raw) {
         std::cout << "(the provider trimmed the reply)\n";
     }
 
-    if (!event.reply.has_value()) {
-        return;
-    }
-
-    const NpcReply& reply = *event.reply;
-    if (!reply.reasoning.empty()) {
-        std::cout << "~ " << reply.reasoning << '\n';
-    }
-    for (const NpcAction& action : reply.actions) {
-        std::cout << "  [" << action.name << ']';
-        if (!action.arguments.empty()) {
-            std::cout << ' ' << action.arguments.dump();
-        }
-        std::cout << '\n';
-    }
-    if (raw) {
+    if (raw && reply != nullptr) {
         std::cout << "--- raw ---\n";
-        if (reply.document.is_null()) {
+        if (reply->document.is_null()) {
             std::cout << "(no document: the turn was stopped before it was whole)\n";
         } else {
-            std::cout << reply.document.dump(2) << '\n';
+            std::cout << reply->document.dump(2) << '\n';
         }
     }
     std::cout << std::flush;
 }
 
-/// Asks the npc and prints the dialogue while it is written.
+/// Asks the npc and prints the turn once it is over.
 /// @param brain Npc to talk to.
 /// @param prompt What to send.
 /// @param raw Whether to print the document of every turn.
@@ -146,20 +153,15 @@ bool runTurn(NPCBrain& brain, const std::string& prompt, bool raw) {
         const int pressed = interrupts().load();
         if (pressed > before) {
             if (pressed - before > 1) {
-                std::cout << '\n';
                 return false;
             }
             if (!cancelling) {
                 brain.cancel(turn);
                 cancelling = true;
-                std::cout << "\n(cancelling, ctrl-c again to leave)\n" << std::flush;
+                std::cout << "(cancelling, ctrl-c again to leave)\n" << std::flush;
             }
         }
         if (!event.has_value()) {
-            continue;
-        }
-        if (event->kind == EventKind::Delta) {
-            std::cout << event->text << std::flush;
             continue;
         }
         if (event->kind == EventKind::Failed) {
