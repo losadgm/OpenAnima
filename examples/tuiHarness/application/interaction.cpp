@@ -512,7 +512,9 @@ std::vector<Domain::Effect> applyKey(Interaction& interaction, Model& model, con
     }
     const std::size_t offsetBefore = model.scrollOffset;
     std::vector<Domain::Effect> effects = Domain::update(model, key, scrollStep);
-    if (scrolls) {
+    // Before the first frame is painted there is no viewport to hold the offset to, and the
+    // session clamps it again as soon as one is drawn.
+    if (scrolls && interaction.shape.frame.width() > 0) {
         // The model asks for the rows, and the viewport gives what it has: the picking follows
         // the rows that were really shown, not the ones that were asked for.
         const std::size_t offsetAfter =
