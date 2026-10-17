@@ -57,7 +57,7 @@ public:
         if (call.format.kind != ResponseFormat::Kind::Text) {
             // What the shipped provider does once the answer is whole: read it as JSON.
             try {
-                done.json = nlohmann::json::parse(done.text);
+                done.json = nlohmann::ordered_json::parse(done.text);
             } catch (const nlohmann::json::exception&) {
                 throw ParseError("the answer was asked for as JSON and is not: " + done.text);
             }

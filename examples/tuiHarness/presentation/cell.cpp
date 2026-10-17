@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <string_view>
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 bool Cell::isBlank() const {
     return kind == Kind::Blank;
@@ -24,4 +24,4 @@ bool Cell::equals(const Cell& other) const {
            std::equal(glyph.begin(), glyph.begin() + length, other.glyph.begin());
 }
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

@@ -168,16 +168,10 @@ private:
     /// Turns the first byte of a press into a key, resolving the sequences that begin with
     /// an escape.
     Key decode(unsigned char first) {
-        Key key;
-
         if (first == 0x1B) {
             return decodeEscape();
         }
-
-        key.kind = controlOrCharacter(first);
-        key.character =
-            key.kind == Key::Kind::Character ? static_cast<char>(first) : static_cast<char>(0);
-        return key;
+        return keyOfByte(first);
     }
 
     /// Reads the rest of an escape sequence, or calls the byte an Escape key.
@@ -192,6 +186,18 @@ private:
         }
 
         const char introducer = m_pending.front();
+        // Alt and backspace together is the word before the caret, the way readline spells it.
+        if (introducer == '\x7f' || introducer == '\b') {
+            m_pending.erase(0, 1);
+            return controlled(Key::Kind::Backspace);
+        }
+        // Alt and `d` is the word after the caret in readline, and it is what an editor that
+        // takes the chord before the terminal sees it sends for control and delete: VS Code
+        // maps that chord to `ESC d` itself.
+        if (introducer == 'd') {
+            m_pending.erase(0, 1);
+            return controlled(Key::Kind::Delete);
+        }
         if (introducer == '[' || introducer == 'O') {
             m_pending.erase(0, 1);
             if (introducer == '[' && !m_pending.empty() && m_pending.front() == 'M') {
@@ -253,7 +259,25 @@ private:
     }
 
     /// Maps a cursor sequence to the key it spells.
-    Key sequenceKey(const std::string& sequence) {
+    /// @param kind What was pressed.
+    /// @return The key, with control held.
+    [[nodiscard]] static Key controlled(Key::Kind kind) {
+        Key key{kind, static_cast<char>(0)};
+        key.ctrl = true;
+        return key;
+    }
+
+    Key sequenceKey(const std::string& rawSequence) {
+        // The enhanced protocol can add the kind of event after a colon: `3;5:1~` is a Delete
+        // with control being pressed, which is the same key as `3;5~`.
+        std::string sequence = rawSequence;
+        if (!sequence.empty() && sequence.back() == '~') {
+            const std::size_t colon = sequence.find(':');
+            if (colon != std::string::npos) {
+                sequence.erase(colon, sequence.size() - 1 - colon);
+            }
+        }
+
         if (sequence == "A") {
             return Key{Key::Kind::ArrowUp, static_cast<char>(0)};
         }
@@ -266,11 +290,32 @@ private:
         if (sequence == "D") {
             return Key{Key::Kind::ArrowLeft, static_cast<char>(0)};
         }
+        if (sequence == "3~") {
+            return Key{Key::Kind::Delete, static_cast<char>(0)};
+        }
         if (sequence == "5~") {
             return Key{Key::Kind::PageUp, static_cast<char>(0)};
         }
         if (sequence == "6~") {
             return Key{Key::Kind::PageDown, static_cast<char>(0)};
+        }
+        // Control held with an arrow or with Delete: `;5` is the modifier part of the sequence,
+        // with one added to the four that mean control.
+        if (sequence == "1;5C") {
+            return controlled(Key::Kind::ArrowRight);
+        }
+        if (sequence == "1;5D") {
+            return controlled(Key::Kind::ArrowLeft);
+        }
+        // Control and Delete as the modifyOtherKeys encoding spells it, and as xterm spells the
+        // key when it reports it itself: `27;5;3~` is a Delete with control held.
+        if (sequence == "3;5~" || sequence == "27;5;3~") {
+            return controlled(Key::Kind::Delete);
+        }
+        // Control and backspace as xterm spells it when it reports the key itself: 8 is the
+        // code point of the byte the classic encoding sends for it.
+        if (sequence == "27;5;8~" || sequence == "27;5;127~") {
+            return controlled(Key::Kind::Backspace);
         }
         // Control and Return together, as the kitty protocol and xterm spell it.
         if (sequence == "13;5u" || sequence == "27;5;13~") {
@@ -310,16 +355,33 @@ private:
             const auto column = static_cast<std::size_t>(
                 std::stoul(sequence.substr(first + 1, second - first - 1)));
             const auto row = static_cast<std::size_t>(std::stoul(sequence.substr(second + 1)));
-            if (const Key wheel = wheelKey(static_cast<unsigned char>(button));
+            if (Key wheel = wheelKey(static_cast<unsigned char>(button));
                 wheel.kind != Key::Kind::Unknown) {
+                // A wheel report carries the cell it happened on, which is what tells the client
+                // which of the two scrolls the user meant.
+                wheel.column = column > 0 ? column - 1 : 0;
+                wheel.row = row > 0 ? row - 1 : 0;
                 return wheel;
             }
 
             Key key;
-            key.kind = final == 'm' ? Key::Kind::MouseRelease : Key::Kind::MousePress;
-            // Bit five says the mouse is moving with a button held, which is a drag.
-            if (final == 'M' && (button & 32) != 0) {
+            // Bit five says the mouse is moving. With no button held that is the pointer going
+            // over the screen, which is what a hover is; with the left button held it is a drag.
+            const bool moving = (button & 32) != 0;
+            const auto held = static_cast<unsigned char>(button & 3);
+            if (moving) {
                 key.kind = Key::Kind::MouseDrag;
+                if (held == 3) {
+                    key.kind = Key::Kind::MouseMove;  // No button down: the pointer passing over.
+                } else if (held != 0) {
+                    key.kind = Key::Kind::Unknown;  // The right or the middle button.
+                }
+            } else if (held != 0) {
+                // The right and the middle button are not the client's: leaving them alone is
+                // what lets the terminal or the editor show its own menu on a right click.
+                key.kind = Key::Kind::Unknown;
+            } else {
+                key.kind = final == 'm' ? Key::Kind::MouseRelease : Key::Kind::MousePress;
             }
             key.column = column > 0 ? column - 1 : 0;
             key.row = row > 0 ? row - 1 : 0;
@@ -350,20 +412,26 @@ private:
 
     /// Maps a key of the enhanced keyboard protocol to the key it is.
     ///
-    /// The form is `<code point>;<modifiers>[:event]`, where the modifiers are a bit mask: one
-    /// is shift, two is alt, four is control and eight is the super key, with one added to the
-    /// lot. Return with any of shift, alt or control is a new line, which is the whole reason
-    /// the protocol is asked for: without it those chords are indistinguishable from a plain
+    /// The form is `<code point>[:<alternate>][;<modifiers>[:event]]`, where the modifiers are a
+    /// bit mask: one is shift, two is alt, four is control and eight is the super key, with one
+    /// added to the lot. Both the alternate code point and the modifiers are optional, and a
+    /// terminal that was asked to disambiguate sends a bare `CSI 27 u` for an Escape key.
+    /// Return with any of shift, alt or control is a new line, which is the whole reason the
+    /// protocol is asked for: without it those chords are indistinguishable from a plain
     /// Return, a Tab or an Escape.
     /// @param parameters The sequence without its final byte.
     /// @return The key it spells.
     Key kittyKey(const std::string& parameters) {
         const std::size_t separator = parameters.find(';');
-        if (separator == std::string::npos) {
-            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        std::string code =
+            separator == std::string::npos ? parameters : parameters.substr(0, separator);
+        // The key can carry the code point it has on another layout after a colon.
+        if (const std::size_t alternate = code.find(':'); alternate != std::string::npos) {
+            code = code.substr(0, alternate);
         }
-        const std::string code = parameters.substr(0, separator);
-        std::string modifiers = parameters.substr(separator + 1);
+        // `1` is the mask of no modifier at all, which is what an absent one means.
+        std::string modifiers =
+            separator == std::string::npos ? std::string{"1"} : parameters.substr(separator + 1);
         // The event kind comes after a colon: `1` is a press, which is the only one acted on.
         const std::size_t colon = modifiers.find(':');
         std::string kind;
@@ -386,9 +454,15 @@ private:
         // The modifiers carry a one that has to come off before the bits mean anything: shift is
         // one, alt is two, control is four, the super key is eight.
         const unsigned long bits = mask > 0 ? mask - 1 : 0;
-        const bool shift = (bits & 1UL) != 0;
-        const bool control = (bits & 4UL) != 0;
+        return kittyCode(codepoint, (bits & 1UL) != 0, (bits & 4UL) != 0);
+    }
 
+    /// Maps a code point the enhanced keyboard protocol reported, its modifiers already read.
+    /// @param codepoint Code point of the key.
+    /// @param shift Whether shift was held.
+    /// @param control Whether control was held.
+    /// @return The key it spells.
+    Key kittyCode(unsigned long codepoint, bool shift, bool control) {
         if (codepoint == 13 || codepoint == 10) {
             return Key{(control || shift) ? Key::Kind::CtrlEnter : Key::Kind::Enter,
                        static_cast<char>(0)};
@@ -400,7 +474,13 @@ private:
             return Key{Key::Kind::Escape, static_cast<char>(0)};
         }
         if (codepoint == 127) {
-            return Key{Key::Kind::Backspace, static_cast<char>(0)};
+            return control ? controlled(Key::Kind::Backspace)
+                           : Key{Key::Kind::Backspace, static_cast<char>(0)};
+        }
+        // The key of the enhanced protocol that stands for Delete. With control it takes the word
+        // after the caret; without it, the character, which is what the key does everywhere.
+        if (codepoint == 3) {
+            return control ? controlled(Key::Kind::Delete) : Key{Key::Kind::Delete, '\0'};
         }
         if (codepoint < 0x20 || codepoint > 0x10FFFF) {
             return Key{Key::Kind::Unknown, static_cast<char>(0)};
@@ -410,8 +490,7 @@ private:
             const auto lowercase =
                 static_cast<unsigned long>(std::tolower(static_cast<unsigned char>(codepoint)));
             if (lowercase >= 'a' && lowercase <= 'z') {
-                return Key{controlOrCharacter(static_cast<unsigned char>(lowercase - 'a' + 1)),
-                           static_cast<char>(0)};
+                return keyOfByte(static_cast<unsigned char>(lowercase - 'a' + 1));
             }
             return Key{Key::Kind::Unknown, static_cast<char>(0)};
         }
@@ -497,43 +576,55 @@ private:
     }
 
     /// Maps a control or printable byte to its key kind.
-    static Key::Kind controlOrCharacter(unsigned char first) {
+    /// @param first Byte that arrived.
+    /// @return The key it is, a printable one included.
+    static Key keyOfByte(unsigned char first) {
         // Everything above ASCII is a byte of a character the terminal sent as UTF-8, which is
         // what an accent, a tilde and an enye are. Dropping it is how typing in Spanish stopped
         // at the keyboard.
         if (first >= 0x20 && first != 0x7F) {
-            return Key::Kind::Character;
+            return Key{Key::Kind::Character, static_cast<char>(first)};
         }
         switch (first) {
         case 0x0D:  // Return.
-            return Key::Kind::Enter;
+            return Key{Key::Kind::Enter, static_cast<char>(0)};
         case 0x0A:  // Ctrl+J, the newline without the return.
-            return Key::Kind::CtrlJ;
+            return Key{Key::Kind::CtrlJ, static_cast<char>(0)};
         case 0x09:  // Tab.
-            return Key::Kind::Tab;
+            return Key{Key::Kind::Tab, static_cast<char>(0)};
         case 0x7F:  // Backspace (Del on some terminals).
-        case 0x08:  // Ctrl+H.
-            return Key::Kind::Backspace;
+            return Key{Key::Kind::Backspace, static_cast<char>(0)};
+        // 0x08 is Ctrl+H by the book, and it is what most terminals send when control and
+        // backspace are pressed together: the two chords are the same byte, and in a line being
+        // typed the useful reading of it is the one that takes a word. The 0x17 below is the
+        // same key under another name, so the two branches answer alike on purpose.
+        // NOLINTNEXTLINE(bugprone-branch-clone)
+        case 0x08:
+            return controlled(Key::Kind::Backspace);
+        // 0x17 is Ctrl+W, which is what a terminal sends for control and backspace when it has
+        // no other way to say it, and the word before the caret is what it means in readline.
+        case 0x17:
+            return controlled(Key::Kind::Backspace);
         case 0x03:
-            return Key::Kind::CtrlC;
+            return Key{Key::Kind::CtrlC, static_cast<char>(0)};
         case 0x04:
-            return Key::Kind::CtrlD;
+            return Key{Key::Kind::CtrlD, static_cast<char>(0)};
         case 0x01:
-            return Key::Kind::CtrlA;
+            return Key{Key::Kind::CtrlA, static_cast<char>(0)};
         case 0x02:
-            return Key::Kind::CtrlB;
+            return Key{Key::Kind::CtrlB, static_cast<char>(0)};
         case 0x05:
-            return Key::Kind::CtrlE;
+            return Key{Key::Kind::CtrlE, static_cast<char>(0)};
         case 0x06:
-            return Key::Kind::CtrlF;
+            return Key{Key::Kind::CtrlF, static_cast<char>(0)};
         case 0x0E:
-            return Key::Kind::CtrlN;
+            return Key{Key::Kind::CtrlN, static_cast<char>(0)};
         case 0x10:
-            return Key::Kind::CtrlP;
+            return Key{Key::Kind::CtrlP, static_cast<char>(0)};
         case 0x16:
-            return Key::Kind::CtrlV;
+            return Key{Key::Kind::CtrlV, static_cast<char>(0)};
         default:
-            return Key::Kind::Unknown;
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
         }
     }
 

@@ -8,7 +8,7 @@
 #include <utility>
 #include <vector>
 
-namespace OpenAnimaTui::App {
+namespace OpenAnimaTui::Domain {
 
 /// The commands the prompt completes, in the order the hints show them.
 /// @return The commands.
@@ -28,4 +28,4 @@ std::vector<std::string> commandMatches(const std::string& draft, std::size_t cu
 std::pair<std::string, std::size_t> completeCommand(const std::string& draft, std::size_t cursor,
                                                     const std::string& chosen);
 
-}  // namespace OpenAnimaTui::App
+}  // namespace OpenAnimaTui::Domain

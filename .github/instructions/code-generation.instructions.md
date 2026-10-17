@@ -51,6 +51,10 @@ place.
 - Wrap the cases in `NOLINTBEGIN(...)`/`NOLINTEND(...)` for the checks the assertions trip,
   and close the block. An unmatched `NOLINTBEGIN` is an error to clang-tidy, and it stops
   suppressing everything below it without saying so.
+- A case name never starts with a slash, however much it names a command. CTest on Windows
+  reads it as one of its own options: the case fails in milliseconds, prints nothing, and the
+  log only shows `***Failed`. Write `the /create command makes the npc` where `/create makes
+  the npc` would read the same.
 - Test the ugly case rather than the happy one: half a message, an empty field, a field
   nobody knows.
 
@@ -61,7 +65,8 @@ place.
 2. `ctest --test-dir build --output-on-failure` green.
 3. `clang-format --dry-run --Werror <files>` silent. The style is in `.clang-format`.
 4. The clang-tidy review below, with nothing left open.
-5. The API reference builds, which is the `docs` job of the pipeline and not something the
+5. No unused includes, by the include cleaner below.
+6. The API reference builds, which is the `docs` job of the pipeline and not something the
    compiler can tell you about. See the last section.
 
 Once it passes, what reaches GitHub with it, and how the roadmap and the issues are kept in
@@ -119,6 +124,30 @@ tail -2 /tmp/tidy.err
     list split in two comes back as `unmatched NOLINTBEGIN`: an error, and the suppression
     for everything below it is gone. When the list is long, use per-line
     `// NOLINTNEXTLINE(check)` instead of a block.
+
+## Unused includes
+
+A file includes what it uses, and nothing else. The editor says so because `.clangd` sets
+`Diagnostics.UnusedIncludes: Strict`; the command line says the same thing through the
+include cleaner of clang-tidy:
+
+```bash
+for f in <files>; do
+  clang-tidy -p build --use-color=0 --checks='-*,misc-include-cleaner' "$f" 2>/dev/null \
+    | grep -E "warning: .*(is not used directly|no header providing)" | sed "s|^|$f :: |"
+done
+```
+
+- A header reported as `included header X is not used directly` goes, together with any
+  `using` that only lived on it. Include what the file uses, not what its neighbour happened
+  to include.
+- The other half of the cleaner, `no header providing ... is directly included`, is not this
+  step. Most of it is a count, a string or an enum that a header already included for another
+  reason happens to provide; adding one include per line grows the list without changing what
+  the file depends on. Add the direct include when the file starts to rely on the type, and
+  leave the rest.
+- A file that gains or loses an include still has to compile and pass the rest of the list,
+  so run it before the build rather than after.
 
 ## Keeping clangd honest
 

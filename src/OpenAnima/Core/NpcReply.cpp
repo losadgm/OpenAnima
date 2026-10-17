@@ -12,7 +12,7 @@ namespace {
 /// @param key Name of the key.
 /// @return The text of the key.
 /// @throws ParseError when it is missing or is not a string.
-std::string requiredString(const nlohmann::json& object, const char* key) {
+std::string requiredString(const nlohmann::ordered_json& object, const char* key) {
     const auto found = object.find(key);
     if (found == object.end() || !found->is_string()) {
         throw ParseError(std::string{"the reply has no string '"} + key + "': " + object.dump());
@@ -33,7 +33,7 @@ NpcReply readReply(const Completion& completion, const std::string& partialDialo
         throw ParseError("the answer was asked for as a reply and has no JSON: " + completion.text);
     }
 
-    const nlohmann::json& document = *completion.json;
+    const nlohmann::ordered_json& document = *completion.json;
     if (!document.is_object()) {
         throw ParseError("the reply is not a JSON object: " + document.dump());
     }
@@ -46,7 +46,7 @@ NpcReply readReply(const Completion& completion, const std::string& partialDialo
     if (actions == document.end() || !actions->is_array()) {
         throw ParseError("the reply has no 'actions' array: " + document.dump());
     }
-    for (const nlohmann::json& entry : *actions) {
+    for (const nlohmann::ordered_json& entry : *actions) {
         if (!entry.is_object()) {
             throw ParseError("an action is not a JSON object: " + entry.dump());
         }

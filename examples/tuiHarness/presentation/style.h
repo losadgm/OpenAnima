@@ -6,7 +6,7 @@
 #include <array>
 #include <cstdint>
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 /// A colour the terminal can paint: its own default, a palette index, or 24-bit RGB.
 struct Color {
@@ -73,6 +73,10 @@ struct Style {
     /// @return A copy with that attribute set.
     [[nodiscard]] Style withReverse(bool value = true) const;
 
+    /// @param value Whether the style is underlined.
+    /// @return A copy with that attribute set.
+    [[nodiscard]] Style withUnderline(bool value = true) const;
+
     /// @return Whether the style asks for nothing, which is what a reset leaves behind.
     [[nodiscard]] bool isDefault() const;
 
@@ -91,6 +95,26 @@ inline constexpr const char* PromptMarker = "\u2771";
 inline constexpr std::array<const char*, 10> Spinner = {"\u280B", "\u2819", "\u2839", "\u2838",
                                                         "\u283C", "\u2834", "\u2826", "\u2827",
                                                         "\u2807", "\u280F"};
+
+/// The stroke the scrollbar on the right is drawn with.
+inline constexpr const char* ScrollBar = "\u2502";
+
+/// The strokes of the frame around the prompt.
+///
+/// They are one-eighth blocks, which paint the eighth of the cell that hugs one edge, so the
+/// frame runs along the inside edge of the panel and nothing of the colour shows outside it. The
+/// corners come from the symbols for legacy computing, where the strips of two edges are joined
+/// in one glyph. Everything is one eighth, which is one pixel across and two down on a cell twice
+/// as tall as it is wide: the sides and the corners match each other, and the top and the bottom
+/// are the thicker pair because a horizontal stroke cannot be thinner than that eighth.
+inline constexpr const char* BoxTopLeft = "\U0001FB7D";      ///< Left and upper eighth.
+inline constexpr const char* BoxTop = "\u2594";              ///< Upper one eighth block.
+inline constexpr const char* BoxTopRight = "\U0001FB7E";     ///< Right and upper eighth.
+inline constexpr const char* BoxLeft = "\u258F";             ///< Left one eighth block.
+inline constexpr const char* BoxRight = "\u2595";            ///< Right one eighth block.
+inline constexpr const char* BoxBottomLeft = "\U0001FB7C";   ///< Left and lower eighth.
+inline constexpr const char* BoxBottom = "\u2581";           ///< Lower one eighth block.
+inline constexpr const char* BoxBottomRight = "\U0001FB7F";  ///< Right and lower eighth.
 
 }  // namespace Glyphs
 
@@ -123,4 +147,4 @@ namespace Palette {
 
 }  // namespace Palette
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

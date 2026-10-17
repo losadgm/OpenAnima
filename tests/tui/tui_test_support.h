@@ -6,18 +6,18 @@
 #include <cstddef>
 #include <string>
 
-#include "screen/canvas.h"
-#include "screen/cell.h"
-#include "screen/style.h"
+#include "presentation/canvas.h"
+#include "presentation/cell.h"
+#include "presentation/style.h"
 
 namespace OpenAnimaTui::Tests {
 
 /// The aliases the screen tests use, so a case reads like the code it checks.
-namespace Palette = OpenAnimaTui::Screen::Palette;
-using OpenAnimaTui::Screen::Canvas;
-using OpenAnimaTui::Screen::Cell;
-using OpenAnimaTui::Screen::Color;
-using OpenAnimaTui::Screen::Style;
+namespace Palette = OpenAnimaTui::Presentation::Palette;
+using OpenAnimaTui::Presentation::Canvas;
+using OpenAnimaTui::Presentation::Cell;
+using OpenAnimaTui::Presentation::Color;
+using OpenAnimaTui::Presentation::Style;
 
 /// The characters of a row, as they would be read off the screen.
 /// @param canvas Canvas to read.

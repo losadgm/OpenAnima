@@ -3,9 +3,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "screen/cell.h"
-#include "screen/style.h"
-#include "screen/text.h"
+#include "presentation/cell.h"
+#include "presentation/style.h"
+#include "presentation/text.h"
 #include "tui_test_support.h"
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
@@ -94,6 +94,15 @@ TEST_CASE("a fill lays a background down without writing characters") {
     CHECK(readRow(canvas, 0) == "     ");
 }
 
+TEST_CASE("a fill covers what was written under it") {
+    Canvas canvas{5, 1};
+    canvas.put(0, 0, "hola", Style{});
+    canvas.fill(0, 1, 3, Palette::panel());
+    CHECK(readRow(canvas, 0) == "h    ");
+    CHECK(canvas.at(0, 1).isBlank());
+    CHECK(canvas.at(0, 1).style.equals(Palette::panel()));
+}
+
 TEST_CASE("two rows compare equal when they paint the same, background included") {
     Canvas one{3, 1};
     Canvas other{3, 1};
@@ -123,10 +132,12 @@ TEST_CASE("resizing keeps what fits and drops the rest") {
 }
 
 TEST_CASE("measuring counts what the terminal shows") {
-    CHECK(OpenAnimaTui::Screen::measure("abc") == 3);
-    CHECK(OpenAnimaTui::Screen::measure("ca\u00f1on") == 5);    // The tilde is part of the letter.
-    CHECK(OpenAnimaTui::Screen::measure("\u65e5\u672c") == 4);  // Two ideographs, four columns.
-    CHECK(OpenAnimaTui::Screen::measure("n\u0303") == 1);       // A combining mark adds none.
+    CHECK(OpenAnimaTui::Presentation::measure("abc") == 3);
+    CHECK(OpenAnimaTui::Presentation::measure("ca\u00f1on") ==
+          5);  // The tilde is part of the letter.
+    CHECK(OpenAnimaTui::Presentation::measure("\u65e5\u672c") ==
+          4);                                                    // Two ideographs, four columns.
+    CHECK(OpenAnimaTui::Presentation::measure("n\u0303") == 1);  // A combining mark adds none.
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

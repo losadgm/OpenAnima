@@ -39,7 +39,8 @@ struct Completion {
     std::optional<TokenUsage> usage;                   ///< Empty when none was reported.
     /// The answer read as JSON, when a shape other than text was asked for. Empty when
     /// text was asked for, and empty on a turn that was cancelled before it was whole.
-    std::optional<nlohmann::json> json;
+    /// It is ordered, so a document keeps the order the model wrote its keys in.
+    std::optional<nlohmann::ordered_json> json;
 };
 
 }  // namespace OpenAnima::Core

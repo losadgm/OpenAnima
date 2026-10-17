@@ -42,7 +42,8 @@ include/OpenAnima/     public headers
     Provider/          the backend interface, the settings, the REST provider
 src/OpenAnima/         the implementation, mirroring the headers
 tests/                 Catch2 tests, one directory per package
-examples/cliHarness/  a runnable client: reads .env, sends a prompt, prints the answer as it arrives
+examples/cliHarness/  a runnable client: takes its settings from flags and .env, sends a
+                      prompt, prints the turn in the order of the reply contract
 examples/common/      shared by both clients: the loader for `.env`
 examples/tuiHarness/  the terminal client: full screen, transcript, mouse and clipboard
 docs/                  these pages, the Doxyfile template and the site template

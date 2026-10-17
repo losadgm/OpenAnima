@@ -5,26 +5,45 @@ both are meant to be read as much as run.
 
 | Client | What it is | Where it stands |
 | --- | --- | --- |
-| `cliHarness` | The command line: one prompt at a time, or a session over stdin | in place |
+| `cliHarness` | The command line: options in, one prompt or a session out | in place |
 | `tuiHarness` | The terminal UI: the conversation on screen, the answer arriving as it is written | built |
 
 ## cliHarness
 
-It reads the configuration from the environment, keeps one conversation across turns and
-prints the answer as it arrives, piece by piece.
+The command-line client. Every setting is an option, the npcs are created from the command
+line or from a command, and the turn is printed once it is over, in the order the reply
+contract defines it.
 
 ```bash
-./build/examples/open_anima_cli "who are you?"   # one prompt, one answer, exit
-./build/examples/open_anima_cli                  # a session, one turn per line
+./build/examples/open_anima_cli --help                    # the manual
+./build/examples/open_anima_cli --persona "a blacksmith" "who are you?"
+./build/examples/open_anima_cli --persona "a blacksmith"  # a session over stdin
 ```
 
-`quit` or `exit` ends a session, and so does the end of the input. The environment is the one
-in [the configuration table](index.html#a-request-end-to-end), and `.env` is loaded on its own
-from the working directory or from up to three of its parents, which is what makes the editor
-buttons work with no wiring. The loader is `examples/common/dotenv`, shared with the terminal
-client. The client is the reference for the streamed reply: `askTurn()` with a sink, the
-dialogue arriving as it is written, the reasoning printed muted above it and the actions
-listed after it.
+- An option wins over the variable it reads, `OPENANIMA_CLI_<NAME>`, and the variable wins
+  over `.env`, which is only a way of setting variables. `--base-url` and `--model` are the
+  two that have to come from somewhere; with both, the client runs with no `.env` at all.
+- There is no npc until one is asked for: `--persona` creates it at startup, `/create` in a
+  session. A prompt with nobody to answer it says how to make one instead of asking a model
+  without a role.
+- `--provider` picks the provider, and `rest` is the only one that exists today.
+- `--raw`, or `/raw` in a session, prints the reply document and nothing else: the three
+  variables as the model wrote them, which is what to look at when a turn comes back wrong.
+  The name of the npc still goes over the document, in the colour a name is painted with, so a
+  transcript reads whose turn it was.
+- The session speaks the vocabulary of the console client: `/create`, `/enter`, `/npcs`,
+  `/leave`, `/clear`, `/raw`, `/help` and `/quit`. Given an argument it does not take, each
+  answers with its usage.
+- `ctrl-c` stops the turn in flight and keeps what it had said; twice, and it leaves. `ctrl-d`
+  leaves too.
+- When stdin is not a terminal there is no banner and no prompt, so a session can be piped.
+
+The settings are read by `examples/common/apiSettings`, shared with the terminal client under
+its own prefix, and the loader for `.env` is `examples/common/dotenv`. The client is the
+reference for the asynchronous turn: `askTurnAsync()` with `poll()`, `cancel()` wired to
+ctrl-c, and the whole document available when the turn is over. The dialogue is written once
+the turn is finished rather than while it arrives, so that the reasoning keeps its place above
+the words it leads to; nothing else is lost, because the answer is kept whole either way.
 
 ## tuiHarness
 
@@ -65,31 +84,60 @@ what is happening and what can be pressed.
   /enter
   /npcs
 
+  +---------------------------------------------------------------+
+  | > /c_                                                         |
+  +---------------------------------------------------------------+
         mock   ask something   /help for keys
-
-❱ /c_
 ```
 
 The commands are listed while one is being typed, up to six of them, with the selected one in
-the accent colour, and the list is cut rather than pushed around when the window is short.
+the accent colour. When there are more than fit, the panel shows the ones around the
+selection, so a command reached with the arrows is never off the panel.
 
-A blank row separates every message from the one before it, so a conversation reads as turns
-instead of as one block of text.
+A blank row separates every turn from the one before it, so a conversation reads as a question
+and the answer it got. The answer itself is one block: the name of the NPC sits on its first
+line, over the thought that opens it, and the dialogue and the actions follow without
+repeating the name or opening a gap.
 
 - The client owns the screen: it runs in the alternate screen, paints the whole window on a
   change, and hands the terminal back on the way out.
-- The conversation lives in a viewport of its own. Page up and page down move it, and the
-  prompt stays where it is, pinned under the transcript.
-- The prompt is the fixed part: the draft is drawn on a panel of its own, with the command in
-  its own colour while one is being typed, and the caret never leaves it.
-- The commands that complete what is being typed float above the prompt on a lighter panel,
-  with the selected one in the accent colour. The arrows walk them, and tab takes the one that
-  is selected.
-- Each role has its own colour and its own prefix, so a long session is readable at a glance.
+- The conversation lives in a viewport of its own. Page up and page down move it, the wheel
+  moves it a row at a notch, and the prompt stays where it is, pinned under the transcript.
+  A one-column bar on the right shows how much of the conversation is on screen and where in
+  it the viewport sits, and it can be dragged to move the view.
+- The prompt is the fixed part: the draft is drawn inside a frame of its own, with the command
+  in its own colour while one is being typed, and the caret never leaves it. The frame runs
+  along the inside edge of the panel with the one-eighth blocks and the legacy computing corners
+  that join two of them, an eighth on every side: one pixel across and two down, because a cell
+  is twice as tall as it is wide, so the colour reaches the edge of the box and none of it shows
+  outside the strokes. The corners need a font that covers U+1FB00 to U+1FBFF, which DejaVu Sans
+  Mono does not. The band inside is the line itself, with a column of it on each side, so the
+  text never sits against the frame. While the line is empty the frame says what can be done
+  from there, which is not the same in the lobby as in a conversation, and the words go as soon
+  as there is something to say. The box grows with the draft, row by row, until it would be
+  taller than the window: past that the panel keeps a window of its rows, and the padding column
+  inside the frame carries a bar that says how much of the draft is out of it. The window
+  follows the caret, so what is being typed is never off the screen, and the wheel over the box
+  or a drag of its bar reads the rest of the draft; the next key that writes brings the window
+  back to the caret.
+- The commands that complete what is being typed float over the last rows of the conversation,
+  on a lighter panel of their own. The panel is as wide as the longest command, its indent and
+  the margin after it, anchored to the left edge, so the rest of those rows still shows what was
+  said. A screen narrower than that keeps the panel inside itself, and the commands that no
+  longer fit whole are cut with an ellipsis. It takes no rows away from the viewport. The
+  selected one is in the accent colour; the arrows walk them and stop at the first and the last
+  one instead of coming round, tab writes the selected one, and a click writes the one under
+  the pointer. When more commands match than the panel has rows, its right edge carries a bar
+  of its own, the same as the one of the conversation, which can be dragged to walk the list.
+- Each role has its own colour: the player in muted gray, the NPC in the accent colour, and
+  the thought quietly under the same name, so it reads as the NPC's and not as the client's.
+- A note is what the client says on its own, and it belongs to no speaker: it starts at the
+  left edge of the transcript, painted quietly, while what an NPC says and does stays lined up
+  under its name.
 - The look borrows the OpenCode theme: a purple accent for the prompt marker and the spinner,
   a warm peach for the persona, muted gray for the quiet text, and the same braille spinner.
-- The status line carries the state: which model answered, how long the turn has been running,
-  and the key that stops it.
+- The status line sits under the frame and carries the state: which model answered, how long
+  the turn has been running, and the key that stops it.
 
 ### Keys
 
@@ -98,27 +146,75 @@ instead of as one block of text.
 | Enter | Sends the draft |
 | Ctrl+Enter, Ctrl+J, or a trailing `\` | Starts a new line instead of sending |
 | Tab | Completes the selected command |
-| Up, Down | Walks the command hints while they are showing, and the prompts of this scope otherwise |
+| Up, Down | Walks the command hints while they are showing, stopping at the ends, and the prompts of this scope otherwise |
 | Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Left, Right | Moves the cursor in the draft |
+| Ctrl+Left, Ctrl+Right | Moves a word at a time |
+| Backspace, Delete | Deletes the character before or after the cursor |
+| Ctrl+Backspace, Ctrl+Delete | Deletes a word at a time, and the gap around it |
 | Ctrl+P, Ctrl+N | Walks the prompts of this scope |
 | Page up, Page down | Scrolls the conversation |
-| Wheel | Scrolls the conversation, three rows a notch |
-| Esc, Ctrl+C | Cancels the turn in flight, keeping what it had produced |
-| Drag over the conversation | Picks out those cells, painted reversed as the pointer moves |
-| Ctrl+C with something picked out | Copies it, and drops the picking |
-| Ctrl+C with nothing in flight or picked out | Clears the draft, and leaves when it is already empty |
+| Wheel | Scrolls whatever the pointer is over: the conversation, the hints, or the draft when it is taller than its box |
+| Drag a scrollbar | Scrolls to where the thumb is put, following the button |
+| Hover a hint or a scrollbar | Lights it up: the hint goes lilac, bold and underlined, the thumb of the bar goes lilac and bold |
+| Click a hint | Writes it into the draft, the same as tab with the selected one |
+| Esc | Cancels the turn in flight, keeping what it had produced |
+| Drag over the conversation | Picks out those cells, painted reversed as the pointer moves, and moves the conversation on when it is held against an edge of the viewport |
+| Press and release on one cell | Picks out that one character |
+| Double click | Picks out the word under the pointer |
+| Triple click | Picks out the whole row |
+| Ctrl+C | Copies what is picked out and drops the picking. It never leaves the client, which is what keeps a reach for the copy key from ending the session |
 | Ctrl+V | Types what was copied last |
 | Ctrl+D | Leaves |
+
+Control and backspace travel as the same byte as Ctrl+H on the terminals that do not report the
+chord itself, which is nearly all of them, so the client reads that byte as the word delete: it
+is what pressing the two keys produces there, and Ctrl+H has nothing else to do in a line being
+typed. The same goes for the other spellings the chords turn into: Ctrl+W, alt and backspace,
+and the modifier forms `27;5;3~` and `27;5;127~`. Control and delete comes in as `3;5~` from a
+terminal, and as alt and `d` from an editor that takes the chord before the terminal sees it,
+which is what VS Code does. An editor that sends the key through the kitty keyboard protocol
+reports the code point instead, so code point 3 reaches the word delete too and code point 127
+the word backspace.
 
 A tab is never written into the draft. It counts as one column to the client and as up to
 eight to the terminal, and the two disagreeing is what tore the row apart.
 
 The picking out follows the button for as long as it is held: the cells are painted as the
 pointer passes over them, the paint grows and shrinks with it, and the last one stays painted
-when the button comes back up. Everything the conversation holds can be picked out, the prompt,
-the panels and the hints included, because what is read back is what was painted. While the
-client runs the mouse is the client's, which is the price of the wheel scrolling the
-conversation; holding shift asks the terminal for its own selection back in most of them.
+when the button comes back up. A double click takes the word under the pointer and a triple
+click takes the whole row, the way a terminal does it; a cell that is not part of a word is a
+word of its own. Picking is only over what was said: the box of the prompt, its padding, the
+marker beside it and the scrollbar on the right are the client's own drawing, so a drag across
+them paints the text and leaves them as they were, and a copy of that same selection holds the
+words without the box and comes out flush with the left edge. The bar inside the box is the
+client's drawing too, and the padding column it takes is not part of the draft.
+Any other key drops the picking, so a selection never sits over text that has been typed over.
+The wheel and the page keys are the exception: they move the conversation, and a picking made in
+it goes with the words it covers, so it stays over what was picked out while it scrolls, and it
+is there again when the words come back.
+A drag that reaches an edge of the viewport and waits there moves the conversation a row at a
+time, so a span can be taken past what is on screen without letting go. The end tied to the text
+goes with it and the end under the pointer waits on the edge, which means the span grows for as
+long as the button is held there.
+A picking belongs to the part of the screen it was made on: one of the conversation is read and
+painted inside the viewport and never reaches the prompt, and one of the prompt stays where it
+is while the conversation moves under it. A drag that starts on the prompt and comes up over the
+conversation therefore takes the draft and leaves what was said above it alone.
+While the client runs the mouse is the client's, which is the price of the wheel scrolling the
+conversation; holding shift asks the terminal for its own selection back in most of them. The
+right button is left to the terminal: the client never uses it, so the menu of the editor or of
+the emulator opens with the copy and paste it offers.
+
+The pointer also lights up what it is over. A command hint under it turns lilac, bold and
+underlined, and a click on it writes it into the draft, which is what tab does with the one that
+was selected. A hint that is not under the pointer is quiet unless it is the selected one, which
+keeps the accent colour. The wheel and the page keys are the wheel of whatever is under the
+pointer: over the panel they walk the hints, stopping at the ends, and anywhere else they scroll
+the conversation. A
+scrollbar under it gives the pointer the thumb it would drag: the thumb turns lilac and bold,
+and the button drags it, which scrolls the conversation to the row it is left on, or walks the
+hints when it is the bar of the panel. A press beside a thumb brings the thumb under the pointer
+first, and a drag that goes past either end stops there.
 
 Anything a keyboard can send reaches the draft as bytes, so an enye, an accented vowel or a
 combining mark typed after a letter lands in the same cell as the letter it belongs to. Copying goes out as the terminal's own clipboard sequence and lives in
@@ -136,6 +232,7 @@ talk to:
 | `/npcs` | Lists the NPCs, and which one is being talked to |
 | `/leave` | Leaves the conversation, keeping it |
 | `/clear` | Drops the active conversation, keeping the persona |
+| `/raw [on|off]` | Shows every turn as the JSON the model wrote, instead of the dialogue |
 | `/help` | Lists the keys and the commands |
 | `/quit` | Leaves |
 
@@ -150,6 +247,21 @@ for the answer, and says so.
 
 ### How it is built
 
+- **The client is four layers, and a dependency only points down.** `domain/` holds the model,
+  the commands and the keys: pure rules, with no terminal, no clock and no position in them.
+  `presentation/` turns a model into a frame: a canvas of cells, and nothing else. `application/`
+  is what has to happen between the two: the session runs a turn of the loop, the interaction
+  turns keys and pointer positions into changes of the model, and the brains carry the effects
+  out. `terminal/` is the only layer that talks to the console. `main.cpp` is the composition
+  root: it reads the configuration, opens the terminal and runs the session, and it is the only
+  place that knows all four.
+- **The patterns that earned their place.** The terminal is an interface with a Unix and a
+  Windows implementation, which is why the loop can be tested without a console. What the button
+  is doing is one state (`Drag`: nothing, a selection, one of the three bars) instead of four
+  flags that could disagree. The renderer is a facade over the parts of a frame, and the session
+  is the one that owns the order they are asked in. Everything else is plain functions over
+  values, which is the pattern that needs no name: a frame is a value, a style is a value, and a
+  selection is a value.
 - **A terminal layer of its own**, with two implementations: raw mode and ANSI sequences on
   Unix (termios), and the console API with virtual terminal sequences on Windows. Windows is a
   target from the start rather than a port to attempt later. It is `terminal/terminal.h` with
@@ -157,13 +269,13 @@ for the answer, and says so.
   size of the window, the alternate screen and writing to the terminal come from. Writing never
   waits for the terminal: what does not fit is kept and sent on the next turn of the loop, so a
   terminal that has stopped reading cannot freeze the client and leave the keyboard unread.
-- **The rest is a functional core and an imperative shell.** Under `app/` the model, the
+- **The rest is a functional core and an imperative shell.** Under `domain/` the model, the
   commands and the keys are pure: `update(model, key)` returns what to do as a list of
   effects, and `applyEvent(model, event)` folds what came back from the provider into the same
-  model. Under `screen/` the rendering is pure too: cells into a canvas, and the canvas into
-  rows. `main.cpp` is the shell, and it is the only place that knows about files, sockets and
-  clocks: it runs the effects against the brains, drains the events, and writes a frame when
-  something changed and the one before it has arrived.
+  model. Under `presentation/` the rendering is pure too: cells into a canvas, and the canvas
+  into rows. `application/` is the shell: the session runs the effects against the brains,
+  drains the events, and writes a frame when something changed and the one before it has
+  arrived.
 - **The screen is a grid of cells, not a string of escapes.** A style is a value (a colour, a
   background, the attributes) and a cell holds a character and the style it is painted with,
   so two frames can be compared before anything is written. Text is placed by columns: a wide
@@ -185,31 +297,35 @@ for the answer, and says so.
   transcript; the model holds the ids, the transcripts and which one is being talked to. The
   library does not need to know that several NPCs exist until they have to speak to each
   other.
-- **Two clients, one configuration**: the same environment, the same `.env` loader and the
-  same provider as the command line.
+- **Two clients, one configuration**: the same settings reader, the same `.env` loader and the
+  same provider as the command line, read from its own prefix, `OPENANIMA_TUI_`. The two can
+  point at different models from the same shell.
 
 ### Packets
 
 | Where | What is in it |
 | --- | --- |
-| `app/` | The model, the commands and the keys: what a key does, and what to ask the shell for |
-| `screen/` | The canvas, the cells, the colours, the text measurement and the frame writer |
+| `domain/` | The model, the commands and the keys: what a key does, and what to ask the shell for |
+| `presentation/` | The canvas, the cells, the colours, the text measurement, the picking and the frame writer |
+| `application/` | The session, the pointer and the brains: the loop, and what a click or a wheel notch means |
 | `terminal/` | Raw mode, key decoding, the size of the window and writing without waiting |
-| `main.cpp` | The shell: brains, effects, events, and the loop that decides when to draw |
+| `main.cpp` | The composition root: configuration, terminal, session |
 
 ### How it is checked
 
 - The pieces: `tests/tui/` covers the text (columns, wrapping, cutting), the canvas (clipping,
   wide characters, combining marks), the frame writer (what it sends, and whether a terminal
   that applies it ends up showing the frame it came from), the commands (matching and
-  completing), the model (every key, the world, the events) and the screen (panels, hints,
+  completing), the model (every key, the world, the events), the pointer (clicks, drags, the
+  three bars, the wheel, and what a drag at an edge does) and the screen (panels, hints,
   viewport, caret, and what the mouse picked out). No terminal is involved.
-- The client itself: driven over a pseudo-terminal, sending keys and reading what comes back,
-  with a throwaway server that streams the answer word by word. The keys, the wheel, the
-  accented characters, the picking out and the clipboard are checked that way, and so is the
-  rule that nothing but whole characters ever leaves the client towards the terminal. PTY on
-  Unix and ConPTY on Windows is where this is going, so the same test runs on all three
-  platforms.
+- The client itself: driven over a pseudo-terminal by hand, sending keys and reading what
+  comes back, with a throwaway server that streams the answer word by word. The keys, the
+  wheel, the accented characters, the picking out and the clipboard are checked that way, and
+  so is the rule that nothing but whole characters ever leaves the client towards the
+  terminal. The case that does it inside the suite is what the roadmap still lists for this
+  point; PTY on Unix and ConPTY on Windows is where it is going, so the same test runs on all
+  three platforms.
 
 ### The plan
 

@@ -1,11 +1,20 @@
 # -----------------------------------------------------------------------------
 #  Example programs. `cliHarness` is the command-line client: it reads the
 #  environment, keeps the conversation and prints the answer as it arrives.
-#  `common/` holds what both clients use: today, the loader for `.env`.
+#  `common/` holds what both clients use: the API settings read from their
+#  prefixed variables, and the loader for `.env`.
 # -----------------------------------------------------------------------------
 add_executable(open_anima_cli
     cliHarness/main.cpp
+    cliHarness/options.cpp
+    cliHarness/session.cpp
+    common/apiSettings.cpp
     common/dotenv.cpp)
+
+# The version printed by --version is the one the project declares, so it cannot drift.
+target_compile_definitions(open_anima_cli
+    PRIVATE
+        OPENANIMA_CLI_VERSION="${PROJECT_VERSION}")
 
 target_include_directories(open_anima_cli
     PRIVATE
@@ -25,17 +34,21 @@ open_anima_enable_warnings(open_anima_cli)
 # -----------------------------------------------------------------------------
 add_executable(open_anima_tui
     tuiHarness/main.cpp
-    tuiHarness/app/commands.cpp
-    tuiHarness/app/model.cpp
-    tuiHarness/screen/canvas.cpp
-    tuiHarness/screen/cell.cpp
-    tuiHarness/screen/diff.cpp
-    tuiHarness/screen/render.cpp
-    tuiHarness/screen/selection.cpp
-    tuiHarness/screen/style.cpp
-    tuiHarness/screen/text.cpp
+    tuiHarness/application/brains.cpp
+    tuiHarness/application/interaction.cpp
+    tuiHarness/application/session.cpp
+    tuiHarness/domain/commands.cpp
+    tuiHarness/domain/model.cpp
+    tuiHarness/presentation/canvas.cpp
+    tuiHarness/presentation/cell.cpp
+    tuiHarness/presentation/diff.cpp
+    tuiHarness/presentation/render.cpp
+    tuiHarness/presentation/selection.cpp
+    tuiHarness/presentation/style.cpp
+    tuiHarness/presentation/text.cpp
     tuiHarness/terminal/terminalUnix.cpp
     tuiHarness/terminal/terminalWindows.cpp
+    common/apiSettings.cpp
     common/dotenv.cpp)
 
 target_include_directories(open_anima_tui

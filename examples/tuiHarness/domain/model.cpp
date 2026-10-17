@@ -1,12 +1,13 @@
 #include "model.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <utility>
 
 #include "commands.h"
 
-namespace OpenAnimaTui::App {
+namespace OpenAnimaTui::Domain {
 
 namespace {
 
@@ -15,7 +16,7 @@ constexpr const char* WaitForTurn = "wait for the answer, or cancel it first";
 
 /// Rows one notch of the wheel moves the conversation, which is enough to follow what is being
 /// written without losing the line being read.
-constexpr std::size_t WheelStep = 3;
+constexpr std::size_t WheelStep = 1;
 
 /// Trailing spaces off a submitted line, so a completed command still matches.
 std::string trimRight(std::string text) {
@@ -73,6 +74,53 @@ std::size_t nextCodepoint(const std::string& text, std::size_t position) {
     return next;
 }
 
+/// @param text Draft to look at.
+/// @param position Where a code point starts.
+/// @return Whether that code point belongs to a word: a letter, a digit, an underscore, or a
+///         byte that is not ASCII, which is how an accent or an enye counts.
+bool isWordAt(const std::string& text, std::size_t position) {
+    if (position >= text.size()) {
+        return false;
+    }
+    const auto first = static_cast<unsigned char>(text[position]);
+    if (first >= 0x80U) {
+        return true;
+    }
+    return std::isalnum(first) != 0 || first == '_';
+}
+
+/// Where the word before a position starts. Blanks and whatever is not part of a word are
+/// skipped first, which is what makes control and backspace take the word and the gap before
+/// it rather than one character at a time.
+/// @param text Draft to look at.
+/// @param position Caret, in bytes.
+/// @return The start of that word, or zero when there is nothing before the caret.
+std::size_t previousWord(const std::string& text, std::size_t position) {
+    std::size_t cursor = position;
+    while (cursor > 0 && !isWordAt(text, previousCodepoint(text, cursor))) {
+        cursor = previousCodepoint(text, cursor);
+    }
+    while (cursor > 0 && isWordAt(text, previousCodepoint(text, cursor))) {
+        cursor = previousCodepoint(text, cursor);
+    }
+    return cursor;
+}
+
+/// Where the word after a position ends.
+/// @param text Draft to look at.
+/// @param position Caret, in bytes.
+/// @return The end of that word, or the end of the draft when there is nothing after it.
+std::size_t nextWord(const std::string& text, std::size_t position) {
+    std::size_t cursor = position;
+    while (cursor < text.size() && !isWordAt(text, cursor)) {
+        cursor = nextCodepoint(text, cursor);
+    }
+    while (cursor < text.size() && isWordAt(text, cursor)) {
+        cursor = nextCodepoint(text, cursor);
+    }
+    return cursor;
+}
+
 /// Adds one character, or a newline, at the caret.
 void editInsert(Model& model, char character) {
     model.cursor = std::min(model.cursor, model.draft.size());
@@ -82,13 +130,29 @@ void editInsert(Model& model, char character) {
 }
 
 /// Deletes the character before the caret, whole.
-void editBackspace(Model& model) {
+/// @param model Model to change.
+/// @param wholeWord Whether control was held, which takes the word instead of the character.
+void editBackspace(Model& model, bool wholeWord) {
     if (model.cursor == 0) {
         return;
     }
-    const std::size_t start = previousCodepoint(model.draft, model.cursor);
+    const std::size_t start = wholeWord ? previousWord(model.draft, model.cursor)
+                                        : previousCodepoint(model.draft, model.cursor);
     model.draft.erase(start, model.cursor - start);
     model.cursor = start;
+    model.hintIndex = 0;
+}
+
+/// Deletes the character after the caret, whole.
+/// @param model Model to change.
+/// @param wholeWord Whether control was held, which takes the word instead of the character.
+void editDelete(Model& model, bool wholeWord) {
+    if (model.cursor >= model.draft.size()) {
+        return;
+    }
+    const std::size_t end =
+        wholeWord ? nextWord(model.draft, model.cursor) : nextCodepoint(model.draft, model.cursor);
+    model.draft.erase(model.cursor, end - model.cursor);
     model.hintIndex = 0;
 }
 
@@ -101,13 +165,22 @@ void editComplete(Model& model, const std::string& chosen) {
     model.hintIndex = 0;
 }
 
-/// Moves the command hint selection, wrapping around.
-void moveHint(Model& model, std::size_t count, int direction) {
-    if (count == 0) {
+/// Moves the command hint selection, stopping at the ends of the list.
+/// @param model The model, which holds the selection.
+/// @param hints The hints that are showing.
+/// @param direction Which way it goes: back to the one before when it is negative, on to the
+///        one after otherwise.
+void moveHint(Model& model, const std::vector<std::string>& hints, int direction) {
+    if (hints.empty()) {
         return;
     }
-    const std::size_t index = std::min(model.hintIndex, count - 1);
-    model.hintIndex = direction < 0 ? (index + count - 1) % count : (index + 1) % count;
+    const std::size_t last = hints.size() - 1;
+    const std::size_t index = std::min(model.hintIndex, last);
+    if (direction < 0) {
+        model.hintIndex = index > 0 ? index - 1 : 0;
+        return;
+    }
+    model.hintIndex = std::min(index + 1, last);
 }
 
 /// Walks the history of the scope being typed at, putting the draft aside on the way.
@@ -157,10 +230,14 @@ void showHelp(Model& model) {
     note(model, "  enter                 send the line");
     note(model, "  ctrl+enter, ctrl+j, trailing \\   new line instead of sending");
     note(model, "  tab                   complete the selected command");
+    note(model, "  ctrl+a, ctrl+e, left, right   move the caret");
+    note(model, "  ctrl+left, ctrl+right  move a word at a time");
+    note(model, "  backspace, delete      delete a character, or a word with ctrl");
     note(model, "  up, down              walk the command hints, or the prompts of this scope");
     note(model, "  page up, page down    scroll the conversation");
-    note(model, "  esc, ctrl+c           cancel the turn in flight");
-    note(model, "  ctrl+c when idle      clear the line, and leave when it is empty");
+    note(model, "  esc                   cancel the turn in flight");
+    note(model, "  ctrl+c                copy what is picked out");
+    note(model, "  ctrl+v                type what was copied last");
     note(model, "  ctrl+d                leave");
     note(model, "commands:");
     note(model, "  /create <description> make an npc and talk to it");
@@ -168,6 +245,7 @@ void showHelp(Model& model) {
     note(model, "  /npcs                 list the npcs");
     note(model, "  /leave                leave the conversation");
     note(model, "  /clear                drop the active conversation, keep the persona");
+    note(model, "  /raw [on|off]         show every turn as the JSON the model wrote");
     note(model, "  /help                 this list");
     note(model, "  /quit                 leave");
 }
@@ -259,6 +337,22 @@ void runCommand(Model& model, const std::string& rawDraft, std::vector<Effect>& 
         return;
     }
 
+    if (draft == "/raw") {
+        model.raw = !model.raw;
+        note(model, std::string{"raw json "} + (model.raw ? "on" : "off"));
+        return;
+    }
+    if (draft.rfind("/raw ", 0) == 0) {
+        const std::string argument = draft.substr(5);
+        if (argument != "on" && argument != "off") {
+            note(model, "usage: /raw [on|off]");
+            return;
+        }
+        model.raw = argument == "on";
+        note(model, std::string{"raw json "} + (model.raw ? "on" : "off"));
+        return;
+    }
+
     if (draft == "/help") {
         showHelp(model);
         return;
@@ -276,7 +370,7 @@ void submit(Model& model, std::vector<Effect>& effects) {
         return;
     }
     if (model.draft.back() == '\\') {
-        editBackspace(model);
+        editBackspace(model, false);
         editInsert(model, '\n');
         return;
     }
@@ -317,23 +411,52 @@ void submit(Model& model, std::vector<Effect>& effects) {
 
 }  // namespace
 
+/// @param kind Key that arrived.
+/// @return Whether it only moves the conversation, which leaves the panel of the prompt where
+///         the reader put it.
+bool movesOnlyTranscript(Key::Kind kind) {
+    return kind == Key::Kind::WheelUp || kind == Key::Kind::WheelDown ||
+           kind == Key::Kind::PageUp || kind == Key::Kind::PageDown;
+}
+
+/// Handles a key while a turn is in flight: the one that stops it and the one that leaves, and
+/// nothing else changes meaning.
+/// @param model The model, changed in place.
+/// @param key The key.
+/// @param effects Receives the cancel, when the key asks for one.
+/// @return Whether the turn in flight took the key.
+bool whileBusy(Model& model, const Key& key, std::vector<Effect>& effects) {
+    if (!model.busy) {
+        return false;
+    }
+    if (key.kind == Key::Kind::Escape) {
+        if (model.world.active.has_value()) {
+            model.cancelling = true;
+            effects.push_back({EffectKind::Cancel, *model.world.active, {}});
+        }
+        return true;
+    }
+    if (key.kind == Key::Kind::CtrlD) {
+        model.running = false;
+        return true;
+    }
+    return false;
+}
+
 std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep) {
     std::vector<Effect> effects;
     const std::vector<std::string> hints = hintsFor(model);
 
-    // A turn in flight takes the keys that stop it, and nothing else changes meaning.
-    if (model.busy) {
-        if (key.kind == Key::Kind::Escape || key.kind == Key::Kind::CtrlC) {
-            if (model.world.active.has_value()) {
-                model.cancelling = true;
-                effects.push_back({EffectKind::Cancel, *model.world.active, {}});
-            }
-            return effects;
-        }
-        if (key.kind == Key::Kind::CtrlD) {
-            model.running = false;
-            return effects;
-        }
+    // A turn in flight takes the key that stops it, and nothing else changes meaning. Ctrl+C is
+    // not that key: it copies, and the shell takes it before it ever gets here.
+    if (whileBusy(model, key, effects)) {
+        return effects;
+    }
+
+    // Writing or moving the caret brings the panel back to it: a window scrolled away from the
+    // caret is only worth keeping while nothing is being typed.
+    if (!movesOnlyTranscript(key.kind)) {
+        model.promptScroll.reset();
     }
 
     switch (key.kind) {
@@ -350,7 +473,11 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
         break;
 
     case Key::Kind::Backspace:
-        editBackspace(model);
+        editBackspace(model, key.ctrl);
+        break;
+
+    case Key::Kind::Delete:
+        editDelete(model, key.ctrl);
         break;
 
     case Key::Kind::Enter:
@@ -363,16 +490,8 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
         break;
 
     case Key::Kind::Escape:
-        break;
-
+    // Ctrl+C is the shell's: it is the copy key, and it never reaches the model.
     case Key::Kind::CtrlC:
-        if (model.draft.empty()) {
-            model.running = false;
-        } else {
-            model.draft.clear();
-            model.cursor = 0;
-            model.hintIndex = 0;
-        }
         break;
 
     case Key::Kind::CtrlD:
@@ -381,7 +500,7 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
 
     case Key::Kind::ArrowUp:
         if (!hints.empty()) {
-            moveHint(model, hints.size(), -1);
+            moveHint(model, hints, -1);
         } else {
             historyWalk(model, -1);
         }
@@ -389,7 +508,7 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
 
     case Key::Kind::ArrowDown:
         if (!hints.empty()) {
-            moveHint(model, hints.size(), 1);
+            moveHint(model, hints, 1);
         } else {
             historyWalk(model, 1);
         }
@@ -405,12 +524,15 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
 
     case Key::Kind::ArrowLeft:
     case Key::Kind::CtrlB:
-        model.cursor = previousCodepoint(model.draft, model.cursor);
+        // Control and an arrow moves a word at a time, the way it does everywhere else.
+        model.cursor = key.ctrl ? previousWord(model.draft, model.cursor)
+                                : previousCodepoint(model.draft, model.cursor);
         break;
 
     case Key::Kind::ArrowRight:
     case Key::Kind::CtrlF:
-        model.cursor = nextCodepoint(model.draft, model.cursor);
+        model.cursor = key.ctrl ? nextWord(model.draft, model.cursor)
+                                : nextCodepoint(model.draft, model.cursor);
         break;
 
     case Key::Kind::CtrlA:
@@ -447,6 +569,7 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
     case Key::Kind::MousePress:
     case Key::Kind::MouseDrag:
     case Key::Kind::MouseRelease:
+    case Key::Kind::MouseMove:
     case Key::Kind::CtrlV:
         break;
     }
@@ -454,39 +577,77 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
     return effects;
 }
 
+/// Writes the turn as the document the model wrote, which is all raw mode shows.
+///
+/// The painted reply is thrown away, but who answered is not: the name of the npc goes over
+/// the document, so a reader knows whose turn it is without reading the json for a clue.
+/// @param model Model to write into.
+/// @param event Finished event of the turn.
+void noteRawTurn(Model& model, const Event& event) {
+    const std::string speaker = model.world.active.has_value()
+                                    ? "npc " + std::to_string(*model.world.active)
+                                    : std::string{"npc"};
+    model.messages.push_back({Role::Speaker, speaker + ":"});
+    if (!event.reply.has_value() || event.reply->document.is_null()) {
+        note(model, "(no document: the turn was stopped before it was whole)");
+        return;
+    }
+    note(model, event.reply->document.dump(2));
+}
+
+/// Writes a finished turn into the transcript as one block: the thought opens it and carries
+/// the name of the npc, and what it says and does follow it without a name of their own.
+/// @param model Model to write into.
+/// @param event Finished event of the turn.
+void noteTurn(Model& model, const Event& event) {
+    bool opened = false;
+    if (event.reply.has_value() && !event.reply->reasoning.empty()) {
+        model.messages.push_back({Role::Thought, "~ " + event.reply->reasoning});
+        opened = true;
+    }
+    if (!model.answer.empty()) {
+        model.messages.push_back({Role::Npc, model.answer, opened});
+        opened = true;
+    }
+    if (event.reply.has_value()) {
+        for (const OpenAnima::Core::NpcAction& action : event.reply->actions) {
+            std::string line = "[" + action.name + "]";
+            if (!action.arguments.empty()) {
+                line += " ";
+                line += action.arguments.dump();
+            }
+            model.messages.push_back({Role::System, line, opened});
+            opened = true;
+        }
+    }
+    if (event.completion.finishReason == OpenAnima::Core::FinishReason::Cancelled) {
+        note(model, "(cancelled, what it had is kept)");
+    }
+}
+
 bool applyEvent(Model& model, const Event& event) {
     switch (event.kind) {
     case OpenAnima::Core::EventKind::Started:
         return false;
     case OpenAnima::Core::EventKind::Delta:
+        // Raw mode shows the turn once it is over, so the dialogue is not painted while it
+        // arrives: the document is the only thing that goes in.
+        if (model.raw) {
+            return false;
+        }
         model.answer += event.text;
         return true;
-    case OpenAnima::Core::EventKind::Finished:
+    case OpenAnima::Core::EventKind::Finished: {
         model.busy = false;
         model.cancelling = false;
-        // What it thought is shown before the line it belongs to, and what it asks for
-        // after: both go in as notes, which is what the transcript paints muted.
-        if (event.reply.has_value() && !event.reply->reasoning.empty()) {
-            note(model, "~ " + event.reply->reasoning);
-        }
-        if (!model.answer.empty()) {
-            model.messages.push_back({Role::Npc, model.answer});
-        }
-        if (event.reply.has_value()) {
-            for (const OpenAnima::Core::NpcAction& action : event.reply->actions) {
-                std::string line = "[" + action.name + "]";
-                if (!action.arguments.empty()) {
-                    line += " ";
-                    line += action.arguments.dump();
-                }
-                note(model, line);
-            }
-        }
-        if (event.completion.finishReason == OpenAnima::Core::FinishReason::Cancelled) {
-            note(model, "(cancelled, what it had is kept)");
+        if (model.raw) {
+            noteRawTurn(model, event);
+        } else {
+            noteTurn(model, event);
         }
         model.answer.clear();
         return true;
+    }
     case OpenAnima::Core::EventKind::Failed:
         model.busy = false;
         model.answer.clear();
@@ -509,4 +670,4 @@ std::size_t elapsedTenths(const Model& model) {
         std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() / 100);
 }
 
-}  // namespace OpenAnimaTui::App
+}  // namespace OpenAnimaTui::Domain

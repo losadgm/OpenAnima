@@ -2,13 +2,13 @@
 
 #include <algorithm>
 
-namespace OpenAnimaTui::App {
+namespace OpenAnimaTui::Domain {
 
 const std::vector<std::string>& commands() {
     // The order is the order the hints are offered in, which is the order they are reached: the
     // ones that start a conversation first, and the way out last.
     static const std::vector<std::string> list = {
-        "/create", "/enter", "/npcs", "/leave", "/clear", "/help", "/quit",
+        "/create", "/enter", "/npcs", "/leave", "/clear", "/raw", "/help", "/quit",
     };
     return list;
 }
@@ -42,4 +42,4 @@ std::pair<std::string, std::size_t> completeCommand(const std::string& draft, st
     return {completed + draft.substr(caret), completed.size()};
 }
 
-}  // namespace OpenAnimaTui::App
+}  // namespace OpenAnimaTui::Domain

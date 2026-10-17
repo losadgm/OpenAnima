@@ -20,17 +20,26 @@
 
 #include "terminal/terminal.h"
 
-namespace OpenAnimaTui::App {
+namespace OpenAnimaTui::Domain {
 
 using OpenAnima::Core::Event;
 
 /// Who speaks a line. The colour of a role is the screen's business.
-enum class Role : std::uint8_t { User, Npc, System };
+enum class Role : std::uint8_t {
+    User,     ///< What the player typed.
+    Npc,      ///< What the npc says out loud.
+    Thought,  ///< What the npc thought first: named like the npc, painted quietly.
+    System,   ///< A note from the client, belonging to no speaker.
+    Speaker   ///< The name of the npc on a line of its own, over what follows.
+};
 
 /// One finished turn of the conversation, oldest first.
 struct Message {
     Role role;
     std::string text;
+    /// Part of the message before it: no blank row between them, and no name of its own.
+    /// A reply is one of these blocks, named once on the thought that opens it.
+    bool continues{false};
 };
 
 /// The prompts typed in one scope (one NPC, or the lobby), and where the walk sits.
@@ -61,10 +70,15 @@ struct Model {
     std::vector<Message> messages;  ///< The transcript on screen: the active one.
     std::string draft;
     std::size_t cursor{0};
+    /// First row of the draft the panel of the prompt shows, when it has been scrolled away
+    /// from the caret. Nothing means the panel follows the caret, which is where a key that
+    /// writes puts it back.
+    std::optional<std::size_t> promptScroll;
     std::size_t scrollOffset{0};  ///< Transcript rows hidden above the viewport.
     std::size_t hintIndex{0};     ///< Which of the command hints is selected.
     std::string answer;           ///< Text of the turn in flight.
     std::string modelName;        ///< Model that answers, for the status line.
+    bool raw{false};              ///< Show every turn as the JSON the model wrote.
     bool busy{false};             ///< A turn is in flight: the NPC is writing.
     bool cancelling{false};       ///< The turn in flight was asked to stop and has not ended yet.
     bool running{true};
@@ -104,4 +118,4 @@ std::vector<std::string> hintsFor(const Model& model);
 /// @return Tenths of a second, or 0 when nothing is running.
 std::size_t elapsedTenths(const Model& model);
 
-}  // namespace OpenAnimaTui::App
+}  // namespace OpenAnimaTui::Domain

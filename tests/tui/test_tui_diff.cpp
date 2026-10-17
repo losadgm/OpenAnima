@@ -9,17 +9,17 @@
 #include <string_view>
 #include <vector>
 
-#include "screen/cell.h"
-#include "screen/diff.h"
-#include "screen/style.h"
-#include "screen/text.h"
+#include "presentation/cell.h"
+#include "presentation/diff.h"
+#include "presentation/style.h"
+#include "presentation/text.h"
 #include "tui_test_support.h"
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
 
 namespace {
 
-using OpenAnimaTui::Screen::FrameWriter;
+using OpenAnimaTui::Presentation::FrameWriter;
 using namespace OpenAnimaTui::Tests;
 
 /// A terminal, as far as the tests care: it holds cells and moves a cursor around.
@@ -54,8 +54,9 @@ public:
                 ++index;
                 continue;
             }
-            const std::uint32_t codepoint = OpenAnimaTui::Screen::decodeCodepoint(bytes, index);
-            const std::size_t columns = OpenAnimaTui::Screen::glyphColumns(codepoint);
+            const std::uint32_t codepoint =
+                OpenAnimaTui::Presentation::decodeCodepoint(bytes, index);
+            const std::size_t columns = OpenAnimaTui::Presentation::glyphColumns(codepoint);
             write(codepoint, columns);
         }
         return true;
@@ -118,11 +119,13 @@ public:
             text.append(cell.glyph.data(), cell.length);
         }
         text += "] fg ";
-        text += std::to_string(cell.style.foreground.kind == OpenAnimaTui::Screen::Color::Kind::Rgb
+        text += std::to_string(cell.style.foreground.kind ==
+                                       OpenAnimaTui::Presentation::Color::Kind::Rgb
                                    ? cell.style.foreground.red
                                    : 0);
         text += " bg ";
-        text += std::to_string(cell.style.background.kind == OpenAnimaTui::Screen::Color::Kind::Rgb
+        text += std::to_string(cell.style.background.kind ==
+                                       OpenAnimaTui::Presentation::Color::Kind::Rgb
                                    ? cell.style.background.red
                                    : 0);
         return text;
@@ -240,10 +243,10 @@ private:
                 style = style.withReverse();
                 break;
             case 39:
-                style = style.withForeground(OpenAnimaTui::Screen::Color::defaultValue());
+                style = style.withForeground(OpenAnimaTui::Presentation::Color::defaultValue());
                 break;
             case 49:
-                style = style.withBackground(OpenAnimaTui::Screen::Color::defaultValue());
+                style = style.withBackground(OpenAnimaTui::Presentation::Color::defaultValue());
                 break;
             case 38:
             case 48: {
@@ -252,7 +255,7 @@ private:
                     values[position + 4] > 255) {
                     return false;
                 }
-                const auto color = OpenAnimaTui::Screen::Color::rgb(
+                const auto color = OpenAnimaTui::Presentation::Color::rgb(
                     static_cast<std::uint8_t>(values[position + 2]),
                     static_cast<std::uint8_t>(values[position + 3]),
                     static_cast<std::uint8_t>(values[position + 4]));

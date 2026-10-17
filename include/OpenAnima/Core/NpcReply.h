@@ -13,8 +13,8 @@ namespace OpenAnima::Core {
 
 /// One thing an NPC asks the host application to do.
 struct NpcAction {
-    std::string name;          ///< Action name, as the catalogue that was used declared it.
-    nlohmann::json arguments;  ///< Arguments the model filled in, as an object.
+    std::string name;                  ///< Action name, as the catalogue declared it.
+    nlohmann::ordered_json arguments;  ///< Arguments the model filled in, as an object.
 };
 
 /// The answer of a turn, split into the three variables the reply contract defines.
@@ -23,11 +23,11 @@ struct NpcAction {
 /// and in the first person. The library never reads into it. It hands it over, and keeps
 /// the whole document in the history so the NPC reads it again on the next turn.
 struct NpcReply {
-    std::string reasoning;           ///< Private thoughts. Empty when it had none.
-    std::string dialogue;            ///< What it says out loud. Empty when it says nothing.
-    std::vector<NpcAction> actions;  ///< What it asks the host to do.
-    nlohmann::json document;         ///< The answer as it arrived. Null when the turn was cut.
-    Completion completion;           ///< The answer as the provider reported it.
+    std::string reasoning;            ///< Private thoughts. Empty when it had none.
+    std::string dialogue;             ///< What it says out loud. Empty when it says nothing.
+    std::vector<NpcAction> actions;   ///< What it asks the host to do.
+    nlohmann::ordered_json document;  ///< The answer as it arrived, in its own order.
+    Completion completion;            ///< The answer as the provider reported it.
 };
 
 /// Reads a reply out of an answer asked for with a reply schema.

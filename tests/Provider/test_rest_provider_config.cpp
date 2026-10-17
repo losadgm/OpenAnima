@@ -1,106 +1,125 @@
 #include <catch2/catch_test_macros.hpp>
-#include <map>
+#include <limits>
+#include <memory>
 #include <string>
-#include <utility>
-#include <vector>
 
 #include "OpenAnima/Errors.h"
+#include "OpenAnima/Provider/RestProvider.h"
 #include "OpenAnima/Provider/RestProviderConfig.h"
 
+#include "support/fake_http_transport.h"
+
 using OpenAnima::ConfigError;
+using OpenAnima::Provider::RestProvider;
 using OpenAnima::Provider::RestProviderConfig;
+using OpenAnima::TestSupport::FakeHttpTransport;
 
 namespace {
 
-/// Builds a lookup over a fixed set of variables.
-RestProviderConfig::EnvironmentLookup lookupOf(std::map<std::string, std::string> values) {
-    return [values = std::move(values)](const char* name) -> std::string {
-        const auto entry = values.find(name);
-        return entry == values.end() ? std::string{} : entry->second;
-    };
-}
-
-/// @return The two variables the library cannot work without.
-std::map<std::string, std::string> minimalValues() {
-    return {{"OPENANIMA_BASE_URL", "http://localhost:11434/v1"}, {"OPENANIMA_MODEL", "qwen2.5:7b"}};
+RestProviderConfig localConfig() {
+    RestProviderConfig config;
+    config.baseUrl = "http://localhost:11434/v1";
+    config.model = "qwen2.5:7b";
+    config.apiKey = "secret";
+    return config;
 }
 
 }  // namespace
 
-// Catch2 assertions expand into do-while blocks and test cases are long by design, so
-// the rules written for production code do not fit here.
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
+TEST_CASE("a configuration with only an endpoint and a model is valid", "[config]") {
+    RestProviderConfig config;
+    config.baseUrl = "http://localhost:11434/v1";
+    config.model = "qwen2.5:7b";
 
-TEST_CASE("RestProviderConfig::fromEnvironment reads the required variables", "[config]") {
-    const RestProviderConfig config =
-        RestProviderConfig::fromEnvironment(lookupOf(minimalValues()));
-
-    CHECK(config.baseUrl == "http://localhost:11434/v1");
-    CHECK(config.model == "qwen2.5:7b");
-    CHECK(config.apiKey.empty());
+    REQUIRE(config.timeoutSeconds == 60);
+    REQUIRE(config.temperature == 0.7);
+    REQUIRE(config.maxTokens == 512);
+    REQUIRE_NOTHROW(config.validate());
 }
 
-TEST_CASE("RestProviderConfig::fromEnvironment applies the documented defaults", "[config]") {
-    const RestProviderConfig config =
-        RestProviderConfig::fromEnvironment(lookupOf(minimalValues()));
+TEST_CASE("validate accepts the edges of every range", "[config]") {
+    RestProviderConfig config = localConfig();
+    config.timeoutSeconds = RestProviderConfig::MinTimeoutSeconds;
+    config.temperature = RestProviderConfig::MinTemperature;
+    config.maxTokens = RestProviderConfig::MinMaxTokens;
+    REQUIRE_NOTHROW(config.validate());
 
-    CHECK(config.timeoutSeconds == 60);
-    CHECK(config.temperature == 0.7);
-    CHECK(config.maxTokens == 512);
+    config.timeoutSeconds = RestProviderConfig::MaxTimeoutSeconds;
+    config.temperature = RestProviderConfig::MaxTemperature;
+    config.maxTokens = RestProviderConfig::MaxMaxTokens;
+    REQUIRE_NOTHROW(config.validate());
 }
 
-TEST_CASE("RestProviderConfig::fromEnvironment reads the optional variables", "[config]") {
-    std::map<std::string, std::string> values = minimalValues();
-    values["OPENANIMA_API_KEY"] = "secret";
-    values["OPENANIMA_TIMEOUT_SECONDS"] = "5";
-    values["OPENANIMA_TEMPERATURE"] = "0.2";
-    values["OPENANIMA_MAX_TOKENS"] = "128";
+TEST_CASE("validate rejects a timeout outside its range", "[config]") {
+    RestProviderConfig config = localConfig();
 
-    const RestProviderConfig config = RestProviderConfig::fromEnvironment(lookupOf(values));
+    config.timeoutSeconds = RestProviderConfig::MinTimeoutSeconds - 1;
+    REQUIRE_THROWS_AS(config.validate(), ConfigError);
 
-    CHECK(config.apiKey == "secret");
-    CHECK(config.timeoutSeconds == 5);
-    CHECK(config.temperature == 0.2);
-    CHECK(config.maxTokens == 128);
+    config.timeoutSeconds = RestProviderConfig::MaxTimeoutSeconds + 1;
+    REQUIRE_THROWS_AS(config.validate(), ConfigError);
 }
 
-TEST_CASE("RestProviderConfig::fromEnvironment requires a base URL and a model", "[config]") {
-    std::map<std::string, std::string> withoutBaseUrl = minimalValues();
-    withoutBaseUrl.erase("OPENANIMA_BASE_URL");
+TEST_CASE("validate rejects a temperature outside its range", "[config]") {
+    RestProviderConfig config = localConfig();
 
-    std::map<std::string, std::string> withoutModel = minimalValues();
-    withoutModel.erase("OPENANIMA_MODEL");
+    config.temperature = RestProviderConfig::MinTemperature - 0.1;
+    REQUIRE_THROWS_AS(config.validate(), ConfigError);
 
-    CHECK_THROWS_AS(RestProviderConfig::fromEnvironment(lookupOf(withoutBaseUrl)), ConfigError);
-    CHECK_THROWS_AS(RestProviderConfig::fromEnvironment(lookupOf(withoutModel)), ConfigError);
+    config.temperature = RestProviderConfig::MaxTemperature + 0.1;
+    REQUIRE_THROWS_AS(config.validate(), ConfigError);
 }
 
-TEST_CASE("RestProviderConfig::fromEnvironment rejects malformed numbers", "[config]") {
-    const std::vector<std::pair<std::string, std::string>> cases = {
-        {"OPENANIMA_TIMEOUT_SECONDS", "soon"},  // not a number
-        {"OPENANIMA_TIMEOUT_SECONDS", "0"},     // below the minimum
-        {"OPENANIMA_TEMPERATURE", "0.7 "},      // trailing garbage
-        {"OPENANIMA_TEMPERATURE", "3"},         // above the maximum
-        {"OPENANIMA_MAX_TOKENS", "512.5"},      // not an integer
-        {"OPENANIMA_MAX_TOKENS", "-1"},         // below the minimum
-    };
+TEST_CASE("validate rejects a temperature that is not a number", "[config]") {
+    RestProviderConfig config = localConfig();
 
-    for (const std::pair<std::string, std::string>& current : cases) {
-        std::map<std::string, std::string> values = minimalValues();
-        values[current.first] = current.second;
+    config.temperature = std::numeric_limits<double>::quiet_NaN();
+    REQUIRE_THROWS_AS(config.validate(), ConfigError);
 
-        INFO("variable " << current.first << " set to '" << current.second << "'");
-        CHECK_THROWS_AS(RestProviderConfig::fromEnvironment(lookupOf(values)), ConfigError);
+    config.temperature = std::numeric_limits<double>::infinity();
+    REQUIRE_THROWS_AS(config.validate(), ConfigError);
+}
+
+TEST_CASE("validate rejects a maxTokens outside its range", "[config]") {
+    RestProviderConfig config = localConfig();
+
+    config.maxTokens = RestProviderConfig::MinMaxTokens - 1;
+    REQUIRE_THROWS_AS(config.validate(), ConfigError);
+
+    config.maxTokens = RestProviderConfig::MaxMaxTokens + 1;
+    REQUIRE_THROWS_AS(config.validate(), ConfigError);
+}
+
+TEST_CASE("the error names the setting that is wrong", "[config]") {
+    RestProviderConfig config = localConfig();
+    config.timeoutSeconds = 0;
+
+    try {
+        config.validate();
+        FAIL("validate accepted a zero timeout");
+    } catch (const ConfigError& error) {
+        const std::string message = error.what();
+        REQUIRE(message.find("timeout") != std::string::npos);
+        REQUIRE(message.find("3600") != std::string::npos);
     }
 }
 
-TEST_CASE("RestProviderConfig::chatCompletionsUrl normalises the trailing slash", "[config]") {
-    RestProviderConfig config;
-    config.baseUrl = "http://localhost:11434/v1/";
-    CHECK(config.chatCompletionsUrl() == "http://localhost:11434/v1/chat/completions");
+TEST_CASE("the completions URL is the base URL plus the route", "[config]") {
+    RestProviderConfig config = localConfig();
+    REQUIRE(config.chatCompletionsUrl() == "http://localhost:11434/v1/chat/completions");
 
-    config.baseUrl = "http://localhost:11434/v1";
-    CHECK(config.chatCompletionsUrl() == "http://localhost:11434/v1/chat/completions");
+    config.baseUrl = "http://localhost:11434/v1/";
+    REQUIRE(config.chatCompletionsUrl() == "http://localhost:11434/v1/chat/completions");
+
+    config.baseUrl = "https://example.test/v1///";
+    REQUIRE(config.chatCompletionsUrl() == "https://example.test/v1/chat/completions");
 }
 
+TEST_CASE("a provider refuses a configuration it cannot use", "[config]") {
+    RestProviderConfig config = localConfig();
+    config.maxTokens = 0;
+
+    REQUIRE_THROWS_AS((RestProvider{config, std::make_shared<FakeHttpTransport>()}), ConfigError);
+}
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

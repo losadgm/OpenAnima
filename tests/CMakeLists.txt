@@ -8,22 +8,28 @@ add_executable(open_anima_tests
     Provider/test_rest_provider_config.cpp
     Provider/test_rest_provider.cpp
     Provider/test_sse_reader.cpp
+    cli/test_cli_options.cpp
+    cli/test_cli_session.cpp
     tui/test_tui_canvas.cpp
     tui/test_tui_commands.cpp
     tui/test_tui_diff.cpp
+    tui/test_tui_interaction.cpp
     tui/test_tui_model.cpp
     tui/test_tui_render.cpp
     tui/test_tui_selection.cpp
     tui/test_tui_text.cpp
-    ../examples/tuiHarness/app/commands.cpp
-    ../examples/tuiHarness/app/model.cpp
-    ../examples/tuiHarness/screen/canvas.cpp
-    ../examples/tuiHarness/screen/cell.cpp
-    ../examples/tuiHarness/screen/diff.cpp
-    ../examples/tuiHarness/screen/render.cpp
-    ../examples/tuiHarness/screen/selection.cpp
-    ../examples/tuiHarness/screen/style.cpp
-    ../examples/tuiHarness/screen/text.cpp
+    ../examples/cliHarness/options.cpp
+    ../examples/cliHarness/session.cpp
+    ../examples/tuiHarness/domain/commands.cpp
+    ../examples/tuiHarness/domain/model.cpp
+    ../examples/tuiHarness/presentation/canvas.cpp
+    ../examples/tuiHarness/presentation/cell.cpp
+    ../examples/tuiHarness/presentation/diff.cpp
+    ../examples/tuiHarness/presentation/render.cpp
+    ../examples/tuiHarness/presentation/selection.cpp
+    ../examples/tuiHarness/presentation/style.cpp
+    ../examples/tuiHarness/presentation/text.cpp
+    ../examples/tuiHarness/application/interaction.cpp
     test_facade.cpp
     support/fake_http_transport.h
     support/fake_provider.h)
@@ -31,17 +37,23 @@ add_executable(open_anima_tests
 # The test sources include the shared fakes as "support/...", the private
 # headers of the library as "OpenAnima/Provider/...", which is where an
 # implementation-only piece such as the SSE reader lives, and the pure parts of
-# the terminal client as "app/..." and "screen/...".
+# both clients as "app/...", "screen/..." and "cliHarness/...".
 target_include_directories(open_anima_tests
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/../src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../examples
         ${CMAKE_CURRENT_SOURCE_DIR}/../examples/tuiHarness)
 
 target_link_libraries(open_anima_tests
     PRIVATE
         OpenAnima::OpenAnima
         Catch2::Catch2WithMain)
+
+# What --version prints, so the case that reads it sees the same value as the binary.
+target_compile_definitions(open_anima_tests
+    PRIVATE
+        OPENANIMA_CLI_VERSION="${PROJECT_VERSION}")
 
 open_anima_enable_warnings(open_anima_tests)
 

@@ -7,7 +7,7 @@
 #include "cell.h"
 #include "style.h"
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 namespace {
 
@@ -281,4 +281,4 @@ void FrameWriter::emit(const Canvas& frame, std::string& out) {
     m_caretWanted = false;
 }
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

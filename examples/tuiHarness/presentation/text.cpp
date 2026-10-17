@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 namespace {
 
@@ -210,6 +210,31 @@ std::size_t measure(std::string_view text) {
     return columns;
 }
 
+std::string clip(std::string_view text, std::size_t columns) {
+    if (measure(text) <= columns) {
+        return std::string{text};
+    }
+    constexpr std::string_view Ellipsis = "...";
+    if (columns <= Ellipsis.size()) {
+        return std::string{Ellipsis.substr(0, columns)};
+    }
+
+    std::string kept;
+    std::size_t used = 0;
+    for (std::size_t offset = 0; offset < text.size();) {
+        const std::size_t start = offset;
+        const std::uint32_t codepoint = decodeCodepoint(text, offset);
+        const std::size_t glyph = glyphColumns(codepoint);
+        if (used + glyph + Ellipsis.size() > columns) {
+            break;  // The next character would push the dots off the end.
+        }
+        kept.append(text.substr(start, offset - start));
+        used += glyph;
+    }
+    kept.append(Ellipsis);
+    return kept;
+}
+
 std::vector<std::string> wrap(std::string_view text, std::size_t width) {
     Wrapper wrapper;
     if (width > 0) {
@@ -245,4 +270,4 @@ std::vector<std::string> wrap(std::string_view text, std::size_t width) {
     return wrapper.rows;
 }
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

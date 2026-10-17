@@ -21,7 +21,7 @@ namespace {
 Completion answered(std::string document) {
     Completion completion;
     completion.text = std::move(document);
-    completion.json = nlohmann::json::parse(completion.text);
+    completion.json = nlohmann::ordered_json::parse(completion.text);
     completion.finishReason = FinishReason::Stop;
     return completion;
 }
@@ -55,6 +55,26 @@ TEST_CASE("readReply accepts an answer with nothing to say or to do", "[reply]")
     CHECK(reply.dialogue.empty());
     CHECK(reply.actions.empty());
     CHECK(reply.document.is_object());
+}
+
+TEST_CASE("the document keeps the order the model wrote it in", "[reply]") {
+    const std::string text = R"({"reasoning":"It waits.","dialogue":"Stay a while.","actions":[]})";
+    const NpcReply reply = readReply(answered(text));
+
+    // Alphabetical would be actions, dialogue, reasoning: the keys come back as they were
+    // sent, which is what makes the raw document worth reading.
+    CHECK(reply.document.dump() == text);
+}
+
+TEST_CASE("the arguments of an action keep their order too", "[reply]") {
+    const Completion completion =
+        answered(R"({"reasoning":"","dialogue":"","actions":[)"
+                 R"({"name":"strike","arguments":{"zone":"arm","force":"light"}}]})");
+
+    const NpcReply reply = readReply(completion);
+
+    REQUIRE(reply.actions.size() == 1);
+    CHECK(reply.actions[0].arguments.dump() == R"({"zone":"arm","force":"light"})");
 }
 
 TEST_CASE("readReply refuses a reply without its keys", "[reply]") {

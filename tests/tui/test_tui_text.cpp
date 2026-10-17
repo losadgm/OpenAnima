@@ -6,16 +6,17 @@
 #include <string>
 #include <vector>
 
-#include "screen/text.h"
+#include "presentation/text.h"
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
 
 namespace {
 
-using OpenAnimaTui::Screen::glyphColumns;
-using OpenAnimaTui::Screen::measure;
-using OpenAnimaTui::Screen::utf8Length;
-using OpenAnimaTui::Screen::wrap;
+using OpenAnimaTui::Presentation::clip;
+using OpenAnimaTui::Presentation::glyphColumns;
+using OpenAnimaTui::Presentation::measure;
+using OpenAnimaTui::Presentation::utf8Length;
+using OpenAnimaTui::Presentation::wrap;
 
 }  // namespace
 
@@ -35,6 +36,26 @@ TEST_CASE("measuring a text counts what is shown, not what is stored") {
     CHECK(measure("\u65e5\u672c") == 4);
     CHECK(measure("n\u0303") == 1);
     CHECK(measure("") == 0);
+}
+
+TEST_CASE("a text that fits is left as it is, and one that does not ends in dots") {
+    CHECK(clip("abc", 3) == "abc");
+    CHECK(clip("abc", 10) == "abc");
+    CHECK(clip("", 0) == "");
+
+    CHECK(clip("abcdef", 5) == "ab...");
+    CHECK(measure(clip("abcdef", 5)) == 5);
+    CHECK(clip("abcdef", 3) == "...");
+    CHECK(clip("abcdef", 2) == "..");
+    CHECK(clip("abcdef", 1) == ".");
+    CHECK(clip("abcdef", 0) == "");
+}
+
+TEST_CASE("cutting a text never splits a wide character") {
+    CHECK(clip("\u65e5\u672c\u8a9e", 6) == "\u65e5\u672c\u8a9e");  // Three of two columns fit.
+    // Two columns each, and the dots take the last three: one of them and the dots.
+    CHECK(clip("\u65e5\u672c\u8a9e", 5) == "\u65e5...");
+    CHECK(clip("\u65e5\u672c\u8a9e", 4) == "...");  // No room for a whole one and the dots.
 }
 
 TEST_CASE("the bytes of a sequence are known from its first byte") {

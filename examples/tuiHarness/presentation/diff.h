@@ -9,7 +9,7 @@
 #include "canvas.h"
 #include "style.h"
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 /// Writes a frame to a terminal by comparing it with the one before it.
 ///
@@ -114,4 +114,4 @@ private:
     std::size_t m_caretColumn{0};
 };
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

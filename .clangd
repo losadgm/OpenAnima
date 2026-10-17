@@ -12,6 +12,9 @@ CompileFlags:
     - -Wpedantic
 
 Diagnostics:
+  # A header that is included and never used is a finding in the editor, the same one the
+  # include cleaner of clang-tidy reports on the command line.
+  UnusedIncludes: Strict
   ClangTidy:
     Add:
       - bugprone-*

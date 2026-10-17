@@ -244,6 +244,16 @@ private:
         return key;
     }
 
+    /// @param kind What was pressed.
+    /// @param control Whether control was held.
+    /// @return The key, with the flag set, which is what makes an arrow or a delete move by
+    ///         words.
+    [[nodiscard]] static Key plain(const Key::Kind kind, const bool control) {
+        Key key{kind, static_cast<char>(0)};
+        key.ctrl = control;
+        return key;
+    }
+
     /// Bytes the console has not taken yet.
     std::string m_out;
     /// Turns one key event into a key, spelling printable characters as UTF-8 bytes in the
@@ -266,7 +276,9 @@ private:
         case VK_RETURN:
             return Key{Key::Kind::Enter, static_cast<char>(0)};
         case VK_BACK:
-            return Key{Key::Kind::Backspace, static_cast<char>(0)};
+            return plain(Key::Kind::Backspace, control);
+        case VK_DELETE:
+            return plain(Key::Kind::Delete, control);
         case VK_TAB:
             return Key{Key::Kind::Tab, static_cast<char>(0)};
         case VK_ESCAPE:
@@ -276,9 +288,9 @@ private:
         case VK_DOWN:
             return Key{Key::Kind::ArrowDown, static_cast<char>(0)};
         case VK_LEFT:
-            return Key{Key::Kind::ArrowLeft, static_cast<char>(0)};
+            return plain(Key::Kind::ArrowLeft, control);
         case VK_RIGHT:
-            return Key{Key::Kind::ArrowRight, static_cast<char>(0)};
+            return plain(Key::Kind::ArrowRight, control);
         case VK_PRIOR:
             return Key{Key::Kind::PageUp, static_cast<char>(0)};
         case VK_NEXT:

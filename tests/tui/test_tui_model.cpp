@@ -9,15 +9,15 @@
 
 #include "OpenAnima/Core/Event.h"
 
-#include "app/model.h"
+#include "domain/model.h"
 
 namespace {
 
 using OpenAnimaTui::Key;
-using OpenAnimaTui::App::Effect;
-using OpenAnimaTui::App::EffectKind;
-using OpenAnimaTui::App::Message;
-using OpenAnimaTui::App::Model;
+using OpenAnimaTui::Domain::Effect;
+using OpenAnimaTui::Domain::EffectKind;
+using OpenAnimaTui::Domain::Message;
+using OpenAnimaTui::Domain::Model;
 
 constexpr std::size_t ScrollStep = 5;
 
@@ -25,18 +25,28 @@ Key key(const Key::Kind kind) {
     return Key{kind, 0};
 }
 
+Key withControl(const Key::Kind kind) {
+    Key key{kind, 0};
+    key.ctrl = true;
+    return key;
+}
+
 Key character(const char value) {
     return Key{Key::Kind::Character, value};
 }
 
+std::vector<Effect> press(Model& model, const Key& key) {
+    return OpenAnimaTui::Domain::update(model, key, ScrollStep);
+}
+
 std::vector<Effect> press(Model& model, const Key::Kind kind) {
-    return OpenAnimaTui::App::update(model, key(kind), ScrollStep);
+    return press(model, key(kind));
 }
 
 /// Feeds a draft the way a terminal does: one byte per key, accents included.
 void type(Model& model, const std::string& text) {
     for (const char value : text) {
-        (void)OpenAnimaTui::App::update(model, character(value), ScrollStep);
+        (void)OpenAnimaTui::Domain::update(model, character(value), ScrollStep);
     }
 }
 
@@ -73,8 +83,20 @@ OpenAnima::Core::Event finished() {
 
 /// Answers the turn in flight the way the shell would when the stream ends.
 void answer(Model& model, const std::string& text) {
-    (void)OpenAnimaTui::App::applyEvent(model, delta(text));
-    (void)OpenAnimaTui::App::applyEvent(model, finished());
+    (void)OpenAnimaTui::Domain::applyEvent(model, delta(text));
+    (void)OpenAnimaTui::Domain::applyEvent(model, finished());
+}
+
+/// A turn that came back as a reply, with the document the model wrote.
+OpenAnima::Core::Event finishedWithReply(const std::string& document) {
+    OpenAnima::Core::Event event = finished();
+    OpenAnima::Core::NpcReply reply;
+    reply.reasoning = "It looks harmless.";
+    reply.dialogue = "Good evening.";
+    reply.actions.push_back({"emote", nlohmann::ordered_json{{"kind", "nod"}}});
+    reply.document = nlohmann::ordered_json::parse(document);
+    event.reply = reply;
+    return event;
 }
 
 }  // namespace
@@ -87,7 +109,6 @@ TEST_CASE("a tab is never typed, because the terminal does not draw it as one co
     (void)press(model, Key::Kind::Tab);
     CHECK(model.draft == "abc");
 }
-
 TEST_CASE("tab completes the hint that is selected") {
     Model model;
     type(model, "/c");
@@ -96,27 +117,37 @@ TEST_CASE("tab completes the hint that is selected") {
     CHECK(model.cursor == model.draft.size());
 }
 
-TEST_CASE("the arrows walk the hints while they are showing") {
+TEST_CASE("the arrows walk the hints while they are showing, and stop at the ends") {
     Model model;
     type(model, "/");
-    CHECK(!OpenAnimaTui::App::hintsFor(model).empty());
+    CHECK(!OpenAnimaTui::Domain::hintsFor(model).empty());
 
+    // The first hint is the first one: going back from it stays there.
     (void)press(model, Key::Kind::ArrowUp);
     (void)press(model, Key::Kind::Tab);
-    CHECK(model.draft == "/quit ");
+    CHECK(model.draft == "/create ");
 
-    Model other;
-    type(other, "/");
-    (void)press(other, Key::Kind::ArrowDown);
-    (void)press(other, Key::Kind::Tab);
-    CHECK(other.draft == "/enter ");
+    Model next;
+    type(next, "/");
+    (void)press(next, Key::Kind::ArrowDown);
+    (void)press(next, Key::Kind::Tab);
+    CHECK(next.draft == "/enter ");
+
+    // And the last one is the last one: going on from it stays there.
+    Model last;
+    type(last, "/");
+    for (int step = 0; step < 20; ++step) {
+        (void)press(last, Key::Kind::ArrowDown);
+    }
+    (void)press(last, Key::Kind::Tab);
+    CHECK(last.draft == "/quit ");
 }
 
 TEST_CASE("the arrows walk the prompts of the scope while no hint is showing") {
     Model model;
     (void)submit(model, "/npcs");
     (void)submit(model, "/help");
-    CHECK(OpenAnimaTui::App::hintsFor(model).empty());
+    CHECK(OpenAnimaTui::Domain::hintsFor(model).empty());
 
     (void)press(model, Key::Kind::ArrowUp);
     CHECK(model.draft == "/help");
@@ -130,7 +161,7 @@ TEST_CASE("the arrows walk the prompts of the scope while no hint is showing") {
 
 TEST_CASE("each scope keeps its own history") {
     Model model = modelWithNpc();
-    CHECK(OpenAnimaTui::App::update(model, key(Key::Kind::None), ScrollStep).empty());
+    CHECK(OpenAnimaTui::Domain::update(model, key(Key::Kind::None), ScrollStep).empty());
 
     (void)submit(model, "/help");
     (void)press(model, Key::Kind::ArrowUp);
@@ -157,7 +188,7 @@ TEST_CASE("ctrl+enter and ctrl+j start a new line without sending anything") {
     CHECK(hasEffect(sent, EffectKind::Ask));
     REQUIRE(model.messages.size() >= 2);
     CHECK(model.messages.back().text == "one\n");
-    CHECK(model.messages.back().role == OpenAnimaTui::App::Role::User);
+    CHECK(model.messages.back().role == OpenAnimaTui::Domain::Role::User);
 
     Model spaced;
     type(spaced, "two");
@@ -208,9 +239,27 @@ TEST_CASE("escape cancels the turn in flight") {
     over.kind = OpenAnima::Core::EventKind::Finished;
     over.completion.finishReason = OpenAnima::Core::FinishReason::Cancelled;
     over.completion.text = "half an answer";
-    (void)OpenAnimaTui::App::applyEvent(model, over);
+    (void)OpenAnimaTui::Domain::applyEvent(model, over);
     CHECK_FALSE(model.busy);
     CHECK_FALSE(model.cancelling);
+}
+
+TEST_CASE("ctrl+c is not the cancel key, and does not leave the client") {
+    Model model = modelWithNpc();
+    (void)submit(model, "hello");
+
+    const std::vector<Effect> effects = press(model, Key::Kind::CtrlC);
+    CHECK_FALSE(hasEffect(effects, EffectKind::Cancel));
+    CHECK_FALSE(model.cancelling);
+    CHECK(model.busy);
+    CHECK(model.running);
+
+    // Nor when nothing is in flight: the shell takes the key to copy, never to leave.
+    (void)OpenAnimaTui::Domain::applyEvent(model, finished());
+    type(model, "a draft");
+    (void)press(model, Key::Kind::CtrlC);
+    CHECK(model.draft == "a draft");
+    CHECK(model.running);
 }
 
 TEST_CASE("the page keys move the viewport and not the caret") {
@@ -228,11 +277,11 @@ TEST_CASE("the wheel moves the conversation and leaves the prompt alone") {
     const std::string draft = model.draft;
 
     (void)press(model, Key::Kind::WheelUp);
-    CHECK(model.scrollOffset == 3);
+    CHECK(model.scrollOffset == 1);
     (void)press(model, Key::Kind::WheelUp);
-    CHECK(model.scrollOffset == 6);
+    CHECK(model.scrollOffset == 2);
     (void)press(model, Key::Kind::WheelDown);
-    CHECK(model.scrollOffset == 3);
+    CHECK(model.scrollOffset == 1);
 
     // A wheel notch is not an arrow: what is typed and what was typed before stay put.
     CHECK(model.draft == draft);
@@ -266,7 +315,7 @@ TEST_CASE("every npc keeps the conversation that belongs to it") {
     CHECK(model.world.active == 1);
     CHECK(model.messages.size() == firstSize);
     CHECK(model.messages[model.messages.size() - 1].text == "well met");
-    CHECK(model.messages[model.messages.size() - 2].role == OpenAnimaTui::App::Role::User);
+    CHECK(model.messages[model.messages.size() - 2].role == OpenAnimaTui::Domain::Role::User);
 }
 
 TEST_CASE("leaving returns to the lobby, which keeps its own log") {
@@ -297,20 +346,199 @@ TEST_CASE("a failed turn is shown and leaves the prompt usable") {
     OpenAnima::Core::Event event;
     event.kind = OpenAnima::Core::EventKind::Failed;
     event.error = "no route to host";
-    CHECK(OpenAnimaTui::App::applyEvent(model, event));
+    CHECK(OpenAnimaTui::Domain::applyEvent(model, event));
     CHECK_FALSE(model.busy);
     CHECK(model.answer.empty());
-    CHECK(model.messages.back().role == OpenAnimaTui::App::Role::System);
+    CHECK(model.messages.back().role == OpenAnimaTui::Domain::Role::System);
     CHECK(model.messages.back().text.find("no route to host") != std::string::npos);
 }
 
 TEST_CASE("the clock only runs while a turn is in flight") {
     Model model = modelWithNpc();
-    CHECK(OpenAnimaTui::App::elapsedTenths(model) == 0);
+    CHECK(OpenAnimaTui::Domain::elapsedTenths(model) == 0);
     (void)submit(model, "hello");
-    CHECK(OpenAnimaTui::App::elapsedTenths(model) == 0);
+    CHECK(OpenAnimaTui::Domain::elapsedTenths(model) == 0);
     CHECK(model.busy);
     CHECK(model.startedAt != std::chrono::steady_clock::time_point{});
+}
+
+TEST_CASE("the /raw command switches between the dialogue and the document") {
+    Model model = modelWithNpc();
+    CHECK_FALSE(model.raw);
+
+    (void)submit(model, "/raw");
+    CHECK(model.raw);
+    CHECK(model.messages.back().text == "raw json on");
+
+    (void)submit(model, "/raw off");
+    CHECK_FALSE(model.raw);
+    CHECK(model.messages.back().text == "raw json off");
+
+    (void)submit(model, "/raw maybe");
+    CHECK_FALSE(model.raw);
+    CHECK(model.messages.back().text == "usage: /raw [on|off]");
+}
+
+TEST_CASE("raw mode shows the turn as the document, once it is over") {
+    Model model = modelWithNpc();
+    (void)submit(model, "/raw on");
+    (void)submit(model, "hello");
+
+    // Nothing is painted while the turn runs: the document is the only thing that goes in.
+    (void)OpenAnimaTui::Domain::applyEvent(model, delta("Good "));
+    CHECK(model.answer.empty());
+
+    (void)OpenAnimaTui::Domain::applyEvent(
+        model,
+        finishedWithReply(
+            R"({"reasoning":"It looks harmless.","dialogue":"Good evening.","actions":[]})"));
+
+    CHECK_FALSE(model.busy);
+    CHECK(model.messages.back().role == OpenAnimaTui::Domain::Role::System);
+    CHECK(model.messages.back().text.find("\"dialogue\": \"Good evening.\"") != std::string::npos);
+
+    // The formatted view is not there: no muted reasoning and no dialogue of its own.
+    for (const Message& message : model.messages) {
+        CHECK(message.text.rfind("~ ", 0) != 0);
+        CHECK(message.text != "Good evening.");
+    }
+}
+
+TEST_CASE("raw mode names the npc that answered") {
+    Model model = modelWithNpc();
+    (void)submit(model, "/raw on");
+    (void)submit(model, "hello");
+    (void)OpenAnimaTui::Domain::applyEvent(
+        model, finishedWithReply(R"({"reasoning":"It looks harmless.","dialogue":"Good evening.",)"
+                                 R"("actions":[]})"));
+
+    // The document comes last, with the name of the npc over it: the json says what the model
+    // wrote, and the name says whose turn it was.
+    REQUIRE(model.messages.size() >= 2);
+    CHECK(model.messages[model.messages.size() - 2].role == OpenAnimaTui::Domain::Role::Speaker);
+    CHECK(model.messages[model.messages.size() - 2].text == "npc 1:");
+    CHECK(model.messages.back().role == OpenAnimaTui::Domain::Role::System);
+    CHECK(model.messages.back().text.find("\"dialogue\"") != std::string::npos);
+}
+
+TEST_CASE("raw mode says so when there is no document to show") {
+    Model model = modelWithNpc();
+    (void)submit(model, "/raw on");
+    (void)submit(model, "hello");
+
+    OpenAnima::Core::Event over = finished();
+    over.completion.finishReason = OpenAnima::Core::FinishReason::Cancelled;
+    over.reply = OpenAnima::Core::NpcReply{};
+    (void)OpenAnimaTui::Domain::applyEvent(model, over);
+
+    CHECK_FALSE(model.busy);
+    CHECK(model.messages.back().text.find("no document") != std::string::npos);
+}
+
+TEST_CASE("a panel of the prompt scrolled away from the caret stays until a key writes") {
+    Model model;
+    type(model, "hola");
+    model.promptScroll = 2;
+
+    // The wheel and the page keys are about the conversation, so the panel keeps its place.
+    (void)press(model, Key::Kind::WheelUp);
+    (void)press(model, Key::Kind::PageDown);
+    CHECK(model.promptScroll.has_value());
+    CHECK(*model.promptScroll == 2);
+
+    // Anything that writes or moves the caret takes it back to where the caret is.
+    (void)OpenAnimaTui::Domain::update(model, character('x'), ScrollStep);
+    CHECK_FALSE(model.promptScroll.has_value());
+}
+
+TEST_CASE("a reply is one block, named on the thought that opens it") {
+    Model model = modelWithNpc();
+    (void)submit(model, "hello");
+    (void)OpenAnimaTui::Domain::applyEvent(model, delta("Good evening."));
+    (void)OpenAnimaTui::Domain::applyEvent(
+        model, finishedWithReply(R"({"reasoning":"It looks harmless.","dialogue":"Good evening.",)"
+                                 R"("actions":[{"name":"emote","arguments":{"kind":"nod"}}]})"));
+
+    const std::size_t count = model.messages.size();
+    REQUIRE(count >= 3);
+
+    // The thought opens the block and carries the name; the rest hangs from it.
+    CHECK(model.messages[count - 3].role == OpenAnimaTui::Domain::Role::Thought);
+    CHECK(model.messages[count - 3].text.find("It looks harmless.") != std::string::npos);
+    CHECK_FALSE(model.messages[count - 3].continues);
+
+    CHECK(model.messages[count - 2].role == OpenAnimaTui::Domain::Role::Npc);
+    CHECK(model.messages[count - 2].text == "Good evening.");
+    CHECK(model.messages[count - 2].continues);
+
+    CHECK(model.messages[count - 1].role == OpenAnimaTui::Domain::Role::System);
+    CHECK(model.messages[count - 1].text.rfind("[emote]", 0) == 0);
+    CHECK(model.messages[count - 1].continues);
+}
+
+TEST_CASE("the delete key takes the character after the caret") {
+    Model model;
+    type(model, "abc");
+    (void)press(model, Key::Kind::CtrlA);
+    (void)press(model, Key::Kind::Delete);
+
+    CHECK(model.draft == "bc");
+    CHECK(model.cursor == 0);
+}
+
+TEST_CASE("delete at the end of the draft changes nothing") {
+    Model model;
+    type(model, "abc");
+    (void)press(model, Key::Kind::Delete);
+
+    CHECK(model.draft == "abc");
+    CHECK(model.cursor == 3);
+}
+
+TEST_CASE("control and an arrow moves a word at a time") {
+    Model model;
+    type(model, "the black cat");
+    (void)press(model, Key::Kind::CtrlA);
+
+    (void)press(model, withControl(Key::Kind::ArrowRight));
+    CHECK(model.cursor == 3);
+    (void)press(model, withControl(Key::Kind::ArrowRight));
+    CHECK(model.cursor == 9);
+
+    (void)press(model, withControl(Key::Kind::ArrowLeft));
+    CHECK(model.cursor == 4);
+    (void)press(model, withControl(Key::Kind::ArrowLeft));
+    CHECK(model.cursor == 0);
+}
+
+TEST_CASE("control and backspace takes the word before the caret, and the gap") {
+    Model model;
+    type(model, "the black cat");
+
+    (void)press(model, withControl(Key::Kind::Backspace));
+    CHECK(model.draft == "the black ");
+    CHECK(model.cursor == 10);
+
+    (void)press(model, withControl(Key::Kind::Backspace));
+    CHECK(model.draft == "the ");
+}
+
+TEST_CASE("control and delete takes the word after the caret") {
+    Model model;
+    type(model, "the black cat");
+    (void)press(model, Key::Kind::CtrlA);
+    (void)press(model, withControl(Key::Kind::Delete));
+
+    CHECK(model.draft == " black cat");
+    CHECK(model.cursor == 0);
+}
+
+TEST_CASE("a word goes on through the letters of any script") {
+    Model model;
+    type(model, "el ca\xc3\xb1on");
+    (void)press(model, withControl(Key::Kind::Backspace));
+
+    CHECK(model.draft == "el ");
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

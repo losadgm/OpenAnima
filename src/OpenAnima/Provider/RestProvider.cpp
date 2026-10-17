@@ -154,7 +154,7 @@ void readJsonAnswer(Completion& completion, const ResponseFormat& format) {
         return;
     }
     try {
-        completion.json = nlohmann::json::parse(completion.text);
+        completion.json = nlohmann::ordered_json::parse(completion.text);
     } catch (const nlohmann::json::exception& error) {
         throw ParseError("the answer was asked for as JSON and is not: " +
                          std::string(error.what()) + ": " + snippet(completion.text));
@@ -281,8 +281,7 @@ void applyChunk(const std::string& payload, long statusCode, Completion& complet
 RestProvider::RestProvider(RestProviderConfig config,
                            std::shared_ptr<OpenAnima::Http::HttpTransport> transport)
     : m_config(std::move(config)), m_transport(std::move(transport)) {
-    assert(!m_config.baseUrl.empty() && "RestProvider requires a base URL");
-    assert(!m_config.model.empty() && "RestProvider requires a model");
+    m_config.validate();
     assert(m_transport != nullptr && "RestProvider requires a transport");
 }
 

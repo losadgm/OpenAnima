@@ -436,7 +436,7 @@ TEST_CASE("RestProvider asks for a JSON object when one is wanted", "[provider]"
     REQUIRE(completion.json.has_value());
     // The REQUIRE above is the check.
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-    const nlohmann::json& answer = *completion.json;
+    const nlohmann::ordered_json& answer = *completion.json;
     CHECK(answer["dialogue"] == "hello");
     CHECK(completion.text == R"({"reasoning":"why","dialogue":"hello"})");
 }
@@ -483,7 +483,7 @@ TEST_CASE("RestProvider reads a streamed answer as JSON too", "[provider]") {
     REQUIRE(completion.json.has_value());
     // The REQUIRE above is the check.
     // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-    const nlohmann::json& answer = *completion.json;
+    const nlohmann::ordered_json& answer = *completion.json;
     CHECK(answer["dialogue"] == "hi");
 }
 
