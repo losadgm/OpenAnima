@@ -4,6 +4,7 @@
 #include <cctype>
 #include <chrono>
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -96,6 +97,21 @@ Bounds boundsOf(Scope scope, std::size_t scrollRows, std::size_t height) {
     return Bounds{split, height - split};
 }
 
+std::optional<RowSpan> coveredRows(const Selection& selection, Bounds rows, std::size_t height) {
+    if (selection.empty() || rows.empty() || height == 0 || selection.lastRow() < 0) {
+        return std::nullopt;
+    }
+    const std::size_t first = std::max(
+        static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.firstRow(), 0)), rows.first);
+    const std::size_t last =
+        std::min(static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.lastRow(), 0)),
+                 std::min(rows.end(), height) - 1);
+    if (first > last) {
+        return std::nullopt;
+    }
+    return RowSpan{first, last};
+}
+
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void Selection::begin(std::size_t row, std::size_t column, Scope scope) {
     m_active = true;
@@ -125,6 +141,13 @@ void Selection::shift(std::ptrdiff_t rows) {
     }
     // The rows are kept as they are, even when they leave the viewport: the span belongs to the
     // text, and it is there again as soon as the text is.
+    slide(rows);
+}
+
+void Selection::slide(std::ptrdiff_t rows) {
+    if (!m_active) {
+        return;
+    }
     m_anchorRow += rows;
     m_cursorRow += rows;
 }
@@ -160,23 +183,13 @@ std::ptrdiff_t Selection::lastRow() const {
 }
 
 std::string selectedText(const Canvas& frame, const Selection& selection, Bounds rows) {
-    if (selection.empty() || rows.empty() || frame.height() == 0 || selection.lastRow() < 0) {
-        return {};
-    }
-
-    // Only the rows of the scope are read: a span of the conversation never reaches into the
-    // prompt, however far it has been scrolled, and a span of the prompt never reaches back.
-    const std::size_t first = std::max(
-        static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.firstRow(), 0)), rows.first);
-    const std::size_t last =
-        std::min(static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.lastRow(), 0)),
-                 std::min(rows.end(), frame.height()) - 1);
-    if (first > last) {
+    const std::optional<RowSpan> span = coveredRows(selection, rows, frame.height());
+    if (!span.has_value()) {
         return {};
     }
 
     std::string text;
-    for (std::size_t row = first; row <= last; ++row) {
+    for (std::size_t row = span->first; row <= span->last; ++row) {
         std::string line;
         for (std::size_t column = 0; column < frame.width(); ++column) {
             if (!selection.contains(row, column)) {

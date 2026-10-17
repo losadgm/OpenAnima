@@ -43,6 +43,7 @@ add_executable(open_anima_tui
     tuiHarness/screen/selection.cpp
     tuiHarness/screen/style.cpp
     tuiHarness/screen/text.cpp
+    tuiHarness/shell/interaction.cpp
     tuiHarness/terminal/terminalUnix.cpp
     tuiHarness/terminal/terminalWindows.cpp
     common/apiSettings.cpp

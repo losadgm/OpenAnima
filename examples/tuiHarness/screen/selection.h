@@ -5,6 +5,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <optional>
 #include <string>
 
 #include "canvas.h"
@@ -76,6 +77,14 @@ public:
     /// @param rows Rows the text moved down, negative when it moved up.
     void shift(std::ptrdiff_t rows);
 
+    /// Moves the selection with the text under it, whichever scope it belongs to.
+    ///
+    /// The prompt is drawn on rows that stay where they are while the draft under them scrolls,
+    /// so a selection of it is moved by hand when the panel moves: this is the same walk as
+    /// `shift`, without the rule that keeps a selection of the screen still.
+    /// @param rows Rows to move it down, negative to move it up.
+    void slide(std::ptrdiff_t rows);
+
     /// @return Whether the mouse is holding something picked out, a single cell included.
     [[nodiscard]] bool active() const;
 
@@ -105,6 +114,24 @@ private:
     std::ptrdiff_t m_cursorRow{0};       ///< Row the mouse is at.
     std::size_t m_cursorColumn{0};       ///< Column the mouse is at.
 };
+
+/// The rows a selection covers that are really on the screen.
+struct RowSpan {
+    std::size_t first{0};  ///< First row it covers.
+    std::size_t last{0};   ///< Last row it covers, included.
+};
+
+/// Clips a selection to the rows of its scope that the screen has.
+///
+/// A span belongs to the text, which may be out of sight above or below the screen, so a
+/// selection can hold rows that cannot be read or painted. This is the one place that decides
+/// which of them are there, and reading a copy and painting the pick both go through it.
+/// @param selection What is picked out.
+/// @param rows Rows of the screen the scope of the selection takes.
+/// @param height Rows the screen has.
+/// @return The rows to walk, or nothing when none of the span is on the screen.
+[[nodiscard]] std::optional<RowSpan> coveredRows(const Selection& selection, Bounds rows,
+                                                 std::size_t height);
 
 /// Reads what a selection covers off the frame that was painted.
 ///

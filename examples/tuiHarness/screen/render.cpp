@@ -244,18 +244,11 @@ std::string statusRow(const Model& model) {
 ///        painted, so a pick of the conversation never marks the prompt and one of the prompt
 ///        never marks what is said above it.
 void pickOutSelection(Canvas& frame, const Selection& selection, Bounds rows) {
-    if (!selection.active() || rows.empty() || frame.height() == 0 || selection.lastRow() < 0) {
+    const std::optional<RowSpan> span = coveredRows(selection, rows, frame.height());
+    if (!span.has_value()) {
         return;
     }
-    const std::size_t first = std::max(
-        static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.firstRow(), 0)), rows.first);
-    const std::size_t last =
-        std::min(static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.lastRow(), 0)),
-                 std::min(rows.end(), frame.height()) - 1);
-    if (first > last) {
-        return;
-    }
-    for (std::size_t picked = first; picked <= last; ++picked) {
+    for (std::size_t picked = span->first; picked <= span->last; ++picked) {
         for (std::size_t column = 0; column < frame.width(); ++column) {
             if (!selection.contains(picked, column)) {
                 continue;

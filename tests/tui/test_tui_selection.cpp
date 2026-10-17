@@ -4,6 +4,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cstddef>
+#include <optional>
 
 #include "screen/selection.h"
 #include "screen/style.h"
@@ -17,7 +18,9 @@ using namespace OpenAnimaTui::Tests;
 using OpenAnimaTui::Screen::Bounds;
 using OpenAnimaTui::Screen::boundsOf;
 using OpenAnimaTui::Screen::Clicks;
+using OpenAnimaTui::Screen::coveredRows;
 using OpenAnimaTui::Screen::lineAt;
+using OpenAnimaTui::Screen::RowSpan;
 using OpenAnimaTui::Screen::Scope;
 using OpenAnimaTui::Screen::selectedText;
 using OpenAnimaTui::Screen::Selection;
@@ -203,6 +206,27 @@ TEST_CASE("each scope takes its own rows of the screen") {
     CHECK(boundsOf(Scope::Conversation, 0, 10).empty());
     CHECK(boundsOf(Scope::Screen, 0, 10).count == 10);
     CHECK(boundsOf(Scope::Screen, 80, 10).empty());
+}
+
+TEST_CASE("the rows a pick really covers are clipped to its scope and the screen") {
+    Selection selection;
+    selection.begin(2, 0);
+    selection.extend(5, 4);
+
+    const std::optional<RowSpan> span = coveredRows(selection, Bounds{0, 5}, 10);
+    REQUIRE(span.has_value());
+    CHECK(span->first == 2);
+    CHECK(span->last == 4);
+
+    // Pushed far above the top, nothing of it is there.
+    selection.shift(-40);
+    CHECK_FALSE(coveredRows(selection, Bounds{0, 5}, 10).has_value());
+
+    // A scope that starts below the span has nothing of it either.
+    selection.shift(40);
+    CHECK_FALSE(coveredRows(selection, Bounds{6, 4}, 10).has_value());
+    CHECK(coveredRows(selection, Bounds{0, 10}, 10).has_value());
+    CHECK_FALSE(coveredRows(selection, Bounds{0, 0}, 10).has_value());
 }
 
 TEST_CASE("a span of the prompt does not read what is said above it") {

@@ -13,6 +13,7 @@ add_executable(open_anima_tests
     tui/test_tui_canvas.cpp
     tui/test_tui_commands.cpp
     tui/test_tui_diff.cpp
+    tui/test_tui_interaction.cpp
     tui/test_tui_model.cpp
     tui/test_tui_render.cpp
     tui/test_tui_selection.cpp
@@ -28,6 +29,7 @@ add_executable(open_anima_tests
     ../examples/tuiHarness/screen/selection.cpp
     ../examples/tuiHarness/screen/style.cpp
     ../examples/tuiHarness/screen/text.cpp
+    ../examples/tuiHarness/shell/interaction.cpp
     test_facade.cpp
     support/fake_http_transport.h
     support/fake_provider.h)
