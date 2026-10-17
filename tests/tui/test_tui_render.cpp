@@ -142,21 +142,23 @@ TEST_CASE("the prompt sits inside a frame, with the caret in it") {
     type(model, "ca\u00f1");
     const RenderResult rendered = render(model, 40, 10);
 
-    // Ten rows: six of conversation, the top border, the prompt, the bottom border, the status.
-    CHECK(readRow(rendered.frame, 6).rfind("\u2597", 0) == 0);
+    // Ten rows: four of conversation, the top border, a row of panel, the prompt, another row
+    // of panel, the bottom border and the status.
+    CHECK(readRow(rendered.frame, 4).rfind("\u2597", 0) == 0);
     CHECK(readRow(rendered.frame, 8).rfind("\u259D", 0) == 0);
 
     // The panel is the inside of the frame: the stroke is exactly where the colour changes.
-    CHECK(rendered.frame.at(6, 1).style.background.kind == Color::Kind::Default);
-    CHECK(rendered.frame.at(7, 0).style.background.kind == Color::Kind::Default);
-    CHECK(rendered.frame.at(7, 2).style.background.equals(Palette::panelColor()));
+    CHECK(rendered.frame.at(4, 1).style.background.kind == Color::Kind::Default);
+    CHECK(rendered.frame.at(5, 0).style.background.kind == Color::Kind::Default);
+    CHECK(rendered.frame.at(5, 1).style.background.equals(Palette::panelColor()));
+    CHECK(rendered.frame.at(7, 1).style.background.equals(Palette::panelColor()));
 
-    const OpenAnimaTui::Screen::Cell& marker = rendered.frame.at(7, 1);
+    const OpenAnimaTui::Screen::Cell& marker = rendered.frame.at(6, 2);
     CHECK(std::string(marker.glyph.data(), marker.length) == "\u2771");
     CHECK(marker.style.foreground.equals(Palette::accent().foreground));
     CHECK(marker.style.background.equals(Palette::panelColor()));
-    CHECK(rendered.caretRow == 7);
-    CHECK(rendered.caretColumn == 3 + 3);
+    CHECK(rendered.caretRow == 6);
+    CHECK(rendered.caretColumn == 4 + 3);
 }
 
 TEST_CASE("the status line sits under the frame, with no indent and no panel") {
@@ -187,9 +189,9 @@ TEST_CASE("a long prompt wraps and the caret follows it down") {
     Model model;
     type(model, std::string(30, 'x'));
     const RenderResult rendered = render(model, 20, 12);
-    // Inside the frame: two columns of frame, two of the marker, sixteen of text.
-    CHECK(rendered.caretRow == 9);
-    CHECK(rendered.caretColumn == 3 + (30 - 16));
+    // Inside the frame: the stroke, a column of panel, the marker and its space, fourteen of text.
+    CHECK(rendered.caretRow == 8);
+    CHECK(rendered.caretColumn == 4 + (30 - 28));
 }
 
 TEST_CASE("the conversation is a viewport over the turns") {
@@ -197,14 +199,14 @@ TEST_CASE("the conversation is a viewport over the turns") {
     CHECK(readAll(render(model, 40, 100).frame).find("m0") != std::string::npos);
     CHECK(readAll(render(model, 40, 100).frame).find("a7") != std::string::npos);
 
-    // Ten rows leave six for the conversation: the frame takes three and the status one.
+    // Ten rows leave four for the conversation: the frame takes five and the status one.
     const std::string tail = readAll(render(model, 40, 10).frame);
     CHECK(tail.find("m0") == std::string::npos);
     CHECK(tail.find("a7") != std::string::npos);
 
     (void)press(model, Key::Kind::PageUp);
     const std::string scrolled = readAll(render(model, 40, 10).frame);
-    CHECK(scrolled.find("m5") != std::string::npos);
+    CHECK(scrolled.find("m6") != std::string::npos);
     CHECK(scrolled.find("a7") == std::string::npos);
 
     for (int step = 0; step < 6; ++step) {
@@ -298,7 +300,7 @@ TEST_CASE("the speaker of a line is named in the prefix and the text follows it"
     submit(model, "/create a smith");
     submit(model, "hello there");
     answer(model, "well met");
-    const RenderResult rendered = render(model, 40, 10);
+    const RenderResult rendered = render(model, 40, 12);
 
     CHECK(readRow(rendered.frame, 2).substr(0, 8) == "you     ");
     CHECK(readRow(rendered.frame, 2).substr(8).find("hello there") == 0);
@@ -331,7 +333,7 @@ TEST_CASE("a reply is painted as one block, named on its first row") {
     done.reply = reply;
     (void)OpenAnimaTui::App::applyEvent(model, done);
 
-    const RenderResult rendered = render(model, 60, 12);
+    const RenderResult rendered = render(model, 60, 13);
 
     // The note, the question, and then the answer as one block with no gaps in it.
     CHECK(readRow(rendered.frame, 4).substr(0, 8) == "npc 1   ");
@@ -349,13 +351,13 @@ TEST_CASE("a character still arriving leaves the prompt clean") {
     type(model, "a");
     type(model, "\xc3");  // The first byte of an enye, with the one after it still on its way.
     RenderResult rendered = render(model, 40, 10);
-    CHECK(readRow(rendered.frame, 7).rfind("\u2590\u2771 a", 0) == 0);
-    CHECK(rendered.frame.at(7, 4).isBlank());
+    CHECK(readRow(rendered.frame, 6).rfind("\u2595 \u2771 a", 0) == 0);
+    CHECK(rendered.frame.at(6, 5).isBlank());
 
     type(model, "\xb1");
     rendered = render(model, 40, 10);
-    CHECK(readRow(rendered.frame, 7).find("a\u00f1") != std::string::npos);
-    CHECK(rendered.frame.at(7, 4).length == 2);
+    CHECK(readRow(rendered.frame, 6).find("a\u00f1") != std::string::npos);
+    CHECK(rendered.frame.at(6, 5).length == 2);
 }
 
 TEST_CASE("a turn in flight is shown as the answer arrives") {

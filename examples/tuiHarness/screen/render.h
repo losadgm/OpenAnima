@@ -17,6 +17,7 @@ namespace Metrics {
 constexpr std::size_t PrefixWidth = 8;  ///< Columns a speaker prefix takes.
 constexpr std::size_t PromptWidth = 2;  ///< Columns the prompt marker and its space take.
 constexpr std::size_t BoxWidth = 1;     ///< Columns the frame around the prompt takes per side.
+constexpr std::size_t PanelPad = 1;     ///< Columns of panel kept empty inside the frame, a side.
 constexpr std::size_t MaxHints = 6;     ///< Command hints shown at once.
 constexpr std::size_t HintIndent = 2;   ///< Columns a hint is indented by.
 

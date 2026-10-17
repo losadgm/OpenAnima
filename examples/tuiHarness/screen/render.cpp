@@ -24,6 +24,7 @@ using App::Role;
 using Metrics::BoxWidth;
 using Metrics::HintIndent;
 using Metrics::MaxHints;
+using Metrics::PanelPad;
 using Metrics::PrefixWidth;
 using Metrics::PromptWidth;
 
@@ -308,25 +309,35 @@ std::string placeholderOf(const Model& model) {
 /// @param width Columns available.
 void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, std::size_t firstRow,
                  std::size_t width) {
-    const std::size_t textColumn = BoxWidth + PromptWidth;
+    const std::size_t markerColumn = BoxWidth + PanelPad;
+    const std::size_t textColumn = markerColumn + PromptWidth;
     const std::size_t commandLength = commandTokenLength(model.draft);
     const Style border = Palette::muted();
 
+    // The panel is the inside of the frame and nothing else: the stroke is the edge of it. It
+    // keeps a row empty above the line being typed and another one below, so the text sits in
+    // the middle of a band of colour instead of against the stroke.
     paintBoxBorder(frame, firstRow, width, true);
-    std::size_t row = firstRow + 1;
-    for (std::size_t index = 0; index < prompt.rows.size(); ++index) {
-        // The panel is the inside of the frame and nothing else: the stroke is the edge of it.
+    const std::size_t panelRows = prompt.rows.size() + 2;
+    for (std::size_t index = 0; index < panelRows; ++index) {
+        const std::size_t row = firstRow + 1 + index;
         if (width > (2 * BoxWidth)) {
             frame.fill(row, BoxWidth, width - (2 * BoxWidth), Palette::panel());
         }
         frame.put(row, 0, Glyphs::BoxLeft, border);
-        if (index == 0) {
-            frame.put(row, BoxWidth, Glyphs::PromptMarker,
+        frame.put(row, width - 1, Glyphs::BoxRight, border);
+        if (index == 0 || index + 1 == panelRows) {
+            continue;  // A row of panel and nothing else.
+        }
+
+        const std::size_t line = index - 1;
+        if (line == 0) {
+            frame.put(row, markerColumn, Glyphs::PromptMarker,
                       Palette::accent().withBackground(Palette::panelColor()));
         }
 
-        const std::size_t rangeStart = prompt.ranges[index].first;
-        const std::string& text = prompt.rows[index];
+        const std::size_t rangeStart = prompt.ranges[line].first;
+        const std::string& text = prompt.rows[line];
         const std::size_t token =
             commandLength > rangeStart ? std::min(commandLength - rangeStart, text.size()) : 0;
         if (token > 0) {
@@ -335,14 +346,12 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
         }
         frame.put(row, textColumn + token, std::string_view{text}.substr(token),
                   Palette::text().withBackground(Palette::panelColor()));
-        if (index == 0 && model.draft.empty()) {
+        if (line == 0 && model.draft.empty()) {
             frame.put(row, textColumn, placeholderOf(model),
                       Palette::muted().withBackground(Palette::panelColor()));
         }
-        frame.put(row, width - 1, Glyphs::BoxRight, border);
-        ++row;
     }
-    paintBoxBorder(frame, row, width, false);
+    paintBoxBorder(frame, firstRow + panelRows + 1, width, false);
 }
 
 }  // namespace
@@ -356,8 +365,10 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     }
 
     // The prompt has a frame of its own, so the line being typed is not read as one more row of
-    // the conversation, and the line inside it is laid out to the width the frame leaves.
-    const std::size_t inside = width > (2 * BoxWidth) ? width - (2 * BoxWidth) : 1;
+    // the conversation, and the line inside it is laid out to the width the frame and the panel
+    // around it leave.
+    const std::size_t margins = 2 * (BoxWidth + PanelPad);
+    const std::size_t inside = width > margins ? width - margins : 1;
     const DraftLayout prompt = layoutDraft(model.draft, inside);
 
     const std::vector<std::string> all = App::hintsFor(model);
@@ -365,8 +376,9 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     std::size_t first = 0;
     const std::vector<std::string> hints = hintWindow(all, selected, first);
 
-    // The frame takes two rows of its own, and the status row goes under it.
-    const std::size_t boxRows = prompt.rows.size() + 2;
+    // The frame takes two rows of its own, and the panel inside it one above the line being
+    // typed and one below. The status row goes under the whole thing.
+    const std::size_t boxRows = prompt.rows.size() + 4;
     const bool withStatus = height > boxRows + hints.size();
     const std::size_t bottomRows = boxRows + hints.size() + (withStatus ? 1 : 0);
     const std::size_t viewRows = height > bottomRows ? height - bottomRows : 0;
@@ -408,15 +420,15 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
 
     // The prompt, framed, which is the part that stays put while the conversation moves.
     paintPrompt(frame, model, prompt, row, width);
-    row += prompt.rows.size() + 2;
+    row += prompt.rows.size() + 4;
 
     if (withStatus) {
         frame.put(row, 0, statusRow(model), Palette::muted());
     }
 
     const auto position = prompt.positions.at(std::min(model.cursor, model.draft.size()));
-    result.caretRow = viewRows + hints.size() + 1 + position.first;
-    result.caretColumn = BoxWidth + PromptWidth + position.second;
+    result.caretRow = viewRows + hints.size() + 2 + position.first;
+    result.caretColumn = BoxWidth + PanelPad + PromptWidth + position.second;
 
     pickOutSelection(frame, selection);
     return result;
