@@ -46,6 +46,26 @@ private:
     /// @param emitted Characters the field gained.
     void consume(char character, std::string& emitted);
 
+    /// Consumes one character that is not inside a string.
+    /// @param character Next character.
+    void consumeOutside(char character);
+
+    /// Opens the string that starts with the quote just read.
+    void openString();
+
+    /// Closes the string that just ended.
+    void closeString();
+
+    /// Consumes one character inside a string.
+    /// @param character Next character.
+    /// @param emitted Characters the field gained.
+    void consumeInString(char character, std::string& emitted);
+
+    /// Consumes the character that follows a backslash.
+    /// @param character Next character.
+    /// @param emitted Characters the field gained.
+    void consumeEscape(char character, std::string& emitted);
+
     /// Reads the digits of a \u escape that just completed.
     /// @param emitted Characters the field gained.
     void finishUnicode(std::string& emitted);

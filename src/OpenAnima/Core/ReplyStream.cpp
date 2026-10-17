@@ -42,44 +42,63 @@ std::string ReplyStream::feed(std::string_view piece) {
 
 void ReplyStream::consume(char character, std::string& emitted) {
     if (m_mode == Mode::Outside) {
-        switch (character) {
-        case '"':
-            if (m_depth == 1 && m_expectingKey) {
-                m_mode = Mode::InKey;
-                m_key.clear();
-            } else if (m_depth == 1 && m_key == m_field) {
-                m_mode = Mode::InValue;
-            } else {
-                m_mode = Mode::Skipping;
-            }
-            break;
-        case '{':
-            ++m_depth;
-            if (m_depth == 1) {
-                m_expectingKey = true;
-            }
-            break;
-        case '[':
-            ++m_depth;
-            break;
-        case '}':
-        case ']':
-            if (m_depth > 0) {
-                --m_depth;
-            }
-            break;
-        case ',':
-        case ':':
-            if (m_depth == 1) {
-                m_expectingKey = character == ',';
-            }
-            break;
-        default:
-            break;
-        }
+        consumeOutside(character);
         return;
     }
+    consumeInString(character, emitted);
+}
 
+void ReplyStream::consumeOutside(char character) {
+    switch (character) {
+    case '"':
+        openString();
+        break;
+    case '{':
+        ++m_depth;
+        if (m_depth == 1) {
+            m_expectingKey = true;
+        }
+        break;
+    case '[':
+        ++m_depth;
+        break;
+    case '}':
+    case ']':
+        if (m_depth > 0) {
+            --m_depth;
+        }
+        break;
+    case ',':
+    case ':':
+        if (m_depth == 1) {
+            m_expectingKey = character == ',';
+        }
+        break;
+    default:
+        break;
+    }
+}
+
+void ReplyStream::openString() {
+    if (m_depth == 1 && m_expectingKey) {
+        m_mode = Mode::InKey;
+        m_key.clear();
+    } else if (m_depth == 1 && m_key == m_field) {
+        m_mode = Mode::InValue;
+    } else {
+        m_mode = Mode::Skipping;
+    }
+}
+
+void ReplyStream::closeString() {
+    const bool wasKey = m_mode == Mode::InKey;
+    m_mode = Mode::Outside;
+    if (wasKey) {
+        m_expectingKey = false;  // the colon that follows is not a key.
+    }
+}
+
+void ReplyStream::consumeInString(char character, std::string& emitted) {
     if (m_unicode) {
         if (isHexDigit(character)) {
             m_hex.push_back(character);
@@ -97,37 +116,8 @@ void ReplyStream::consume(char character, std::string& emitted) {
 
     if (m_escape) {
         m_escape = false;
-        switch (character) {
-        case 'u':
-            m_unicode = true;
-            m_hex.clear();
-            return;
-        case 'n':
-            flushSurrogate(emitted);
-            appendByte('\n', emitted);
-            return;
-        case 't':
-            flushSurrogate(emitted);
-            appendByte('\t', emitted);
-            return;
-        case 'r':
-            flushSurrogate(emitted);
-            appendByte('\r', emitted);
-            return;
-        case 'b':
-            flushSurrogate(emitted);
-            appendByte('\b', emitted);
-            return;
-        case 'f':
-            flushSurrogate(emitted);
-            appendByte('\f', emitted);
-            return;
-        default:
-            // "\"", "\\" and "\/", and anything JSON does not define, which is passed on.
-            flushSurrogate(emitted);
-            appendByte(character, emitted);
-            return;
-        }
+        consumeEscape(character, emitted);
+        return;
     }
 
     if (character == '\\') {
@@ -136,17 +126,49 @@ void ReplyStream::consume(char character, std::string& emitted) {
     }
 
     if (character == '"') {
+        // The pair is flushed before the string closes, while the text still belongs to
+        // the field.
         flushSurrogate(emitted);
-        const bool wasKey = m_mode == Mode::InKey;
-        m_mode = Mode::Outside;
-        if (wasKey) {
-            m_expectingKey = false;  // the colon that follows is not a key.
-        }
+        closeString();
         return;
     }
 
     flushSurrogate(emitted);
     appendByte(character, emitted);
+}
+
+void ReplyStream::consumeEscape(char character, std::string& emitted) {
+    switch (character) {
+    case 'u':
+        m_unicode = true;
+        m_hex.clear();
+        return;
+    case 'n':
+        flushSurrogate(emitted);
+        appendByte('\n', emitted);
+        return;
+    case 't':
+        flushSurrogate(emitted);
+        appendByte('\t', emitted);
+        return;
+    case 'r':
+        flushSurrogate(emitted);
+        appendByte('\r', emitted);
+        return;
+    case 'b':
+        flushSurrogate(emitted);
+        appendByte('\b', emitted);
+        return;
+    case 'f':
+        flushSurrogate(emitted);
+        appendByte('\f', emitted);
+        return;
+    default:
+        // "\"", "\\" and "\/", and anything JSON does not define, which is passed on.
+        flushSurrogate(emitted);
+        appendByte(character, emitted);
+        return;
+    }
 }
 
 void ReplyStream::finishUnicode(std::string& emitted) {

@@ -408,10 +408,13 @@ TEST_CASE("NPCBrain::askTurnAsync reports the dialogue and ends with the reply",
     CHECK(events[2].text == "evening.");
     CHECK(events[3].kind == EventKind::Finished);
     REQUIRE(events[3].reply.has_value());
-    CHECK(events[3].reply->reasoning == "He looks harmless.");
-    CHECK(events[3].reply->dialogue == "Good evening.");
-    REQUIRE(events[3].reply->actions.size() == 1);
-    CHECK(events[3].reply->actions[0].name == "emote");
+    // The assertion above is the check; the analyzer cannot see through it.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const NpcReply& reply = events[3].reply.value();
+    CHECK(reply.reasoning == "He looks harmless.");
+    CHECK(reply.dialogue == "Good evening.");
+    REQUIRE(reply.actions.size() == 1);
+    CHECK(reply.actions[0].name == "emote");
     for (const Event& event : events) {
         CHECK(event.id == turnId);
     }
@@ -442,9 +445,12 @@ TEST_CASE("NPCBrain::askTurnAsync keeps half a document out of the history", "[n
     const std::vector<Event> events = drain(brain);
     REQUIRE(events.size() == 1);
     REQUIRE(events[0].reply.has_value());
-    CHECK(events[0].reply->dialogue == "Good ");
-    CHECK(events[0].reply->document.is_null());
-    CHECK(events[0].completion.finishReason == FinishReason::Cancelled);
+    // The assertion above is the check; the analyzer cannot see through it.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const NpcReply& cut = events[0].reply.value();
+    CHECK(cut.dialogue == "Good ");
+    CHECK(cut.document.is_null());
+    CHECK(cut.completion.finishReason == FinishReason::Cancelled);
 
     // Half a document is not a turn the model could read back.
     CHECK(brain.history().empty());

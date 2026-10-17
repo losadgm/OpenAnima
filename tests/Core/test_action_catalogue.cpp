@@ -7,6 +7,10 @@
 using OpenAnima::Core::ActionCatalogue;
 using OpenAnima::Core::ActionSpec;
 
+// Catch2 assertions expand into do-while blocks and test cases are long by design, so the
+// analyzer reads both as findings. Neither fits production code.
+// NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
+
 TEST_CASE("ActionCatalogue::base offers the actions every NPC starts with", "[catalogue]") {
     const ActionCatalogue catalogue = ActionCatalogue::base();
 
@@ -80,3 +84,5 @@ TEST_CASE("ActionCatalogue tells the model what to answer with", "[catalogue]") 
     CHECK(instruction.find("- end_conversation:") != std::string::npos);
     CHECK(instruction.find("- emote:") != std::string::npos);
 }
+
+// NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

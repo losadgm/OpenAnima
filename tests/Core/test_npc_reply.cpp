@@ -28,6 +28,10 @@ Completion answered(std::string document) {
 
 }  // namespace
 
+// Catch2 assertions expand into do-while blocks and test cases are long by design, so the
+// analyzer reads both as findings. Neither fits production code.
+// NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
+
 TEST_CASE("readReply splits the three variables", "[reply]") {
     const Completion completion =
         answered(R"({"reasoning":"He looks harmless.","dialogue":"Good evening.","actions":[)"
@@ -168,3 +172,5 @@ TEST_CASE("ReplyStream keeps what arrived before the document was cut", "[reply]
     CHECK(stream.feed(R"({"reasoning":"Careful.","dialogue":"Good eve)") == "Good eve");
     CHECK(stream.text() == "Good eve");
 }
+
+// NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
