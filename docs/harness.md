@@ -126,10 +126,10 @@ repeating the name or opening a gap.
 | Ctrl+P, Ctrl+N | Walks the prompts of this scope |
 | Page up, Page down | Scrolls the conversation |
 | Wheel | Scrolls the conversation, one row a notch |
-| Esc, Ctrl+C | Cancels the turn in flight, keeping what it had produced |
+| Esc | Cancels the turn in flight, keeping what it had produced |
 | Drag over the conversation | Picks out those cells, painted reversed as the pointer moves |
-| Ctrl+C with something picked out | Copies it, and drops the picking |
-| Ctrl+C with nothing in flight or picked out | Clears the draft, and leaves when it is already empty |
+| Press and release on one cell | Picks out that one character |
+| Ctrl+C | Copies what is picked out and drops the picking. It never leaves the client, which is what keeps a reach for the copy key from ending the session |
 | Ctrl+V | Types what was copied last |
 | Ctrl+D | Leaves |
 

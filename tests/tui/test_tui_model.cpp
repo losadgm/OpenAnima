@@ -225,6 +225,24 @@ TEST_CASE("escape cancels the turn in flight") {
     CHECK_FALSE(model.cancelling);
 }
 
+TEST_CASE("ctrl+c is not the cancel key, and does not leave the client") {
+    Model model = modelWithNpc();
+    (void)submit(model, "hello");
+
+    const std::vector<Effect> effects = press(model, Key::Kind::CtrlC);
+    CHECK_FALSE(hasEffect(effects, EffectKind::Cancel));
+    CHECK_FALSE(model.cancelling);
+    CHECK(model.busy);
+    CHECK(model.running);
+
+    // Nor when nothing is in flight: the shell takes the key to copy, never to leave.
+    (void)OpenAnimaTui::App::applyEvent(model, finished());
+    type(model, "a draft");
+    (void)press(model, Key::Kind::CtrlC);
+    CHECK(model.draft == "a draft");
+    CHECK(model.running);
+}
+
 TEST_CASE("the page keys move the viewport and not the caret") {
     Model model;
     (void)press(model, Key::Kind::PageUp);

@@ -37,8 +37,8 @@ public:
     /// @return Whether the mouse is holding something picked out, a single cell included.
     [[nodiscard]] bool active() const;
 
-    /// @return Whether there is nothing worth taking: a selection the mouse never left, which is
-    /// what a click leaves behind, and one that was never started.
+    /// @return Whether there is nothing picked out at all. A selection of one cell is a
+    /// selection: picking out a single character is something a reader asks for.
     [[nodiscard]] bool empty() const;
 
     /// @param row Row to look at.

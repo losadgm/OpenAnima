@@ -159,8 +159,9 @@ void showHelp(Model& model) {
     note(model, "  tab                   complete the selected command");
     note(model, "  up, down              walk the command hints, or the prompts of this scope");
     note(model, "  page up, page down    scroll the conversation");
-    note(model, "  esc, ctrl+c           cancel the turn in flight");
-    note(model, "  ctrl+c when idle      clear the line, and leave when it is empty");
+    note(model, "  esc                   cancel the turn in flight");
+    note(model, "  ctrl+c                copy what is picked out");
+    note(model, "  ctrl+v                type what was copied last");
     note(model, "  ctrl+d                leave");
     note(model, "commands:");
     note(model, "  /create <description> make an npc and talk to it");
@@ -338,9 +339,10 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
     std::vector<Effect> effects;
     const std::vector<std::string> hints = hintsFor(model);
 
-    // A turn in flight takes the keys that stop it, and nothing else changes meaning.
+    // A turn in flight takes the key that stops it, and nothing else changes meaning. Ctrl+C is
+    // not that key: it copies, and the shell takes it before it ever gets here.
     if (model.busy) {
-        if (key.kind == Key::Kind::Escape || key.kind == Key::Kind::CtrlC) {
+        if (key.kind == Key::Kind::Escape) {
             if (model.world.active.has_value()) {
                 model.cancelling = true;
                 effects.push_back({EffectKind::Cancel, *model.world.active, {}});
@@ -380,16 +382,8 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
         break;
 
     case Key::Kind::Escape:
-        break;
-
+    // Ctrl+C is the shell's: it is the copy key, and it never reaches the model.
     case Key::Kind::CtrlC:
-        if (model.draft.empty()) {
-            model.running = false;
-        } else {
-            model.draft.clear();
-            model.cursor = 0;
-            model.hintIndex = 0;
-        }
         break;
 
     case Key::Kind::CtrlD:

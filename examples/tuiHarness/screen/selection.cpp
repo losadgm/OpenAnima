@@ -49,7 +49,7 @@ bool Selection::active() const {
 }
 
 bool Selection::empty() const {
-    return !m_active || (m_anchorRow == m_cursorRow && m_anchorColumn == m_cursorColumn);
+    return !m_active;
 }
 
 bool Selection::contains(std::size_t row, std::size_t column) const {

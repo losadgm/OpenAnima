@@ -28,17 +28,17 @@ Canvas painted() {
 
 }  // namespace
 
-TEST_CASE("a selection that covers nothing is not a selection") {
+TEST_CASE("a selection picks out the cell the button went down on") {
     Selection selection;
     CHECK_FALSE(selection.active());
     CHECK(selection.empty());
 
     selection.begin(2, 4);
     CHECK(selection.active());
-    CHECK(selection.empty());
-
-    selection.extend(2, 9);
     CHECK_FALSE(selection.empty());
+    CHECK(selection.contains(2, 4));
+    CHECK_FALSE(selection.contains(2, 5));
+    CHECK_FALSE(selection.contains(1, 4));
 }
 
 TEST_CASE("a selection runs from one position to the other, whichever way it was made") {
@@ -91,9 +91,10 @@ TEST_CASE("the text of a selection is what the frame shows there") {
     wholeRows.extend(2, 19);
     CHECK(selectedText(frame, wholeRows) == "you     hello\nnpc 1   well met\n  a note");
 
-    Selection click;
-    click.begin(1, 5);
-    CHECK(selectedText(frame, click).empty());
+    // One cell is a selection: it is how a single character is taken.
+    Selection oneCell;
+    oneCell.begin(1, 10);
+    CHECK(selectedText(frame, oneCell) == "l");
 }
 
 TEST_CASE("a trailing blank is not part of what was selected") {

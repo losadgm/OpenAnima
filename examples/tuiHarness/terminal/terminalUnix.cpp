@@ -350,20 +350,26 @@ private:
 
     /// Maps a key of the enhanced keyboard protocol to the key it is.
     ///
-    /// The form is `<code point>;<modifiers>[:event]`, where the modifiers are a bit mask: one
-    /// is shift, two is alt, four is control and eight is the super key, with one added to the
-    /// lot. Return with any of shift, alt or control is a new line, which is the whole reason
-    /// the protocol is asked for: without it those chords are indistinguishable from a plain
+    /// The form is `<code point>[:<alternate>][;<modifiers>[:event]]`, where the modifiers are a
+    /// bit mask: one is shift, two is alt, four is control and eight is the super key, with one
+    /// added to the lot. Both the alternate code point and the modifiers are optional, and a
+    /// terminal that was asked to disambiguate sends a bare `CSI 27 u` for an Escape key.
+    /// Return with any of shift, alt or control is a new line, which is the whole reason the
+    /// protocol is asked for: without it those chords are indistinguishable from a plain
     /// Return, a Tab or an Escape.
     /// @param parameters The sequence without its final byte.
     /// @return The key it spells.
     Key kittyKey(const std::string& parameters) {
         const std::size_t separator = parameters.find(';');
-        if (separator == std::string::npos) {
-            return Key{Key::Kind::Unknown, static_cast<char>(0)};
+        std::string code =
+            separator == std::string::npos ? parameters : parameters.substr(0, separator);
+        // The key can carry the code point it has on another layout after a colon.
+        if (const std::size_t alternate = code.find(':'); alternate != std::string::npos) {
+            code = code.substr(0, alternate);
         }
-        const std::string code = parameters.substr(0, separator);
-        std::string modifiers = parameters.substr(separator + 1);
+        // `1` is the mask of no modifier at all, which is what an absent one means.
+        std::string modifiers =
+            separator == std::string::npos ? std::string{"1"} : parameters.substr(separator + 1);
         // The event kind comes after a colon: `1` is a press, which is the only one acted on.
         const std::size_t colon = modifiers.find(':');
         std::string kind;

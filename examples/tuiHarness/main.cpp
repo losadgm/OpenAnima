@@ -129,21 +129,15 @@ bool handleScreenKey(const Key& key, OpenAnimaTui::Screen::Selection& selection,
         selection.begin(key.row, key.column);
         return true;
     case Key::Kind::MouseDrag:
-        // Dragging back over where the button went down is part of a drag, and the paint
-        // follows it down to the one cell it covers.
-        selection.extend(key.row, key.column);
-        return true;
     case Key::Kind::MouseRelease:
+        // The drag moves the far end of the selection, and the release leaves it where the
+        // pointer is. A press and a release on the same cell leave that cell picked out, which
+        // is the only way to take a single character.
         selection.extend(key.row, key.column);
-        // A click that went nowhere picks nothing out: there is no selection to copy or to show.
-        if (selection.empty()) {
-            selection.clear();
-        }
         return true;
     case Key::Kind::CtrlC:
-        if (selection.empty()) {
-            return false;  // Nothing picked out: the model cancels, clears or leaves.
-        }
+        // The copy key, and nothing else. A client that leaves on it is a client someone leaves
+        // by accident while reaching for a selection.
         copySelection(selection, painted, clipboard, terminal);
         selection.clear();
         return true;
