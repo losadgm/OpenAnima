@@ -141,12 +141,14 @@ repeating the name or opening a gap.
 | Ctrl+P, Ctrl+N | Walks the prompts of this scope |
 | Page up, Page down | Scrolls the conversation |
 | Wheel | Scrolls the conversation, one row a notch |
+| Drag the scrollbar | Scrolls to where the thumb is put, following the button |
+| Hover a hint or the scrollbar | Lights it up: the hint goes lilac, bold and underlined, the thumb of the bar goes lilac and bold |
+| Click a hint | Takes it as the one tab writes |
 | Esc | Cancels the turn in flight, keeping what it had produced |
 | Drag over the conversation | Picks out those cells, painted reversed as the pointer moves |
 | Press and release on one cell | Picks out that one character |
 | Double click | Picks out the word under the pointer |
 | Triple click | Picks out the whole row |
-| Right click | Opens a small menu with copy and paste, where the button was |
 | Ctrl+C | Copies what is picked out and drops the picking. It never leaves the client, which is what keeps a reach for the copy key from ending the session |
 | Ctrl+V | Types what was copied last |
 | Ctrl+D | Leaves |
@@ -155,9 +157,11 @@ Control and backspace travel as the same byte as Ctrl+H on the terminals that do
 chord itself, which is nearly all of them, so the client reads that byte as the word delete: it
 is what pressing the two keys produces there, and Ctrl+H has nothing else to do in a line being
 typed. The same goes for the other spellings the chords turn into: Ctrl+W, alt and backspace,
-and the modifier forms `27;5;3~` and `27;5;127~`. An editor that sends the key through the kitty
-keyboard protocol reports the code point instead, so code point 3 reaches the word delete too and
-code point 127 the word backspace.
+and the modifier forms `27;5;3~` and `27;5;127~`. Control and delete comes in as `3;5~` from a
+terminal, and as alt and `d` from an editor that takes the chord before the terminal sees it,
+which is what VS Code does. An editor that sends the key through the kitty keyboard protocol
+reports the code point instead, so code point 3 reaches the word delete too and code point 127
+the word backspace.
 
 A tab is never written into the draft. It counts as one column to the client and as up to
 eight to the terminal, and the two disagreeing is what tore the row apart.
@@ -172,11 +176,17 @@ them paints the text and leaves them as they were, and a copy of that same selec
 words without the box and comes out flush with the left edge.
 Any other key drops the picking, so a selection never sits over text that has moved under it.
 While the client runs the mouse is the client's, which is the price of the wheel scrolling the
-conversation; holding shift asks the terminal for its own selection back in most of them.
+conversation; holding shift asks the terminal for its own selection back in most of them. The
+right button is left to the terminal: the client never uses it, so the menu of the editor or of
+the emulator opens with the copy and paste it offers.
 
-The menu the right button opens takes the arrows and Return, and Escape drops it without doing
-anything; a click on an entry picks it just the same. It is drawn over the conversation and the
-selection stays where it was, so picking copy copies the same thing Ctrl+C would.
+The pointer also lights up what it is over. A command hint under it turns lilac, bold and
+underlined, and a click on it takes it as the one tab writes. A hint that is not under the
+pointer is quiet unless it is the selected one, which keeps the accent colour. The scrollbar on
+the right gives the pointer the thumb it would drag: the thumb turns lilac and bold, and the
+button drags it, which scrolls the conversation to the row it is left on. A press beside the
+thumb brings the thumb under the pointer first, and a drag that goes past either end stops
+there.
 
 Anything a keyboard can send reaches the draft as bytes, so an enye, an accented vowel or a
 combining mark typed after a letter lands in the same cell as the letter it belongs to. Copying goes out as the terminal's own clipboard sequence and lives in

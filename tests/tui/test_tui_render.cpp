@@ -411,21 +411,57 @@ TEST_CASE("picking out marks the words and leaves the frame of the prompt alone"
     CHECK_FALSE(rendered.frame.at(7, 3).style.reverse);  // The panel between the two.
 }
 
-TEST_CASE("the menu is painted over the screen, with its first entry picked out") {
+TEST_CASE("a hint lights up under the pointer, and the rows of the others do not") {
     Model model;
-    OpenAnimaTui::Screen::Menu menu;
-    menu.open = true;
-    menu.placement = OpenAnimaTui::Screen::placeMenu(1, 2, 40, 10);
+    type(model, "/");
+    const RenderResult plain = render(model, 40, 12);
+    REQUIRE(plain.hintCount > 1);
+    const std::size_t row = plain.hintRow + 1;
+    const std::size_t column = OpenAnimaTui::Screen::Metrics::HintIndent;
 
-    const RenderResult rendered = render(model, 40, 10, Selection{}, menu);
-    const std::string screen = readAll(rendered.frame);
-    CHECK(screen.find("copy") != std::string::npos);
-    CHECK(screen.find("paste") != std::string::npos);
+    CHECK_FALSE(plain.frame.at(row, column).style.bold);
 
-    const std::size_t row = menu.placement.row + 1;
-    const std::size_t column = menu.placement.column + 2;
-    CHECK(rendered.frame.at(row, column).style.foreground.equals(Palette::accent().foreground));
-    CHECK(rendered.frame.at(row + 1, column).style.foreground.equals(Palette::text().foreground));
+    const RenderResult hovered =
+        render(model, 40, 12, Selection{}, OpenAnimaTui::Screen::Pointer{true, row, 0});
+    CHECK(hovered.frame.at(row, column).style.bold);
+    CHECK(hovered.frame.at(row, column).style.underline);
+    CHECK(hovered.frame.at(row, column).style.foreground.equals(Palette::accent().foreground));
+    CHECK_FALSE(hovered.frame.at(plain.hintRow, column).style.bold);
+}
+
+TEST_CASE(
+    "the scrollbar takes the accent under the pointer, and its thumb says where the view is") {
+    Model model;
+    for (int index = 0; index < 60; ++index) {
+        model.messages.push_back(
+            {OpenAnimaTui::App::Role::User, "row " + std::to_string(index), false});
+    }
+
+    const RenderResult plain = render(model, 40, 12);
+    REQUIRE(plain.maxScrollOffset > 0);
+    const std::size_t column = 39;
+    // Nothing is scrolled, so the view is at the bottom and so is the thumb.
+    const std::size_t thumb = OpenAnimaTui::Screen::thumbRow(plain.transcriptRows, plain.scrollRows,
+                                                             plain.maxScrollOffset);
+    REQUIRE(thumb + 1 == plain.scrollRows);
+    CHECK(plain.frame.at(thumb, column).style.foreground.equals(Palette::muted().foreground));
+    CHECK_FALSE(plain.frame.at(thumb, column).style.bold);
+
+    const RenderResult hovered =
+        render(model, 40, 12, Selection{}, OpenAnimaTui::Screen::Pointer{true, thumb, column});
+    CHECK(hovered.frame.at(thumb, column).style.foreground.equals(Palette::accent().foreground));
+    CHECK(hovered.frame.at(thumb, column).style.bold);
+    CHECK(hovered.frame.at(0, column).style.dim);  // The track stays the track.
+}
+
+TEST_CASE("a row of the bar maps back to the scroll position the thumb stands for") {
+    CHECK(OpenAnimaTui::Screen::thumbRow(100, 10, 0) == 0);
+    CHECK(OpenAnimaTui::Screen::thumbRow(100, 10, 40) == 4);
+    CHECK(OpenAnimaTui::Screen::thumbRow(100, 10, 90) == 9);
+    CHECK(OpenAnimaTui::Screen::firstRowForThumb(100, 10, 0) == 0);
+    CHECK(OpenAnimaTui::Screen::firstRowForThumb(100, 10, 4) == 40);
+    CHECK(OpenAnimaTui::Screen::firstRowForThumb(100, 10, 9) == 90);
+    CHECK(OpenAnimaTui::Screen::firstRowForThumb(100, 10, 99) == 90);
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

@@ -532,8 +532,7 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
     case Key::Kind::MousePress:
     case Key::Kind::MouseDrag:
     case Key::Kind::MouseRelease:
-    case Key::Kind::MouseRightPress:
-    case Key::Kind::MouseRightRelease:
+    case Key::Kind::MouseMove:
     case Key::Kind::CtrlV:
         break;
     }

@@ -270,16 +270,18 @@ std::vector<std::string> hintWindow(const std::vector<std::string>& all, std::si
 }
 
 /// Paints the scrollbar: one column on the right, a picture of where the viewport sits and
-/// nothing else. The track is dim, the thumb is not.
+/// nothing else. The track is dim, the thumb is not, and the thumb is painted in the accent
+/// colour while the pointer is over the bar, which is what says it can be dragged.
 /// @param frame Canvas to paint on.
 /// @param viewRows Rows the conversation occupies.
 /// @param width Columns available.
 /// @param total Rows the whole conversation takes.
 /// @param start First row of the conversation that is on screen.
+/// @param hovered Whether the pointer is over the bar.
 // The rows, the columns and the two counts are named at the only call site there is.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void paintScrollBar(Canvas& frame, std::size_t viewRows, std::size_t width, std::size_t total,
-                    std::size_t start) {
+                    std::size_t start, bool hovered) {
     if (total <= viewRows || viewRows == 0 || width < 2) {
         return;
     }
@@ -290,11 +292,10 @@ void paintScrollBar(Canvas& frame, std::size_t viewRows, std::size_t width, std:
     }
 
     const std::size_t thumb = std::max<std::size_t>(1, viewRows * viewRows / total);
-    const std::size_t travel = viewRows - thumb;
-    const std::size_t range = total - viewRows;
-    const std::size_t firstRow = start * travel / range;
+    const std::size_t firstRow = thumbRow(total, viewRows, start);
+    const Style style = hovered ? Palette::accent().withBold() : Palette::muted();
     for (std::size_t row = 0; row < thumb; ++row) {
-        frame.put(firstRow + row, column, Glyphs::ScrollBar, Palette::muted());
+        frame.put(firstRow + row, column, Glyphs::ScrollBar, style);
     }
 }
 
@@ -382,56 +383,67 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
     paintBoxBorder(frame, firstRow + panelRows + 1, width, false);
 }
 
-/// Paints the menu over everything else: a panel of its own, framed with the same strokes as the
-/// prompt, with the entry under the pointer in the accent colour.
+/// Paints the hints that float above the prompt, on a panel of their own.
+///
+/// The selected one is in the accent colour, and the one under the pointer is lit up the same
+/// way with the underline and the weight that say a click would take it.
 /// @param frame Canvas to paint on.
-/// @param menu Menu to paint.
-void paintMenu(Canvas& frame, const Menu& menu) {
-    const MenuPlacement& box = menu.placement;
-    if (!menu.open || box.rows < 3 || box.columns < 3) {
-        return;
-    }
-    const std::size_t bottom = std::min(box.row + box.rows, frame.height()) - 1;
-    const std::size_t right = std::min(box.column + box.columns, frame.width()) - 1;
-    const Style border = Palette::muted().withBackground(Palette::raisedColor());
-
-    for (std::size_t row = box.row; row <= bottom; ++row) {
-        frame.fill(row, box.column, right - box.column + 1, Palette::raised());
-    }
-    frame.put(box.row, box.column, Glyphs::BoxTopLeft, border);
-    for (std::size_t column = box.column + 1; column < right; ++column) {
-        frame.put(box.row, column, Glyphs::BoxTop, border);
-    }
-    frame.put(box.row, right, Glyphs::BoxTopRight, border);
-    for (std::size_t row = box.row + 1; row < bottom; ++row) {
-        frame.put(row, box.column, Glyphs::BoxLeft, border);
-        frame.put(row, right, Glyphs::BoxRight, border);
-    }
-    frame.put(bottom, box.column, Glyphs::BoxBottomLeft, border);
-    for (std::size_t column = box.column + 1; column < right; ++column) {
-        frame.put(bottom, column, Glyphs::BoxBottom, border);
-    }
-    frame.put(bottom, right, Glyphs::BoxBottomRight, border);
-
-    for (std::size_t index = 0; index < MenuEntries.size() && box.row + 1 + index < bottom;
-         ++index) {
-        const Style style = (index == menu.selected ? Palette::accent() : Palette::text())
-                                .withBackground(Palette::raisedColor());
-        frame.put(box.row + 1 + index, box.column + 2, MenuEntries.at(index), style);
-    }
-
-    // The menu is the client's own drawing, so a copy never takes it for something that was said.
-    for (std::size_t row = box.row; row <= bottom; ++row) {
-        for (std::size_t column = box.column; column <= right; ++column) {
-            frame.at(row, column).furniture = true;
+/// @param hints Hints of the window, in order.
+/// @param highlighted Which of them is the selected one.
+/// @param firstRow Row the first one goes on.
+/// @param width Columns available.
+/// @param pointer Where the pointer is.
+// The rows, the columns and the two counts are named at the only call site there is.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+void paintHints(Canvas& frame, const std::vector<std::string>& hints, std::size_t highlighted,
+                std::size_t firstRow, std::size_t width, const Pointer& pointer) {
+    std::size_t row = firstRow;
+    for (std::size_t index = 0; index < hints.size(); ++index) {
+        Style style = (index == highlighted ? Palette::accent() : Palette::muted())
+                          .withBackground(Palette::raisedColor());
+        if (pointer.onScreen && pointer.row == row) {
+            style =
+                Palette::accent().withBackground(Palette::raisedColor()).withBold().withUnderline();
         }
+        frame.fill(row, 0, width, Palette::raised());
+        frame.put(row, HintIndent, hints[index], style);
+        ++row;
     }
 }
 
 }  // namespace
 
+std::size_t thumbRow(std::size_t transcriptRows, std::size_t viewRows, std::size_t start) {
+    if (transcriptRows <= viewRows || viewRows == 0) {
+        return 0;
+    }
+    const std::size_t thumb = std::max<std::size_t>(1, viewRows * viewRows / transcriptRows);
+    const std::size_t travel = viewRows - thumb;
+    if (travel == 0) {
+        return 0;  // The thumb fills the bar, so there is nowhere for it to go.
+    }
+    return start * travel / (transcriptRows - viewRows);
+}
+
+// The two counts and the row are named where they are used, and both helpers take them in the
+// order the bar is laid out in.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::size_t firstRowForThumb(std::size_t transcriptRows, std::size_t viewRows, std::size_t row) {
+    if (transcriptRows <= viewRows || viewRows == 0) {
+        return 0;
+    }
+    const std::size_t thumb = std::max<std::size_t>(1, viewRows * viewRows / transcriptRows);
+    const std::size_t travel = viewRows - thumb;
+    if (travel == 0) {
+        return 0;
+    }
+    const std::size_t wanted = std::min(row, travel);
+    return std::min(transcriptRows - viewRows,
+                    (wanted * (transcriptRows - viewRows) + travel - 1) / travel);
+}
+
 RenderResult render(const Model& model, std::size_t width, std::size_t height,
-                    const Selection& selection, const Menu& menu) {
+                    const Selection& selection, const Pointer& pointer) {
     RenderResult result{Canvas{width, height}, 0, 0};
     Canvas& frame = result.frame;
     if (width == 0 || height == 0) {
@@ -490,20 +502,22 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
             frame.put(row, measure(line.prefix), line.body, line.bodyStyle);
         }
     }
-    paintScrollBar(frame, viewRows, width, total, start);
+    paintScrollBar(frame, viewRows, width, total, start,
+                   pointer.onScreen && pointer.column + 1 == width && pointer.row < viewRows);
+    result.scrollRows = viewRows;
+    result.transcriptRows = total;
 
-    // The hints float over the conversation, on their own panel.
-    std::size_t row = viewRows;
+    // The hints float over the conversation, on their own panel. The one under the pointer is
+    // lit up the same way as the one that is selected, and underlined and bold, which is what
+    // says a click would take it.
     const std::size_t highlighted = selected - first;
-    for (std::size_t index = 0; index < hints.size(); ++index) {
-        const Style style = (index == highlighted ? Palette::accent() : Palette::muted())
-                                .withBackground(Palette::raisedColor());
-        frame.fill(row, 0, width, Palette::raised());
-        frame.put(row, HintIndent, hints[index], style);
-        ++row;
-    }
+    result.hintRow = viewRows;
+    result.hintCount = hints.size();
+    result.hintOffset = first;
+    paintHints(frame, hints, highlighted, viewRows, width, pointer);
 
     // The prompt, framed, which is the part that stays put while the conversation moves.
+    std::size_t row = viewRows + hints.size();
     paintPrompt(frame, model, prompt, row, width);
     row += prompt.rows.size() + 2;
 
@@ -516,7 +530,6 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     result.caretColumn = BoxWidth + PanelPad + PromptWidth + position.second;
 
     pickOutSelection(frame, selection);
-    paintMenu(frame, menu);
     return result;
 }
 

@@ -39,7 +39,6 @@ add_executable(open_anima_tui
     tuiHarness/screen/canvas.cpp
     tuiHarness/screen/cell.cpp
     tuiHarness/screen/diff.cpp
-    tuiHarness/screen/menu.cpp
     tuiHarness/screen/render.cpp
     tuiHarness/screen/selection.cpp
     tuiHarness/screen/style.cpp

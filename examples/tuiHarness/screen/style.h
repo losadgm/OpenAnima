@@ -73,6 +73,10 @@ struct Style {
     /// @return A copy with that attribute set.
     [[nodiscard]] Style withReverse(bool value = true) const;
 
+    /// @param value Whether the style is underlined.
+    /// @return A copy with that attribute set.
+    [[nodiscard]] Style withUnderline(bool value = true) const;
+
     /// @return Whether the style asks for nothing, which is what a reset leaves behind.
     [[nodiscard]] bool isDefault() const;
 

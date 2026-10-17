@@ -191,6 +191,13 @@ private:
             m_pending.erase(0, 1);
             return controlled(Key::Kind::Backspace);
         }
+        // Alt and `d` is the word after the caret in readline, and it is what an editor that
+        // takes the chord before the terminal sees it sends for control and delete: VS Code
+        // maps that chord to `ESC d` itself.
+        if (introducer == 'd') {
+            m_pending.erase(0, 1);
+            return controlled(Key::Kind::Delete);
+        }
         if (introducer == '[' || introducer == 'O') {
             m_pending.erase(0, 1);
             if (introducer == '[' && !m_pending.empty() && m_pending.front() == 'M') {
@@ -354,15 +361,23 @@ private:
             }
 
             Key key;
-            key.kind = final == 'm' ? Key::Kind::MouseRelease : Key::Kind::MousePress;
-            // Bit five says the mouse is moving with a button held, which is a drag.
-            if (final == 'M' && (button & 32) != 0) {
+            // Bit five says the mouse is moving. With no button held that is the pointer going
+            // over the screen, which is what a hover is; with the left button held it is a drag.
+            const bool moving = (button & 32) != 0;
+            const auto held = static_cast<unsigned char>(button & 3);
+            if (moving) {
                 key.kind = Key::Kind::MouseDrag;
-            }
-            // The right button opens the menu rather than picking text out, and its release says
-            // nothing: the menu is already up. Bit six is the wheel, which is not a button.
-            if ((button & 64) == 0 && (button & 3) == 2) {
-                key.kind = final == 'm' ? Key::Kind::MouseRightRelease : Key::Kind::MouseRightPress;
+                if (held == 3) {
+                    key.kind = Key::Kind::MouseMove;  // No button down: the pointer passing over.
+                } else if (held != 0) {
+                    key.kind = Key::Kind::Unknown;  // The right or the middle button.
+                }
+            } else if (held != 0) {
+                // The right and the middle button are not the client's: leaving them alone is
+                // what lets the terminal or the editor show its own menu on a right click.
+                key.kind = Key::Kind::Unknown;
+            } else {
+                key.kind = final == 'm' ? Key::Kind::MouseRelease : Key::Kind::MousePress;
             }
             key.column = column > 0 ? column - 1 : 0;
             key.row = row > 0 ? row - 1 : 0;
@@ -577,7 +592,9 @@ private:
             return Key{Key::Kind::Backspace, static_cast<char>(0)};
         // 0x08 is Ctrl+H by the book, and it is what most terminals send when control and
         // backspace are pressed together: the two chords are the same byte, and in a line being
-        // typed the useful reading of it is the one that takes a word.
+        // typed the useful reading of it is the one that takes a word. The 0x17 below is the
+        // same key under another name, so the two branches answer alike on purpose.
+        // NOLINTNEXTLINE(bugprone-branch-clone)
         case 0x08:
             return controlled(Key::Kind::Backspace);
         // 0x17 is Ctrl+W, which is what a terminal sends for control and backspace when it has

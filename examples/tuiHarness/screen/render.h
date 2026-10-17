@@ -7,7 +7,6 @@
 
 #include "app/model.h"
 #include "canvas.h"
-#include "menu.h"
 #include "selection.h"
 
 namespace OpenAnimaTui::Screen {
@@ -24,15 +23,41 @@ constexpr std::size_t HintIndent = 2;   ///< Columns a hint is indented by.
 
 }  // namespace Metrics
 
+/// Where the pointer is on the screen, which is what the client lights up under it.
+struct Pointer {
+    bool onScreen{false};   ///< Whether the pointer is over the screen at all.
+    std::size_t row{0};     ///< Row the pointer is over.
+    std::size_t column{0};  ///< Column the pointer is over.
+};
+
 /// One frame, ready to be written.
 struct RenderResult {
-    Canvas frame;                ///< The cells of the screen.
-    std::size_t caretRow{0};     ///< Row the caret belongs in, when a prompt is being typed.
-    std::size_t caretColumn{0};  ///< Column the caret belongs in.
+    Canvas frame;                   ///< The cells of the screen.
+    std::size_t caretRow{0};        ///< Row the caret belongs in, when a prompt is being typed.
+    std::size_t caretColumn{0};     ///< Column the caret belongs in.
+    std::size_t scrollRows{0};      ///< Rows the conversation viewport has, which is the bar.
+    std::size_t transcriptRows{0};  ///< Rows the whole conversation takes, on screen or not.
+    std::size_t hintRow{0};         ///< Row the hints start on, whether any is drawn or not.
+    std::size_t hintCount{0};       ///< Hints drawn, zero when none are.
+    std::size_t hintOffset{0};      ///< Index in the whole list of the first hint drawn.
     /// Rows hidden above the viewport when it is scrolled all the way up, which is the
     /// largest offset the model can hold.
     std::size_t maxScrollOffset{0};
 };
+
+/// @param transcriptRows Rows the whole conversation takes.
+/// @param viewRows Rows the conversation viewport has.
+/// @param start First row of the conversation that is on screen.
+/// @return The row of the viewport the thumb of the scrollbar begins at.
+[[nodiscard]] std::size_t thumbRow(std::size_t transcriptRows, std::size_t viewRows,
+                                   std::size_t start);
+
+/// @param transcriptRows Rows the whole conversation takes.
+/// @param viewRows Rows the conversation viewport has.
+/// @param row Row of the viewport the thumb is dragged to.
+/// @return The first row of the conversation that puts the thumb there.
+[[nodiscard]] std::size_t firstRowForThumb(std::size_t transcriptRows, std::size_t viewRows,
+                                           std::size_t row);
 
 /// Paints a model into a canvas of a given size.
 ///
@@ -43,10 +68,10 @@ struct RenderResult {
 /// @param width Columns available.
 /// @param height Rows available.
 /// @param selection What the mouse picked out, painted over everything else.
-/// @param menu The menu the right button opened, painted over the selection.
+/// @param pointer Where the pointer is, which decides what is lit up under it.
 /// @return The frame and where the caret goes.
 [[nodiscard]] RenderResult render(const App::Model& model, std::size_t width, std::size_t height,
                                   const Selection& selection = Selection{},
-                                  const Menu& menu = Menu{});
+                                  const Pointer& pointer = Pointer{});
 
 }  // namespace OpenAnimaTui::Screen

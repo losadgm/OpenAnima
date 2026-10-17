@@ -80,6 +80,12 @@ Style Style::withReverse(bool value) const {
     return copy;
 }
 
+Style Style::withUnderline(bool value) const {
+    Style copy = *this;
+    copy.underline = value;
+    return copy;
+}
+
 bool Style::isDefault() const {
     return foreground.equals(Color{}) && background.equals(Color{}) && !bold && !dim && !italic &&
            !underline && !reverse;
