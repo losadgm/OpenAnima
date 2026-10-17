@@ -8,15 +8,21 @@
 namespace OpenAnima::Core {
 namespace {
 
-/// What the model reads about the inner voice. It is also the definition the library
-/// promises to the host, so the two say the same thing.
-constexpr const char* ReasoningDescription =
-    "The NPC's own thoughts before it answers, in character and in the first person. "
-    "This is not part of what it says.";
+/// What the model reads about the inner voice. Written once because it goes to two places:
+/// the description of the schema, and the instruction that a provider ignoring the schema
+/// still reads. Two copies would drift apart, and say different things about one field.
+constexpr const char* ReasoningField =
+    "Your private thoughts before you answer, in character and in the first person. One or two "
+    "sentences. Nothing here is said out loud.";
 
-/// What the model reads about the spoken part.
-constexpr const char* DialogueDescription =
-    "What the NPC says out loud, in character. An empty string when it says nothing.";
+/// What the model reads about the spoken part. Written once, as ReasoningField is.
+constexpr const char* DialogueField =
+    "What you say out loud, in character. An empty string when you say nothing.";
+
+/// What the model reads about the actions. Written once, as ReasoningField is.
+constexpr const char* ActionsField =
+    "What you ask the host to do, as a list. Every entry is an object with \"name\" and "
+    "\"arguments\". Empty when you do nothing.";
 
 /// The arguments of an action that takes none.
 /// @return A schema that accepts an object with nothing in it.
@@ -61,10 +67,7 @@ void ActionCatalogue::add(ActionSpec spec) {
 }
 
 nlohmann::json ActionCatalogue::replySchema() const {
-    nlohmann::json actions =
-        nlohmann::json{{"type", "array"},
-                       {"description", "What the NPC asks the host to do. Empty when it "
-                                       "does nothing."}};
+    nlohmann::json actions = nlohmann::json{{"type", "array"}, {"description", ActionsField}};
     if (m_actions.empty()) {
         // No action is allowed, and the schema says so without an empty "oneOf", which
         // is not a schema every provider accepts.
@@ -88,9 +91,8 @@ nlohmann::json ActionCatalogue::replySchema() const {
         {"type", "object"},
         {"properties",
          nlohmann::json{
-             {"reasoning",
-              nlohmann::json{{"type", "string"}, {"description", ReasoningDescription}}},
-             {"dialogue", nlohmann::json{{"type", "string"}, {"description", DialogueDescription}}},
+             {"reasoning", nlohmann::json{{"type", "string"}, {"description", ReasoningField}}},
+             {"dialogue", nlohmann::json{{"type", "string"}, {"description", DialogueField}}},
              {"actions", std::move(actions)}}},
         {"required", nlohmann::json::array({"reasoning", "dialogue", "actions"})},
         {"additionalProperties", false}};
@@ -100,12 +102,13 @@ std::string ActionCatalogue::replyInstruction() const {
     std::string instruction =
         "Answer with one json object and nothing else, with these keys in this order:\n"
         "\n"
-        "1. \"reasoning\": your private thoughts, in character and in the first person. One\n"
-        "   or two sentences. Nothing here is said out loud.\n"
-        "2. \"dialogue\": what you say out loud, in character. An empty string when you say\n"
-        "   nothing.\n"
-        "3. \"actions\": what you ask the host to do, as a list. Every entry is an object\n"
-        "   with \"name\" and \"arguments\". Empty when you do nothing.\n";
+        "1. \"reasoning\": ";
+    instruction += ReasoningField;
+    instruction += "\n2. \"dialogue\": ";
+    instruction += DialogueField;
+    instruction += "\n3. \"actions\": ";
+    instruction += ActionsField;
+    instruction += '\n';
 
     if (m_actions.empty()) {
         instruction += "\nYou cannot take actions.\n";
