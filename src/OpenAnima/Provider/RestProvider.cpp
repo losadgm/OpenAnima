@@ -154,7 +154,7 @@ void readJsonAnswer(Completion& completion, const ResponseFormat& format) {
         return;
     }
     try {
-        completion.json = nlohmann::json::parse(completion.text);
+        completion.json = nlohmann::ordered_json::parse(completion.text);
     } catch (const nlohmann::json::exception& error) {
         throw ParseError("the answer was asked for as JSON and is not: " +
                          std::string(error.what()) + ": " + snippet(completion.text));
