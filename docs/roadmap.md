@@ -95,10 +95,12 @@ context is what the senses let through.
     as well as raw, and an answer that is not the JSON that was asked for is a `ParseError`
     rather than something the caller discovers later. The contract of an NPC's own answer is
     the next point.
-- [ ] Isolate the output variables: `reasoning`, `dialogue`, `actions`.
-  - This is what turns an answer into something an NPC can act on: what it thought, what it
-    says, and what it does. `Completion::text` is still opaque text, and `Role::Tool` exists in
-    the enum with nothing producing or consuming it.
+- [x] Isolate the output variables: `reasoning`, `dialogue`, `actions`.
+  - `askTurn()` and `askTurnAsync()` ask the answer in a schema built from an
+    `ActionCatalogue`, read it back as an `NpcReply` and keep the whole document in the
+    history. The contract also travels in the instruction sent with the prompt, so a provider
+    that ignores the schema still answers in it, and the dialogue is read out of the document
+    while it arrives, so a sink paints words rather than JSON.
 - [ ] Reject malformed answers and fall back.
   - The validation half is in place: `ParseError` and `ProviderError` reject anything that
     cannot be read or that the provider refused, and the error carries the HTTP status. The

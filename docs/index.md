@@ -33,6 +33,10 @@ The conversation is one of three channels an NPC uses:
   `Core::ResponseFormat`, and the answer arrives parsed as well as raw. A provider that does
   not know the field is still checked: an answer that is not the JSON that was asked for is a
   `ParseError`.
+- A reply in three variables: `askTurn()` asks for `reasoning`, `dialogue` and `actions` in one
+  document, built from an `ActionCatalogue`, and returns them as `Core::NpcReply`. The dialogue
+  is reported while it is written and the whole document is kept as the turn, so the NPC reads
+  its own thoughts back.
 - One provider interface, `OpenAnima::Provider::IProvider`, and a REST implementation for the
   OpenAI chat-completions contract. Ollama, llama.cpp and vLLM speak it too.
 - One HTTP boundary, `OpenAnima::Http::HttpTransport`, so providers can be tested without a
