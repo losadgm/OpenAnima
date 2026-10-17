@@ -7,7 +7,7 @@
 
 #include "commands.h"
 
-namespace OpenAnimaTui::App {
+namespace OpenAnimaTui::Domain {
 
 namespace {
 
@@ -670,4 +670,4 @@ std::size_t elapsedTenths(const Model& model) {
         std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count() / 100);
 }
 
-}  // namespace OpenAnimaTui::App
+}  // namespace OpenAnimaTui::Domain

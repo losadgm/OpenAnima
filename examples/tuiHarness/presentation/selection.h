@@ -10,7 +10,7 @@
 
 #include "canvas.h"
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 /// Where a selection lives.
 ///
@@ -206,4 +206,4 @@ private:
     int m_count{0};                              ///< Presses in the run so far.
 };
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

@@ -10,7 +10,7 @@
 #include "cell.h"
 #include "text.h"
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 namespace {
 
@@ -203,4 +203,4 @@ bool Canvas::rowEquals(const Canvas& other, std::size_t row) const {
     return true;
 }
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

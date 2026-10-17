@@ -6,17 +6,17 @@
 #include <string>
 #include <vector>
 
-#include "screen/text.h"
+#include "presentation/text.h"
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
 
 namespace {
 
-using OpenAnimaTui::Screen::clip;
-using OpenAnimaTui::Screen::glyphColumns;
-using OpenAnimaTui::Screen::measure;
-using OpenAnimaTui::Screen::utf8Length;
-using OpenAnimaTui::Screen::wrap;
+using OpenAnimaTui::Presentation::clip;
+using OpenAnimaTui::Presentation::glyphColumns;
+using OpenAnimaTui::Presentation::measure;
+using OpenAnimaTui::Presentation::utf8Length;
+using OpenAnimaTui::Presentation::wrap;
 
 }  // namespace
 

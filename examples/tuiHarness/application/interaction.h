@@ -13,27 +13,34 @@
 #include <string>
 #include <vector>
 
-#include "app/model.h"
-#include "screen/render.h"
-#include "screen/selection.h"
+#include "domain/model.h"
+#include "presentation/render.h"
+#include "presentation/selection.h"
 #include "terminal/terminal.h"
 
-namespace OpenAnimaTui::Shell {
+namespace OpenAnimaTui::Application {
 
-using App::Model;
+using Domain::Model;
 
 /// What the pointer has done to the screen: what is picked out, where it is, and what it is
 /// dragging. All of it is the shell's business, so the model never hears about a position.
 struct Interaction {
-    Screen::Selection selection;   ///< The cells the mouse picked out.
-    Screen::Clicks clicks;         ///< Presses counted, which a double click is.
-    Screen::Pointer pointer;       ///< Where the pointer is.
-    Screen::RenderResult shape;    ///< The frame on screen and where its parts sit.
-    std::size_t barGrab{0};        ///< Row of the thumb the drag holds.
-    bool pullingBar{false};        ///< Whether the bar of the conversation is dragged.
-    bool pullingHintBar{false};    ///< Whether the bar of the hints is dragged.
-    bool pullingPromptBar{false};  ///< Whether the bar of the prompt is dragged.
-    bool pullingSelection{false};  ///< Whether the drag stretches a selection.
+    /// What the button is holding, when it is holding anything. One value, so two drags cannot
+    /// be in flight at once: a press that takes a bar lets go of anything else first.
+    enum class Drag : std::uint8_t {
+        None,             ///< Nothing is held.
+        Selection,        ///< The far end of a span follows the pointer.
+        ConversationBar,  ///< The thumb of the transcript follows it.
+        HintBar,          ///< The thumb of the hints follows it.
+        PromptBar         ///< The thumb of the draft follows it.
+    };
+
+    Presentation::Selection selection;  ///< The cells the mouse picked out.
+    Presentation::Clicks clicks;        ///< Presses counted, which a double click is.
+    Presentation::Pointer pointer;      ///< Where the pointer is.
+    Presentation::RenderResult shape;   ///< The frame on screen and where its parts sit.
+    Drag drag{Drag::None};              ///< What the button is dragging.
+    std::size_t barGrab{0};             ///< Row of the thumb the drag holds.
     std::chrono::steady_clock::time_point nextAutoScroll;  ///< When the edge may move it on.
 };
 
@@ -66,8 +73,8 @@ struct KeyResult {
 /// @param key Key that arrived.
 /// @param scrollStep Rows a page scroll takes, as `update` wants.
 /// @return What the shell has to carry out, in order.
-[[nodiscard]] std::vector<App::Effect> applyKey(Interaction& interaction, Model& model,
-                                                const Key& key, std::size_t scrollStep);
+[[nodiscard]] std::vector<Domain::Effect> applyKey(Interaction& interaction, Model& model,
+                                                   const Key& key, std::size_t scrollStep);
 
 /// Moves the conversation or the panel of the prompt on when a drag waits at an edge.
 /// @param interaction What the pointer has done to the screen.
@@ -77,4 +84,4 @@ struct KeyResult {
 [[nodiscard]] bool autoscrollAtEdge(Interaction& interaction, Model& model,
                                     std::chrono::steady_clock::time_point now);
 
-}  // namespace OpenAnimaTui::Shell
+}  // namespace OpenAnimaTui::Application

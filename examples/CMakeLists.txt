@@ -34,16 +34,18 @@ open_anima_enable_warnings(open_anima_cli)
 # -----------------------------------------------------------------------------
 add_executable(open_anima_tui
     tuiHarness/main.cpp
-    tuiHarness/app/commands.cpp
-    tuiHarness/app/model.cpp
-    tuiHarness/screen/canvas.cpp
-    tuiHarness/screen/cell.cpp
-    tuiHarness/screen/diff.cpp
-    tuiHarness/screen/render.cpp
-    tuiHarness/screen/selection.cpp
-    tuiHarness/screen/style.cpp
-    tuiHarness/screen/text.cpp
-    tuiHarness/shell/interaction.cpp
+    tuiHarness/application/brains.cpp
+    tuiHarness/application/interaction.cpp
+    tuiHarness/application/session.cpp
+    tuiHarness/domain/commands.cpp
+    tuiHarness/domain/model.cpp
+    tuiHarness/presentation/canvas.cpp
+    tuiHarness/presentation/cell.cpp
+    tuiHarness/presentation/diff.cpp
+    tuiHarness/presentation/render.cpp
+    tuiHarness/presentation/selection.cpp
+    tuiHarness/presentation/style.cpp
+    tuiHarness/presentation/text.cpp
     tuiHarness/terminal/terminalUnix.cpp
     tuiHarness/terminal/terminalWindows.cpp
     common/apiSettings.cpp

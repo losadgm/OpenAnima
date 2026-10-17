@@ -20,16 +20,16 @@ add_executable(open_anima_tests
     tui/test_tui_text.cpp
     ../examples/cliHarness/options.cpp
     ../examples/cliHarness/session.cpp
-    ../examples/tuiHarness/app/commands.cpp
-    ../examples/tuiHarness/app/model.cpp
-    ../examples/tuiHarness/screen/canvas.cpp
-    ../examples/tuiHarness/screen/cell.cpp
-    ../examples/tuiHarness/screen/diff.cpp
-    ../examples/tuiHarness/screen/render.cpp
-    ../examples/tuiHarness/screen/selection.cpp
-    ../examples/tuiHarness/screen/style.cpp
-    ../examples/tuiHarness/screen/text.cpp
-    ../examples/tuiHarness/shell/interaction.cpp
+    ../examples/tuiHarness/domain/commands.cpp
+    ../examples/tuiHarness/domain/model.cpp
+    ../examples/tuiHarness/presentation/canvas.cpp
+    ../examples/tuiHarness/presentation/cell.cpp
+    ../examples/tuiHarness/presentation/diff.cpp
+    ../examples/tuiHarness/presentation/render.cpp
+    ../examples/tuiHarness/presentation/selection.cpp
+    ../examples/tuiHarness/presentation/style.cpp
+    ../examples/tuiHarness/presentation/text.cpp
+    ../examples/tuiHarness/application/interaction.cpp
     test_facade.cpp
     support/fake_http_transport.h
     support/fake_provider.h)

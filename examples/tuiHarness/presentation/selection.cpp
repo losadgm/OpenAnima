@@ -12,7 +12,7 @@
 #include "cell.h"
 #include "style.h"
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 namespace {
 
@@ -267,4 +267,4 @@ int Clicks::press(std::size_t row, std::size_t column, std::chrono::steady_clock
     return m_count;
 }
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

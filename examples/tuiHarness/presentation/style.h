@@ -6,7 +6,7 @@
 #include <array>
 #include <cstdint>
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 /// A colour the terminal can paint: its own default, a palette index, or 24-bit RGB.
 struct Color {
@@ -147,4 +147,4 @@ namespace Palette {
 
 }  // namespace Palette
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

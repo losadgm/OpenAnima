@@ -3,9 +3,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "screen/cell.h"
-#include "screen/style.h"
-#include "screen/text.h"
+#include "presentation/cell.h"
+#include "presentation/style.h"
+#include "presentation/text.h"
 #include "tui_test_support.h"
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
@@ -132,10 +132,12 @@ TEST_CASE("resizing keeps what fits and drops the rest") {
 }
 
 TEST_CASE("measuring counts what the terminal shows") {
-    CHECK(OpenAnimaTui::Screen::measure("abc") == 3);
-    CHECK(OpenAnimaTui::Screen::measure("ca\u00f1on") == 5);    // The tilde is part of the letter.
-    CHECK(OpenAnimaTui::Screen::measure("\u65e5\u672c") == 4);  // Two ideographs, four columns.
-    CHECK(OpenAnimaTui::Screen::measure("n\u0303") == 1);       // A combining mark adds none.
+    CHECK(OpenAnimaTui::Presentation::measure("abc") == 3);
+    CHECK(OpenAnimaTui::Presentation::measure("ca\u00f1on") ==
+          5);  // The tilde is part of the letter.
+    CHECK(OpenAnimaTui::Presentation::measure("\u65e5\u672c") ==
+          4);                                                    // Two ideographs, four columns.
+    CHECK(OpenAnimaTui::Presentation::measure("n\u0303") == 1);  // A combining mark adds none.
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

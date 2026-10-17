@@ -15,13 +15,13 @@
 #include "style.h"
 #include "text.h"
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 namespace {
 
-using App::Message;
-using App::Model;
-using App::Role;
+using Domain::Message;
+using Domain::Model;
+using Domain::Role;
 using Metrics::BoxWidth;
 using Metrics::HintIndent;
 using Metrics::HintPad;
@@ -216,7 +216,7 @@ std::vector<TranscriptRow> transcriptRows(const Model& model, std::size_t width)
 /// @return The row, painted later.
 std::string statusRow(const Model& model) {
     if (model.busy) {
-        const std::size_t tenths = App::elapsedTenths(model);
+        const std::size_t tenths = Domain::elapsedTenths(model);
         const std::size_t frame = tenths % Glyphs::Spinner.size();
         const std::string tail = model.cancelling ? "   cancelling" : "   esc to cancel";
         return Glyphs::Spinner.at(frame) + std::string{" working "} + std::to_string(tenths / 10) +
@@ -667,7 +667,7 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     const PromptWindow window =
         promptWindow(prompt.rows.size(), position.first, height, model.promptScroll);
 
-    const std::vector<std::string> all = App::hintsFor(model);
+    const std::vector<std::string> all = Domain::hintsFor(model);
     const std::size_t selected = all.empty() ? 0 : std::min(model.hintIndex, all.size() - 1);
     std::size_t first = 0;
     const std::vector<std::string> hints = hintWindow(all, selected, first);
@@ -745,4 +745,4 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     return result;
 }
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

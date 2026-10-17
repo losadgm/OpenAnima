@@ -20,7 +20,7 @@
 
 #include "terminal/terminal.h"
 
-namespace OpenAnimaTui::App {
+namespace OpenAnimaTui::Domain {
 
 using OpenAnima::Core::Event;
 
@@ -118,4 +118,4 @@ std::vector<std::string> hintsFor(const Model& model);
 /// @return Tenths of a second, or 0 when nothing is running.
 std::size_t elapsedTenths(const Model& model);
 
-}  // namespace OpenAnimaTui::App
+}  // namespace OpenAnimaTui::Domain

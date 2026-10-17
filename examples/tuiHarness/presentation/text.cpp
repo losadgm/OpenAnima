@@ -7,7 +7,7 @@
 #include <string_view>
 #include <vector>
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 namespace {
 
@@ -270,4 +270,4 @@ std::vector<std::string> wrap(std::string_view text, std::size_t width) {
     return wrapper.rows;
 }
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

@@ -10,7 +10,7 @@
 #include "cell.h"
 #include "style.h"
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 /// A rectangle of cells: the only thing the client paints on.
 ///
@@ -99,4 +99,4 @@ private:
     std::vector<Cell> m_cells;
 };
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

@@ -9,11 +9,11 @@
 
 #include "OpenAnima/Core/Event.h"
 
-#include "app/commands.h"
-#include "app/model.h"
-#include "screen/render.h"
-#include "screen/selection.h"
-#include "screen/text.h"
+#include "domain/commands.h"
+#include "domain/model.h"
+#include "presentation/render.h"
+#include "presentation/selection.h"
+#include "presentation/text.h"
 #include "tui_test_support.h"
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
@@ -21,25 +21,25 @@
 namespace {
 
 using OpenAnimaTui::Key;
-using OpenAnimaTui::App::Effect;
-using OpenAnimaTui::App::Model;
-using OpenAnimaTui::Screen::render;
-using OpenAnimaTui::Screen::RenderResult;
-using OpenAnimaTui::Screen::Scope;
-using OpenAnimaTui::Screen::Selection;
-using OpenAnimaTui::Screen::Metrics::MaxHints;
+using OpenAnimaTui::Domain::Effect;
+using OpenAnimaTui::Domain::Model;
+using OpenAnimaTui::Presentation::render;
+using OpenAnimaTui::Presentation::RenderResult;
+using OpenAnimaTui::Presentation::Scope;
+using OpenAnimaTui::Presentation::Selection;
+using OpenAnimaTui::Presentation::Metrics::MaxHints;
 using namespace OpenAnimaTui::Tests;
 
 constexpr std::size_t ScrollStep = 5;
 
 void type(Model& model, const std::string& text) {
     for (const char value : text) {
-        (void)OpenAnimaTui::App::update(model, Key{Key::Kind::Character, value}, ScrollStep);
+        (void)OpenAnimaTui::Domain::update(model, Key{Key::Kind::Character, value}, ScrollStep);
     }
 }
 
 std::vector<Effect> press(Model& model, const Key::Kind kind) {
-    return OpenAnimaTui::App::update(model, Key{kind, 0}, ScrollStep);
+    return OpenAnimaTui::Domain::update(model, Key{kind, 0}, ScrollStep);
 }
 
 void submit(Model& model, const std::string& text) {
@@ -51,13 +51,13 @@ void answer(Model& model, const std::string& text) {
     OpenAnima::Core::Event piece;
     piece.kind = OpenAnima::Core::EventKind::Delta;
     piece.text = text;
-    (void)OpenAnimaTui::App::applyEvent(model, piece);
+    (void)OpenAnimaTui::Domain::applyEvent(model, piece);
 
     OpenAnima::Core::Event done;
     done.kind = OpenAnima::Core::EventKind::Finished;
     done.completion.text = text;
     done.completion.finishReason = OpenAnima::Core::FinishReason::Stop;
-    (void)OpenAnimaTui::App::applyEvent(model, done);
+    (void)OpenAnimaTui::Domain::applyEvent(model, done);
 }
 
 /// A conversation with eight turns in it, so that it does not fit on a short screen.
@@ -96,8 +96,8 @@ std::vector<std::size_t> raisedRows(const RenderResult& rendered) {
 
 /// Whether the cell holds the stroke the scrollbar is drawn with.
 bool isBarCell(const Cell& cell) {
-    return !cell.isBlank() &&
-           std::string(cell.glyph.data(), cell.length) == OpenAnimaTui::Screen::Glyphs::ScrollBar;
+    return !cell.isBlank() && std::string(cell.glyph.data(), cell.length) ==
+                                  OpenAnimaTui::Presentation::Glyphs::ScrollBar;
 }
 
 /// @return How many rows the conversation occupies: everything above the frame of the prompt,
@@ -147,7 +147,7 @@ TEST_CASE("no row of the screen is wider than the terminal") {
     CHECK(rendered.frame.width() == 24);
     CHECK(rendered.frame.height() == 6);
     for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
-        CHECK(OpenAnimaTui::Screen::measure(readRow(rendered.frame, row)) == 24);
+        CHECK(OpenAnimaTui::Presentation::measure(readRow(rendered.frame, row)) == 24);
     }
 }
 
@@ -166,7 +166,7 @@ TEST_CASE("the prompt sits inside a frame, with the caret in it") {
     CHECK(rendered.frame.at(7, 1).style.background.equals(Palette::panelColor()));
     CHECK(rendered.frame.at(9, 0).style.background.kind == Color::Kind::Default);
 
-    const OpenAnimaTui::Screen::Cell& marker = rendered.frame.at(7, 2);
+    const OpenAnimaTui::Presentation::Cell& marker = rendered.frame.at(7, 2);
     CHECK(std::string(marker.glyph.data(), marker.length) == "\u2771");
     CHECK(marker.style.foreground.equals(Palette::accent().foreground));
     CHECK(marker.style.background.equals(Palette::panelColor()));
@@ -216,7 +216,7 @@ TEST_CASE("the status line is cut with an ellipsis when it does not fit") {
     const std::string row = readRow(rendered.frame, rendered.caretRow + 2);
 
     CHECK(row.rfind("...", row.size() - 3) != std::string::npos);
-    CHECK(OpenAnimaTui::Screen::measure(row) == 30);
+    CHECK(OpenAnimaTui::Presentation::measure(row) == 30);
 }
 
 TEST_CASE("a long prompt wraps and the caret follows it down") {
@@ -299,10 +299,10 @@ TEST_CASE("the hints float over the conversation and the selected one stands out
 TEST_CASE("the hint panel follows the selection when the list does not fit") {
     Model model;
     type(model, "/");
-    REQUIRE(OpenAnimaTui::App::commands().size() > MaxHints);
+    REQUIRE(OpenAnimaTui::Domain::commands().size() > MaxHints);
 
     // Walk to the last command, which used to be cut off the bottom of the panel.
-    for (std::size_t step = 0; step + 1 < OpenAnimaTui::App::commands().size(); ++step) {
+    for (std::size_t step = 0; step + 1 < OpenAnimaTui::Domain::commands().size(); ++step) {
         (void)press(model, Key::Kind::ArrowDown);
     }
     const RenderResult rendered = render(model, 40, 12);
@@ -354,7 +354,7 @@ TEST_CASE("a reply is painted as one block, named on its first row") {
     OpenAnima::Core::Event piece;
     piece.kind = OpenAnima::Core::EventKind::Delta;
     piece.text = "Good evening.";
-    (void)OpenAnimaTui::App::applyEvent(model, piece);
+    (void)OpenAnimaTui::Domain::applyEvent(model, piece);
 
     OpenAnima::Core::Event done;
     done.kind = OpenAnima::Core::EventKind::Finished;
@@ -364,7 +364,7 @@ TEST_CASE("a reply is painted as one block, named on its first row") {
     reply.dialogue = "Good evening.";
     reply.actions.push_back({"emote", nlohmann::ordered_json{{"kind", "nod"}}});
     done.reply = reply;
-    (void)OpenAnimaTui::App::applyEvent(model, done);
+    (void)OpenAnimaTui::Domain::applyEvent(model, done);
 
     const RenderResult rendered = render(model, 60, 13);
 
@@ -400,7 +400,7 @@ TEST_CASE("a turn in flight is shown as the answer arrives") {
     OpenAnima::Core::Event piece;
     piece.kind = OpenAnima::Core::EventKind::Delta;
     piece.text = "waiting";
-    (void)OpenAnimaTui::App::applyEvent(model, piece);
+    (void)OpenAnimaTui::Domain::applyEvent(model, piece);
 
     const std::string screen = readAll(render(model, 40, 12).frame);
     CHECK(screen.find("waiting") != std::string::npos);
@@ -504,9 +504,9 @@ TEST_CASE("a picking of the prompt stays where it is, whether the text scrolls o
 TEST_CASE("raw mode names the npc in the colour of a speaker, not in the quiet one") {
     Model model;
     model.raw = true;
-    model.messages.push_back({OpenAnimaTui::App::Role::Speaker, "npc 1:", false});
+    model.messages.push_back({OpenAnimaTui::Domain::Role::Speaker, "npc 1:", false});
     model.messages.push_back(
-        {OpenAnimaTui::App::Role::System, R"({"dialogue": "Good evening."})", false});
+        {OpenAnimaTui::Domain::Role::System, R"({"dialogue": "Good evening."})", false});
 
     const RenderResult rendered = render(model, 40, 10);
     CHECK(readRow(rendered.frame, 0).rfind("npc 1:", 0) == 0);
@@ -538,7 +538,7 @@ TEST_CASE("a draft taller than the screen keeps a window of itself and a bar") {
 
     // It lights up under the pointer, the same as the ones of the conversation and the hints.
     const RenderResult hovered =
-        render(model, 40, 10, Selection{}, OpenAnimaTui::Screen::Pointer{true, 7, column});
+        render(model, 40, 10, Selection{}, OpenAnimaTui::Presentation::Pointer{true, 7, column});
     CHECK(hovered.frame.at(7, column).style.bold);
     CHECK(hovered.frame.at(7, column).style.foreground.equals(Palette::accent().foreground));
     CHECK_FALSE(hovered.frame.at(1, column).style.bold);  // The track stays the track.
@@ -574,12 +574,12 @@ TEST_CASE("a hint lights up under the pointer, and the rows of the others do not
     const RenderResult plain = render(model, 40, 12);
     REQUIRE(plain.hintCount > 1);
     const std::size_t row = plain.hintRow + 1;
-    const std::size_t column = OpenAnimaTui::Screen::Metrics::HintIndent;
+    const std::size_t column = OpenAnimaTui::Presentation::Metrics::HintIndent;
 
     CHECK_FALSE(plain.frame.at(row, column).style.bold);
 
     const RenderResult hovered =
-        render(model, 40, 12, Selection{}, OpenAnimaTui::Screen::Pointer{true, row, 0});
+        render(model, 40, 12, Selection{}, OpenAnimaTui::Presentation::Pointer{true, row, 0});
     CHECK(hovered.frame.at(row, column).style.bold);
     CHECK(hovered.frame.at(row, column).style.underline);
     CHECK(hovered.frame.at(row, column).style.foreground.equals(Palette::accent().foreground));
@@ -591,41 +591,41 @@ TEST_CASE(
     Model model;
     for (int index = 0; index < 60; ++index) {
         model.messages.push_back(
-            {OpenAnimaTui::App::Role::User, "row " + std::to_string(index), false});
+            {OpenAnimaTui::Domain::Role::User, "row " + std::to_string(index), false});
     }
 
     const RenderResult plain = render(model, 40, 12);
     REQUIRE(plain.maxScrollOffset > 0);
     const std::size_t column = 39;
     // Nothing is scrolled, so the view is at the bottom and so is the thumb.
-    const std::size_t thumb = OpenAnimaTui::Screen::thumbRow(plain.transcriptRows, plain.scrollRows,
-                                                             plain.maxScrollOffset);
+    const std::size_t thumb = OpenAnimaTui::Presentation::thumbRow(
+        plain.transcriptRows, plain.scrollRows, plain.maxScrollOffset);
     REQUIRE(thumb + 1 == plain.scrollRows);
     CHECK(plain.frame.at(thumb, column).style.foreground.equals(Palette::muted().foreground));
     CHECK_FALSE(plain.frame.at(thumb, column).style.bold);
 
-    const RenderResult hovered =
-        render(model, 40, 12, Selection{}, OpenAnimaTui::Screen::Pointer{true, thumb, column});
+    const RenderResult hovered = render(model, 40, 12, Selection{},
+                                        OpenAnimaTui::Presentation::Pointer{true, thumb, column});
     CHECK(hovered.frame.at(thumb, column).style.foreground.equals(Palette::accent().foreground));
     CHECK(hovered.frame.at(thumb, column).style.bold);
     CHECK(hovered.frame.at(0, column).style.dim);  // The track stays the track.
 }
 
 TEST_CASE("a row of the bar maps back to the scroll position the thumb stands for") {
-    CHECK(OpenAnimaTui::Screen::thumbRow(100, 10, 0) == 0);
-    CHECK(OpenAnimaTui::Screen::thumbRow(100, 10, 40) == 4);
-    CHECK(OpenAnimaTui::Screen::thumbRow(100, 10, 90) == 9);
-    CHECK(OpenAnimaTui::Screen::firstRowForThumb(100, 10, 0) == 0);
-    CHECK(OpenAnimaTui::Screen::firstRowForThumb(100, 10, 4) == 40);
-    CHECK(OpenAnimaTui::Screen::firstRowForThumb(100, 10, 9) == 90);
-    CHECK(OpenAnimaTui::Screen::firstRowForThumb(100, 10, 99) == 90);
+    CHECK(OpenAnimaTui::Presentation::thumbRow(100, 10, 0) == 0);
+    CHECK(OpenAnimaTui::Presentation::thumbRow(100, 10, 40) == 4);
+    CHECK(OpenAnimaTui::Presentation::thumbRow(100, 10, 90) == 9);
+    CHECK(OpenAnimaTui::Presentation::firstRowForThumb(100, 10, 0) == 0);
+    CHECK(OpenAnimaTui::Presentation::firstRowForThumb(100, 10, 4) == 40);
+    CHECK(OpenAnimaTui::Presentation::firstRowForThumb(100, 10, 9) == 90);
+    CHECK(OpenAnimaTui::Presentation::firstRowForThumb(100, 10, 99) == 90);
 }
 
 TEST_CASE("the hints float on a panel of their own that leaves the conversation in view") {
     Model model;
     for (int index = 0; index < 20; ++index) {
         model.messages.push_back(
-            {OpenAnimaTui::App::Role::User, "row " + std::to_string(index), false});
+            {OpenAnimaTui::Domain::Role::User, "row " + std::to_string(index), false});
     }
     const RenderResult quiet = render(model, 100, 12);
     type(model, "/");
@@ -635,11 +635,11 @@ TEST_CASE("the hints float on a panel of their own that leaves the conversation 
     // leaves the rest of the screen to what was said.
     CHECK(hinted.scrollRows == quiet.scrollRows);
     std::size_t longest = 0;
-    for (const std::string& hint : OpenAnimaTui::App::hintsFor(model)) {
-        longest = std::max(longest, OpenAnimaTui::Screen::measure(hint));
+    for (const std::string& hint : OpenAnimaTui::Domain::hintsFor(model)) {
+        longest = std::max(longest, OpenAnimaTui::Presentation::measure(hint));
     }
-    CHECK(hinted.hintColumns == OpenAnimaTui::Screen::Metrics::HintIndent + longest +
-                                    OpenAnimaTui::Screen::Metrics::HintPad);
+    CHECK(hinted.hintColumns == OpenAnimaTui::Presentation::Metrics::HintIndent + longest +
+                                    OpenAnimaTui::Presentation::Metrics::HintPad);
     REQUIRE(hinted.hintCount > 0);
     CHECK(hinted.hintRow + hinted.hintCount == hinted.scrollRows);
     CHECK(hinted.frame.at(hinted.hintRow, 0).style.background.equals(Palette::raisedColor()));
@@ -651,11 +651,11 @@ TEST_CASE("the panel of hints is as wide as its longest command, or as the scree
     Model model;
     type(model, "/");
     std::size_t longest = 0;
-    for (const std::string& hint : OpenAnimaTui::App::hintsFor(model)) {
-        longest = std::max(longest, OpenAnimaTui::Screen::measure(hint));
+    for (const std::string& hint : OpenAnimaTui::Domain::hintsFor(model)) {
+        longest = std::max(longest, OpenAnimaTui::Presentation::measure(hint));
     }
-    const std::size_t needed = OpenAnimaTui::Screen::Metrics::HintIndent + longest +
-                               OpenAnimaTui::Screen::Metrics::HintPad;
+    const std::size_t needed = OpenAnimaTui::Presentation::Metrics::HintIndent + longest +
+                               OpenAnimaTui::Presentation::Metrics::HintPad;
 
     // The command, its indent and a column of margin, whatever the screen is.
     CHECK(render(model, 200, 12).hintColumns == needed);
@@ -678,20 +678,21 @@ TEST_CASE("the panel of hints has a bar of its own, which lights up under the po
         plain.frame.at(plain.hintRow, column).style.foreground.equals(Palette::muted().foreground));
     CHECK(plain.frame.at(plain.hintRow + plain.hintCount - 1, column).style.dim);
 
-    const RenderResult hovered = render(model, 40, 12, Selection{},
-                                        OpenAnimaTui::Screen::Pointer{true, plain.hintRow, column});
+    const RenderResult hovered =
+        render(model, 40, 12, Selection{},
+               OpenAnimaTui::Presentation::Pointer{true, plain.hintRow, column});
     CHECK(hovered.frame.at(plain.hintRow, column)
               .style.foreground.equals(Palette::accent().foreground));
     CHECK(hovered.frame.at(plain.hintRow, column).style.bold);
 }
 
 TEST_CASE("a row of the bar of the hints stands for one of them") {
-    CHECK(OpenAnimaTui::Screen::hintThumbRow(8, 6, 0) == 0);
-    CHECK(OpenAnimaTui::Screen::hintThumbRow(8, 6, 7) == 2);
-    CHECK(OpenAnimaTui::Screen::hintAtThumbRow(8, 6, 0) == 0);
-    CHECK(OpenAnimaTui::Screen::hintAtThumbRow(8, 6, 1) == 4);
-    CHECK(OpenAnimaTui::Screen::hintAtThumbRow(8, 6, 2) == 7);
-    CHECK(OpenAnimaTui::Screen::hintAtThumbRow(6, 6, 5) == 0);  // Nothing to scroll.
+    CHECK(OpenAnimaTui::Presentation::hintThumbRow(8, 6, 0) == 0);
+    CHECK(OpenAnimaTui::Presentation::hintThumbRow(8, 6, 7) == 2);
+    CHECK(OpenAnimaTui::Presentation::hintAtThumbRow(8, 6, 0) == 0);
+    CHECK(OpenAnimaTui::Presentation::hintAtThumbRow(8, 6, 1) == 4);
+    CHECK(OpenAnimaTui::Presentation::hintAtThumbRow(8, 6, 2) == 7);
+    CHECK(OpenAnimaTui::Presentation::hintAtThumbRow(6, 6, 5) == 0);  // Nothing to scroll.
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

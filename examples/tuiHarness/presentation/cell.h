@@ -10,7 +10,7 @@
 
 #include "style.h"
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 /// One cell of the screen.
 ///
@@ -49,4 +49,4 @@ struct Cell {
     [[nodiscard]] bool equals(const Cell& other) const;
 };
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

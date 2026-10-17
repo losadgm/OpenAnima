@@ -6,8 +6,8 @@
 #include <cstddef>
 #include <optional>
 
-#include "screen/selection.h"
-#include "screen/style.h"
+#include "presentation/selection.h"
+#include "presentation/style.h"
 #include "tui_test_support.h"
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
@@ -15,16 +15,16 @@
 namespace {
 
 using namespace OpenAnimaTui::Tests;
-using OpenAnimaTui::Screen::Bounds;
-using OpenAnimaTui::Screen::boundsOf;
-using OpenAnimaTui::Screen::Clicks;
-using OpenAnimaTui::Screen::coveredRows;
-using OpenAnimaTui::Screen::lineAt;
-using OpenAnimaTui::Screen::RowSpan;
-using OpenAnimaTui::Screen::Scope;
-using OpenAnimaTui::Screen::selectedText;
-using OpenAnimaTui::Screen::Selection;
-using OpenAnimaTui::Screen::wordAt;
+using OpenAnimaTui::Presentation::Bounds;
+using OpenAnimaTui::Presentation::boundsOf;
+using OpenAnimaTui::Presentation::Clicks;
+using OpenAnimaTui::Presentation::coveredRows;
+using OpenAnimaTui::Presentation::lineAt;
+using OpenAnimaTui::Presentation::RowSpan;
+using OpenAnimaTui::Presentation::Scope;
+using OpenAnimaTui::Presentation::selectedText;
+using OpenAnimaTui::Presentation::Selection;
+using OpenAnimaTui::Presentation::wordAt;
 
 /// A frame with three lines of text on it.
 Canvas painted() {
@@ -295,7 +295,7 @@ TEST_CASE("what the client draws for itself is not copied") {
     frame.put(1, 2, "\u2771", textStyle);
     frame.put(1, 4, "hi", textStyle);
     frame.put(2, 0, "\U0001FB7C\u2581\u2581", frameStyle);
-    frame.put(1, 11, OpenAnimaTui::Screen::Glyphs::ScrollBar, Palette::muted());
+    frame.put(1, 11, OpenAnimaTui::Presentation::Glyphs::ScrollBar, Palette::muted());
 
     Selection all;
     all.begin(0, 0);

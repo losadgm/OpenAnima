@@ -247,6 +247,21 @@ for the answer, and says so.
 
 ### How it is built
 
+- **The client is four layers, and a dependency only points down.** `domain/` holds the model,
+  the commands and the keys: pure rules, with no terminal, no clock and no position in them.
+  `presentation/` turns a model into a frame: a canvas of cells, and nothing else. `application/`
+  is what has to happen between the two: the session runs a turn of the loop, the interaction
+  turns keys and pointer positions into changes of the model, and the brains carry the effects
+  out. `terminal/` is the only layer that talks to the console. `main.cpp` is the composition
+  root: it reads the configuration, opens the terminal and runs the session, and it is the only
+  place that knows all four.
+- **The patterns that earned their place.** The terminal is an interface with a Unix and a
+  Windows implementation, which is why the loop can be tested without a console. What the button
+  is doing is one state (`Drag`: nothing, a selection, one of the three bars) instead of four
+  flags that could disagree. The renderer is a facade over the parts of a frame, and the session
+  is the one that owns the order they are asked in. Everything else is plain functions over
+  values, which is the pattern that needs no name: a frame is a value, a style is a value, and a
+  selection is a value.
 - **A terminal layer of its own**, with two implementations: raw mode and ANSI sequences on
   Unix (termios), and the console API with virtual terminal sequences on Windows. Windows is a
   target from the start rather than a port to attempt later. It is `terminal/terminal.h` with
@@ -254,13 +269,13 @@ for the answer, and says so.
   size of the window, the alternate screen and writing to the terminal come from. Writing never
   waits for the terminal: what does not fit is kept and sent on the next turn of the loop, so a
   terminal that has stopped reading cannot freeze the client and leave the keyboard unread.
-- **The rest is a functional core and an imperative shell.** Under `app/` the model, the
+- **The rest is a functional core and an imperative shell.** Under `domain/` the model, the
   commands and the keys are pure: `update(model, key)` returns what to do as a list of
   effects, and `applyEvent(model, event)` folds what came back from the provider into the same
-  model. Under `screen/` the rendering is pure too: cells into a canvas, and the canvas into
-  rows. `main.cpp` is the shell, and it is the only place that knows about files, sockets and
-  clocks: it runs the effects against the brains, drains the events, and writes a frame when
-  something changed and the one before it has arrived.
+  model. Under `presentation/` the rendering is pure too: cells into a canvas, and the canvas
+  into rows. `application/` is the shell: the session runs the effects against the brains,
+  drains the events, and writes a frame when something changed and the one before it has
+  arrived.
 - **The screen is a grid of cells, not a string of escapes.** A style is a value (a colour, a
   background, the attributes) and a cell holds a character and the style it is painted with,
   so two frames can be compared before anything is written. Text is placed by columns: a wide
@@ -290,10 +305,11 @@ for the answer, and says so.
 
 | Where | What is in it |
 | --- | --- |
-| `app/` | The model, the commands and the keys: what a key does, and what to ask the shell for |
-| `screen/` | The canvas, the cells, the colours, the text measurement and the frame writer |
+| `domain/` | The model, the commands and the keys: what a key does, and what to ask the shell for |
+| `presentation/` | The canvas, the cells, the colours, the text measurement, the picking and the frame writer |
+| `application/` | The session, the pointer and the brains: the loop, and what a click or a wheel notch means |
 | `terminal/` | Raw mode, key decoding, the size of the window and writing without waiting |
-| `main.cpp` | The shell: brains, effects, events, and the loop that decides when to draw |
+| `main.cpp` | The composition root: configuration, terminal, session |
 
 ### How it is checked
 

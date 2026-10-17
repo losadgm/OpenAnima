@@ -1,6 +1,6 @@
 #include "style.h"
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 namespace {
 
@@ -133,4 +133,4 @@ Color raisedColor() {
 
 }  // namespace Palette
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

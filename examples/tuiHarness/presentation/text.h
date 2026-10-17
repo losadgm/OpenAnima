@@ -9,7 +9,7 @@
 #include <string_view>
 #include <vector>
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 /// Length in bytes of the UTF-8 sequence that starts with a byte.
 /// @param byte First byte of the sequence.
@@ -54,4 +54,4 @@ namespace OpenAnimaTui::Screen {
 /// @return The rows, at least one.
 [[nodiscard]] std::vector<std::string> wrap(std::string_view text, std::size_t width);
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

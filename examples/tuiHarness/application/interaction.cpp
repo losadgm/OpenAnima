@@ -8,12 +8,12 @@
 #include <utility>
 #include <vector>
 
-#include "app/model.h"
-#include "screen/render.h"
-#include "screen/selection.h"
+#include "domain/model.h"
+#include "presentation/render.h"
+#include "presentation/selection.h"
 #include "terminal/terminal.h"
 
-namespace OpenAnimaTui::Shell {
+namespace OpenAnimaTui::Application {
 
 namespace {
 
@@ -36,7 +36,7 @@ bool scrollsTranscript(Key::Kind kind) {
 /// @param row Row the pointer is on.
 /// @return Whether the pointer is over the bar of the conversation.
 bool overScrollBar(const Interaction& interaction, std::size_t column, std::size_t row) {
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     return shape.maxScrollOffset > 0 && row < shape.scrollRows && column + 1 == shape.frame.width();
 }
 
@@ -46,13 +46,14 @@ bool overScrollBar(const Interaction& interaction, std::size_t column, std::size
 /// @return Whether the pointer is over the bar of the prompt, which is only there when the
 ///         draft is taller than the panel that shows it.
 bool overPromptBar(const Interaction& interaction, std::size_t column, std::size_t row) {
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     const std::size_t width = shape.frame.width();
     if (shape.promptTotal <= shape.promptRows || shape.promptRows == 0 ||
-        width < Screen::Metrics::BoxWidth + Screen::Metrics::PanelPad) {
+        width < Presentation::Metrics::BoxWidth + Presentation::Metrics::PanelPad) {
         return false;
     }
-    const std::size_t barColumn = width - Screen::Metrics::BoxWidth - Screen::Metrics::PanelPad;
+    const std::size_t barColumn =
+        width - Presentation::Metrics::BoxWidth - Presentation::Metrics::PanelPad;
     return column == barColumn && row > shape.scrollRows &&
            row <= shape.scrollRows + shape.promptRows;
 }
@@ -61,7 +62,7 @@ bool overPromptBar(const Interaction& interaction, std::size_t column, std::size
 /// @param row Row the pointer is on.
 /// @return Whether the pointer is over the box of the prompt, borders included.
 bool overPromptBox(const Interaction& interaction, std::size_t row) {
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     return row >= shape.scrollRows && row < shape.scrollRows + shape.promptRows + 2;
 }
 
@@ -70,10 +71,11 @@ bool overPromptBox(const Interaction& interaction, std::size_t row) {
 /// @param model The model, which holds where the panel starts.
 /// @param row Row the pointer is on.
 void dragPromptBarTo(const Interaction& interaction, Model& model, std::size_t row) {
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     const std::size_t top = shape.scrollRows + 1;
     const std::size_t offset = row >= top ? row - top : 0;
-    model.promptScroll = Screen::firstRowForThumb(shape.promptTotal, shape.promptRows, offset);
+    model.promptScroll =
+        Presentation::firstRowForThumb(shape.promptTotal, shape.promptRows, offset);
 }
 
 /// @param interaction What the pointer has done to the screen.
@@ -82,7 +84,7 @@ void dragPromptBarTo(const Interaction& interaction, Model& model, std::size_t r
 /// @return Whether the pointer is over the bar of the hints, which is only there when the list
 ///         is longer than the panel.
 bool overHintBar(const Interaction& interaction, std::size_t column, std::size_t row) {
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     return shape.hintTotal > shape.hintCount && shape.hintCount > 0 &&
            column + 1 == shape.hintColumns && row >= shape.hintRow &&
            row < shape.hintRow + shape.hintCount;
@@ -94,7 +96,7 @@ bool overHintBar(const Interaction& interaction, std::size_t column, std::size_t
 /// @return The hint the pointer is over, or nothing when it is not on the panel.
 std::optional<std::size_t> hintAt(const Interaction& interaction, std::size_t column,
                                   std::size_t row) {
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     if (column + 1 > shape.hintColumns || row < shape.hintRow ||
         row >= shape.hintRow + shape.hintCount) {
         return std::nullopt;
@@ -106,7 +108,7 @@ std::optional<std::size_t> hintAt(const Interaction& interaction, std::size_t co
 /// @param model The model, which holds the selection.
 /// @param forward Whether it goes on to the next hint or back to the one before.
 void stepHint(Model& model, bool forward) {
-    const std::size_t count = App::hintsFor(model).size();
+    const std::size_t count = Domain::hintsFor(model).size();
     if (count == 0) {
         return;
     }
@@ -123,9 +125,9 @@ void stepHint(Model& model, bool forward) {
 /// @param model The model, which holds the selection.
 /// @param row Row the pointer is on.
 void dragHintBarTo(const Interaction& interaction, Model& model, std::size_t row) {
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     const std::size_t offset = row >= shape.hintRow ? row - shape.hintRow : 0;
-    model.hintIndex = Screen::hintAtThumbRow(shape.hintTotal, shape.hintCount, offset);
+    model.hintIndex = Presentation::hintAtThumbRow(shape.hintTotal, shape.hintCount, offset);
 }
 
 /// Puts the thumb of the bar where the pointer is, keeping the row it was grabbed by.
@@ -133,14 +135,14 @@ void dragHintBarTo(const Interaction& interaction, Model& model, std::size_t row
 /// @param model The model, which holds the offset.
 /// @param row Row the pointer is on.
 void dragBarTo(Interaction& interaction, Model& model, std::size_t row) {
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     const std::size_t range = shape.maxScrollOffset;
     const std::size_t viewRows = shape.scrollRows;
-    if (range == 0 || Screen::thumbRow(shape.transcriptRows, viewRows, range) == 0) {
+    if (range == 0 || Presentation::thumbRow(shape.transcriptRows, viewRows, range) == 0) {
         return;  // There is no room for the thumb to move, so there is nothing to drag.
     }
     const std::size_t top = row >= interaction.barGrab ? row - interaction.barGrab : 0;
-    const std::size_t start = Screen::firstRowForThumb(shape.transcriptRows, viewRows, top);
+    const std::size_t start = Presentation::firstRowForThumb(shape.transcriptRows, viewRows, top);
     model.scrollOffset = range - std::min(start, range);
 }
 
@@ -150,15 +152,15 @@ void dragBarTo(Interaction& interaction, Model& model, std::size_t row) {
 /// @param model The model, which holds the offset.
 /// @param row Row the pointer is on.
 void grabBar(Interaction& interaction, Model& model, std::size_t row) {
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     const std::size_t range = shape.maxScrollOffset;
     const std::size_t viewRows = shape.scrollRows;
-    const std::size_t travel = Screen::thumbRow(shape.transcriptRows, viewRows, range);
+    const std::size_t travel = Presentation::thumbRow(shape.transcriptRows, viewRows, range);
     const std::size_t thumb = viewRows > travel ? viewRows - travel : 1;
     const std::size_t start = range - std::min(model.scrollOffset, range);
-    const std::size_t top = Screen::thumbRow(shape.transcriptRows, viewRows, start);
+    const std::size_t top = Presentation::thumbRow(shape.transcriptRows, viewRows, start);
     interaction.barGrab = (row >= top && row < top + thumb) ? row - top : thumb / 2;
-    interaction.pullingBar = true;
+    interaction.drag = Interaction::Drag::ConversationBar;
     dragBarTo(interaction, model, row);
 }
 
@@ -178,16 +180,18 @@ void movePointer(Interaction& interaction, std::size_t row, std::size_t column) 
 /// @param row Row the pointer is on.
 /// @return Where a selection made on that row lives: the conversation scrolls under it, and
 ///         the prompt and what surrounds it do not.
-Screen::Scope scopeAt(const Interaction& interaction, std::size_t row) {
-    return row < interaction.shape.scrollRows ? Screen::Scope::Conversation : Screen::Scope::Screen;
+Presentation::Scope scopeAt(const Interaction& interaction, std::size_t row) {
+    return row < interaction.shape.scrollRows ? Presentation::Scope::Conversation
+                                              : Presentation::Scope::Screen;
 }
 
 /// @param interaction What the pointer has done to the screen.
 /// @param selection What is picked out.
 /// @return Rows of the screen the scope of the selection takes, which is as far as it reaches.
-Screen::Bounds rowsOf(const Interaction& interaction, const Screen::Selection& selection) {
-    return Screen::boundsOf(selection.scope(), interaction.shape.scrollRows,
-                            interaction.shape.frame.height());
+Presentation::Bounds rowsOf(const Interaction& interaction,
+                            const Presentation::Selection& selection) {
+    return Presentation::boundsOf(selection.scope(), interaction.shape.scrollRows,
+                                  interaction.shape.frame.height());
 }
 
 /// Copies what the mouse picked out, to the terminal and to hand for a later paste.
@@ -195,10 +199,10 @@ Screen::Bounds rowsOf(const Interaction& interaction, const Screen::Selection& s
 /// @param painted The frame on screen, which is where the text is read from.
 /// @param clipboard Where the text is kept for the next paste.
 /// @param terminal Terminal the clipboard sequence goes to.
-void copySelection(const Interaction& interaction, const Screen::Canvas& painted,
+void copySelection(const Interaction& interaction, const Presentation::Canvas& painted,
                    std::string& clipboard, Terminal& terminal) {
-    clipboard = Screen::selectedText(painted, interaction.selection,
-                                     rowsOf(interaction, interaction.selection));
+    clipboard = Presentation::selectedText(painted, interaction.selection,
+                                           rowsOf(interaction, interaction.selection));
     if (clipboard.empty()) {
         return;
     }
@@ -213,7 +217,7 @@ void insertText(Model& model, const std::string& text, std::size_t scrollStep) {
     for (const char value : text) {
         const Key key =
             value == '\n' ? Key{Key::Kind::CtrlEnter, 0} : Key{Key::Kind::Character, value};
-        (void)App::update(model, key, scrollStep);
+        (void)Domain::update(model, key, scrollStep);
     }
 }
 
@@ -241,11 +245,11 @@ struct EdgeDrag {
 /// @return What the drag is pushing, which is nothing when the pointer is not holding a
 ///         selection against an edge of the part it belongs to.
 EdgeDrag edgeDragOf(const Interaction& interaction) {
-    if (!interaction.pullingSelection || interaction.selection.empty()) {
+    if (interaction.drag != Interaction::Drag::Selection || interaction.selection.empty()) {
         return {};
     }
-    const Screen::RenderResult& shape = interaction.shape;
-    if (interaction.selection.scope() == Screen::Scope::Conversation) {
+    const Presentation::RenderResult& shape = interaction.shape;
+    if (interaction.selection.scope() == Presentation::Scope::Conversation) {
         if (shape.scrollRows == 0) {
             return {};
         }
@@ -304,11 +308,13 @@ bool autoScrollConversation(Interaction& interaction, Model& model, EdgeScroll d
 /// @param direction Where the draft goes.
 /// @return Whether the panel moved.
 bool autoScrollPrompt(Interaction& interaction, Model& model, EdgeScroll direction) {
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     const std::size_t last = shape.promptTotal - shape.promptRows;
     const std::size_t before = model.promptScroll.value_or(shape.promptFirst);
-    const std::size_t after = direction == EdgeScroll::Earlier ? (before > 0 ? before - 1 : 0)
-                                                               : std::min(before + 1, last);
+    std::size_t after = std::min(before + 1, last);
+    if (direction == EdgeScroll::Earlier) {
+        after = before > 0 ? before - 1 : 0;
+    }
     if (after == before) {
         return false;
     }
@@ -327,11 +333,11 @@ bool autoScrollPrompt(Interaction& interaction, Model& model, EdgeScroll directi
 /// @param model The model, for the hints and the scroll.
 /// @param scrollStep Rows a page scroll takes, as `update` wants.
 void pressAt(const Key& key, Interaction& interaction, Model& model, std::size_t scrollStep) {
-    interaction.pullingSelection = false;
+    interaction.drag = Interaction::Drag::None;
     // The bar of the hints takes hold first: dragging it walks the list the way dragging the
     // bar of the conversation scrolls it.
     if (overHintBar(interaction, key.column, key.row)) {
-        interaction.pullingHintBar = true;
+        interaction.drag = Interaction::Drag::HintBar;
         dragHintBarTo(interaction, model, key.row);
         return;
     }
@@ -340,7 +346,7 @@ void pressAt(const Key& key, Interaction& interaction, Model& model, std::size_t
     if (const std::optional<std::size_t> hint = hintAt(interaction, key.column, key.row);
         hint.has_value()) {
         model.hintIndex = *hint;
-        (void)App::update(model, Key{Key::Kind::Tab, 0}, scrollStep);
+        (void)Domain::update(model, Key{Key::Kind::Tab, 0}, scrollStep);
         interaction.selection.clear();
         return;
     }
@@ -349,7 +355,7 @@ void pressAt(const Key& key, Interaction& interaction, Model& model, std::size_t
         return;
     }
     if (overPromptBar(interaction, key.column, key.row)) {
-        interaction.pullingPromptBar = true;
+        interaction.drag = Interaction::Drag::PromptBar;
         dragPromptBarTo(interaction, model, key.row);
         return;
     }
@@ -358,19 +364,20 @@ void pressAt(const Key& key, Interaction& interaction, Model& model, std::size_t
     // conversation's, which scrolls; the rest of the screen stays where it is.
     const int count =
         interaction.clicks.press(key.row, key.column, std::chrono::steady_clock::now());
-    const Screen::Scope scope = scopeAt(interaction, key.row);
+    const Presentation::Scope scope = scopeAt(interaction, key.row);
     if (count == 2) {
-        interaction.selection = Screen::wordAt(interaction.shape.frame, key.row, key.column, scope);
+        interaction.selection =
+            Presentation::wordAt(interaction.shape.frame, key.row, key.column, scope);
         return;
     }
     if (count > 2) {
-        interaction.selection = Screen::lineAt(interaction.shape.frame, key.row, scope);
+        interaction.selection = Presentation::lineAt(interaction.shape.frame, key.row, scope);
         return;
     }
     interaction.selection.begin(key.row, key.column, scope);
     // A plain press holds the far end of the selection: it is what a drag stretches, and what
     // keeps the text moving while the pointer waits at an edge of the viewport.
-    interaction.pullingSelection = true;
+    interaction.drag = Interaction::Drag::Selection;
 }
 
 /// Follows the pointer with whatever it is holding: a bar, or the far end of the selection.
@@ -378,21 +385,24 @@ void pressAt(const Key& key, Interaction& interaction, Model& model, std::size_t
 /// @param interaction What the pointer has done to the screen.
 /// @param model The model, which holds the scroll and the hints.
 void dragTo(const Key& key, Interaction& interaction, Model& model) {
-    if (interaction.pullingHintBar) {
+    switch (interaction.drag) {
+    case Interaction::Drag::HintBar:
         dragHintBarTo(interaction, model, key.row);
         return;
-    }
-    if (interaction.pullingBar) {
+    case Interaction::Drag::ConversationBar:
         dragBarTo(interaction, model, key.row);
         return;
-    }
-    if (interaction.pullingPromptBar) {
+    case Interaction::Drag::PromptBar:
         dragPromptBarTo(interaction, model, key.row);
         return;
-    }
-    // A word or a row taken by a double click stays as it is: the pointer is still inside it.
-    if (interaction.clicks.count() < 2) {
-        interaction.selection.extend(key.row, key.column);
+    case Interaction::Drag::Selection:
+        // A word or a row taken by a double click stays as it is: the pointer is still inside it.
+        if (interaction.clicks.count() < 2) {
+            interaction.selection.extend(key.row, key.column);
+        }
+        return;
+    case Interaction::Drag::None:
+        return;
     }
 }
 
@@ -413,7 +423,7 @@ bool scrollWith(const Key& key, const Interaction& interaction, Model& model) {
     }
     // The wheel over the prompt moves the draft when the panel is too short for it; the page
     // keys stay with the conversation, which is what they are for.
-    const Screen::RenderResult& shape = interaction.shape;
+    const Presentation::RenderResult& shape = interaction.shape;
     if (fromWheel && shape.promptTotal > shape.promptRows && overPromptBox(interaction, row)) {
         const std::size_t last = shape.promptTotal - shape.promptRows;
         const std::size_t here = model.promptScroll.value_or(shape.promptFirst);
@@ -431,7 +441,7 @@ bool scrollWith(const Key& key, const Interaction& interaction, Model& model) {
 
 KeyResult handleKey(Interaction& interaction, Model& model, const Key& key, std::size_t scrollStep,
                     std::string& clipboard, Terminal& terminal) {
-    const Screen::Pointer before = interaction.pointer;
+    const Presentation::Pointer before = interaction.pointer;
     switch (key.kind) {
     case Key::Kind::MousePress:
     case Key::Kind::MouseDrag:
@@ -450,19 +460,16 @@ KeyResult handleKey(Interaction& interaction, Model& model, const Key& key, std:
     case Key::Kind::MouseDrag:
         dragTo(key, interaction, model);
         return {true, true};
-    case Key::Kind::MouseRelease:
-        interaction.pullingSelection = false;
-        interaction.pullingPromptBar = false;
-        if (interaction.pullingHintBar) {
-            interaction.pullingHintBar = false;
-            return {true, true};
-        }
-        if (interaction.pullingBar) {
-            interaction.pullingBar = false;
+    case Key::Kind::MouseRelease: {
+        const Interaction::Drag dragging = interaction.drag;
+        interaction.drag = Interaction::Drag::None;
+        if (dragging == Interaction::Drag::HintBar ||
+            dragging == Interaction::Drag::ConversationBar) {
             return {true, true};
         }
         dragTo(key, interaction, model);
         return {true, true};
+    }
     case Key::Kind::MouseMove: {
         // Only what is under the pointer can have changed, and a frame that would look the same
         // is never written.
@@ -494,14 +501,14 @@ KeyResult handleKey(Interaction& interaction, Model& model, const Key& key, std:
     }
 }
 
-std::vector<App::Effect> applyKey(Interaction& interaction, Model& model, const Key& key,
-                                  std::size_t scrollStep) {
+std::vector<Domain::Effect> applyKey(Interaction& interaction, Model& model, const Key& key,
+                                     std::size_t scrollStep) {
     const bool scrolls = scrollsTranscript(key.kind);
     if (!scrolls) {
         interaction.selection.clear();
     }
     const std::size_t offsetBefore = model.scrollOffset;
-    std::vector<App::Effect> effects = App::update(model, key, scrollStep);
+    std::vector<Domain::Effect> effects = Domain::update(model, key, scrollStep);
     if (scrolls) {
         // The model asks for the rows, and the viewport gives what it has: the picking follows
         // the rows that were really shown, not the ones that were asked for.
@@ -527,4 +534,4 @@ bool autoscrollAtEdge(Interaction& interaction, Model& model,
     return autoScrollConversation(interaction, model, drag.direction);
 }
 
-}  // namespace OpenAnimaTui::Shell
+}  // namespace OpenAnimaTui::Application

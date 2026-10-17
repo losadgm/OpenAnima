@@ -9,15 +9,15 @@
 
 #include "OpenAnima/Core/Event.h"
 
-#include "app/model.h"
+#include "domain/model.h"
 
 namespace {
 
 using OpenAnimaTui::Key;
-using OpenAnimaTui::App::Effect;
-using OpenAnimaTui::App::EffectKind;
-using OpenAnimaTui::App::Message;
-using OpenAnimaTui::App::Model;
+using OpenAnimaTui::Domain::Effect;
+using OpenAnimaTui::Domain::EffectKind;
+using OpenAnimaTui::Domain::Message;
+using OpenAnimaTui::Domain::Model;
 
 constexpr std::size_t ScrollStep = 5;
 
@@ -36,7 +36,7 @@ Key character(const char value) {
 }
 
 std::vector<Effect> press(Model& model, const Key& key) {
-    return OpenAnimaTui::App::update(model, key, ScrollStep);
+    return OpenAnimaTui::Domain::update(model, key, ScrollStep);
 }
 
 std::vector<Effect> press(Model& model, const Key::Kind kind) {
@@ -46,7 +46,7 @@ std::vector<Effect> press(Model& model, const Key::Kind kind) {
 /// Feeds a draft the way a terminal does: one byte per key, accents included.
 void type(Model& model, const std::string& text) {
     for (const char value : text) {
-        (void)OpenAnimaTui::App::update(model, character(value), ScrollStep);
+        (void)OpenAnimaTui::Domain::update(model, character(value), ScrollStep);
     }
 }
 
@@ -83,8 +83,8 @@ OpenAnima::Core::Event finished() {
 
 /// Answers the turn in flight the way the shell would when the stream ends.
 void answer(Model& model, const std::string& text) {
-    (void)OpenAnimaTui::App::applyEvent(model, delta(text));
-    (void)OpenAnimaTui::App::applyEvent(model, finished());
+    (void)OpenAnimaTui::Domain::applyEvent(model, delta(text));
+    (void)OpenAnimaTui::Domain::applyEvent(model, finished());
 }
 
 /// A turn that came back as a reply, with the document the model wrote.
@@ -120,7 +120,7 @@ TEST_CASE("tab completes the hint that is selected") {
 TEST_CASE("the arrows walk the hints while they are showing, and stop at the ends") {
     Model model;
     type(model, "/");
-    CHECK(!OpenAnimaTui::App::hintsFor(model).empty());
+    CHECK(!OpenAnimaTui::Domain::hintsFor(model).empty());
 
     // The first hint is the first one: going back from it stays there.
     (void)press(model, Key::Kind::ArrowUp);
@@ -147,7 +147,7 @@ TEST_CASE("the arrows walk the prompts of the scope while no hint is showing") {
     Model model;
     (void)submit(model, "/npcs");
     (void)submit(model, "/help");
-    CHECK(OpenAnimaTui::App::hintsFor(model).empty());
+    CHECK(OpenAnimaTui::Domain::hintsFor(model).empty());
 
     (void)press(model, Key::Kind::ArrowUp);
     CHECK(model.draft == "/help");
@@ -161,7 +161,7 @@ TEST_CASE("the arrows walk the prompts of the scope while no hint is showing") {
 
 TEST_CASE("each scope keeps its own history") {
     Model model = modelWithNpc();
-    CHECK(OpenAnimaTui::App::update(model, key(Key::Kind::None), ScrollStep).empty());
+    CHECK(OpenAnimaTui::Domain::update(model, key(Key::Kind::None), ScrollStep).empty());
 
     (void)submit(model, "/help");
     (void)press(model, Key::Kind::ArrowUp);
@@ -188,7 +188,7 @@ TEST_CASE("ctrl+enter and ctrl+j start a new line without sending anything") {
     CHECK(hasEffect(sent, EffectKind::Ask));
     REQUIRE(model.messages.size() >= 2);
     CHECK(model.messages.back().text == "one\n");
-    CHECK(model.messages.back().role == OpenAnimaTui::App::Role::User);
+    CHECK(model.messages.back().role == OpenAnimaTui::Domain::Role::User);
 
     Model spaced;
     type(spaced, "two");
@@ -239,7 +239,7 @@ TEST_CASE("escape cancels the turn in flight") {
     over.kind = OpenAnima::Core::EventKind::Finished;
     over.completion.finishReason = OpenAnima::Core::FinishReason::Cancelled;
     over.completion.text = "half an answer";
-    (void)OpenAnimaTui::App::applyEvent(model, over);
+    (void)OpenAnimaTui::Domain::applyEvent(model, over);
     CHECK_FALSE(model.busy);
     CHECK_FALSE(model.cancelling);
 }
@@ -255,7 +255,7 @@ TEST_CASE("ctrl+c is not the cancel key, and does not leave the client") {
     CHECK(model.running);
 
     // Nor when nothing is in flight: the shell takes the key to copy, never to leave.
-    (void)OpenAnimaTui::App::applyEvent(model, finished());
+    (void)OpenAnimaTui::Domain::applyEvent(model, finished());
     type(model, "a draft");
     (void)press(model, Key::Kind::CtrlC);
     CHECK(model.draft == "a draft");
@@ -315,7 +315,7 @@ TEST_CASE("every npc keeps the conversation that belongs to it") {
     CHECK(model.world.active == 1);
     CHECK(model.messages.size() == firstSize);
     CHECK(model.messages[model.messages.size() - 1].text == "well met");
-    CHECK(model.messages[model.messages.size() - 2].role == OpenAnimaTui::App::Role::User);
+    CHECK(model.messages[model.messages.size() - 2].role == OpenAnimaTui::Domain::Role::User);
 }
 
 TEST_CASE("leaving returns to the lobby, which keeps its own log") {
@@ -346,18 +346,18 @@ TEST_CASE("a failed turn is shown and leaves the prompt usable") {
     OpenAnima::Core::Event event;
     event.kind = OpenAnima::Core::EventKind::Failed;
     event.error = "no route to host";
-    CHECK(OpenAnimaTui::App::applyEvent(model, event));
+    CHECK(OpenAnimaTui::Domain::applyEvent(model, event));
     CHECK_FALSE(model.busy);
     CHECK(model.answer.empty());
-    CHECK(model.messages.back().role == OpenAnimaTui::App::Role::System);
+    CHECK(model.messages.back().role == OpenAnimaTui::Domain::Role::System);
     CHECK(model.messages.back().text.find("no route to host") != std::string::npos);
 }
 
 TEST_CASE("the clock only runs while a turn is in flight") {
     Model model = modelWithNpc();
-    CHECK(OpenAnimaTui::App::elapsedTenths(model) == 0);
+    CHECK(OpenAnimaTui::Domain::elapsedTenths(model) == 0);
     (void)submit(model, "hello");
-    CHECK(OpenAnimaTui::App::elapsedTenths(model) == 0);
+    CHECK(OpenAnimaTui::Domain::elapsedTenths(model) == 0);
     CHECK(model.busy);
     CHECK(model.startedAt != std::chrono::steady_clock::time_point{});
 }
@@ -385,16 +385,16 @@ TEST_CASE("raw mode shows the turn as the document, once it is over") {
     (void)submit(model, "hello");
 
     // Nothing is painted while the turn runs: the document is the only thing that goes in.
-    (void)OpenAnimaTui::App::applyEvent(model, delta("Good "));
+    (void)OpenAnimaTui::Domain::applyEvent(model, delta("Good "));
     CHECK(model.answer.empty());
 
-    (void)OpenAnimaTui::App::applyEvent(
+    (void)OpenAnimaTui::Domain::applyEvent(
         model,
         finishedWithReply(
             R"({"reasoning":"It looks harmless.","dialogue":"Good evening.","actions":[]})"));
 
     CHECK_FALSE(model.busy);
-    CHECK(model.messages.back().role == OpenAnimaTui::App::Role::System);
+    CHECK(model.messages.back().role == OpenAnimaTui::Domain::Role::System);
     CHECK(model.messages.back().text.find("\"dialogue\": \"Good evening.\"") != std::string::npos);
 
     // The formatted view is not there: no muted reasoning and no dialogue of its own.
@@ -408,16 +408,16 @@ TEST_CASE("raw mode names the npc that answered") {
     Model model = modelWithNpc();
     (void)submit(model, "/raw on");
     (void)submit(model, "hello");
-    (void)OpenAnimaTui::App::applyEvent(
+    (void)OpenAnimaTui::Domain::applyEvent(
         model, finishedWithReply(R"({"reasoning":"It looks harmless.","dialogue":"Good evening.",)"
                                  R"("actions":[]})"));
 
     // The document comes last, with the name of the npc over it: the json says what the model
     // wrote, and the name says whose turn it was.
     REQUIRE(model.messages.size() >= 2);
-    CHECK(model.messages[model.messages.size() - 2].role == OpenAnimaTui::App::Role::Speaker);
+    CHECK(model.messages[model.messages.size() - 2].role == OpenAnimaTui::Domain::Role::Speaker);
     CHECK(model.messages[model.messages.size() - 2].text == "npc 1:");
-    CHECK(model.messages.back().role == OpenAnimaTui::App::Role::System);
+    CHECK(model.messages.back().role == OpenAnimaTui::Domain::Role::System);
     CHECK(model.messages.back().text.find("\"dialogue\"") != std::string::npos);
 }
 
@@ -429,7 +429,7 @@ TEST_CASE("raw mode says so when there is no document to show") {
     OpenAnima::Core::Event over = finished();
     over.completion.finishReason = OpenAnima::Core::FinishReason::Cancelled;
     over.reply = OpenAnima::Core::NpcReply{};
-    (void)OpenAnimaTui::App::applyEvent(model, over);
+    (void)OpenAnimaTui::Domain::applyEvent(model, over);
 
     CHECK_FALSE(model.busy);
     CHECK(model.messages.back().text.find("no document") != std::string::npos);
@@ -447,15 +447,15 @@ TEST_CASE("a panel of the prompt scrolled away from the caret stays until a key 
     CHECK(*model.promptScroll == 2);
 
     // Anything that writes or moves the caret takes it back to where the caret is.
-    (void)OpenAnimaTui::App::update(model, character('x'), ScrollStep);
+    (void)OpenAnimaTui::Domain::update(model, character('x'), ScrollStep);
     CHECK_FALSE(model.promptScroll.has_value());
 }
 
 TEST_CASE("a reply is one block, named on the thought that opens it") {
     Model model = modelWithNpc();
     (void)submit(model, "hello");
-    (void)OpenAnimaTui::App::applyEvent(model, delta("Good evening."));
-    (void)OpenAnimaTui::App::applyEvent(
+    (void)OpenAnimaTui::Domain::applyEvent(model, delta("Good evening."));
+    (void)OpenAnimaTui::Domain::applyEvent(
         model, finishedWithReply(R"({"reasoning":"It looks harmless.","dialogue":"Good evening.",)"
                                  R"("actions":[{"name":"emote","arguments":{"kind":"nod"}}]})"));
 
@@ -463,15 +463,15 @@ TEST_CASE("a reply is one block, named on the thought that opens it") {
     REQUIRE(count >= 3);
 
     // The thought opens the block and carries the name; the rest hangs from it.
-    CHECK(model.messages[count - 3].role == OpenAnimaTui::App::Role::Thought);
+    CHECK(model.messages[count - 3].role == OpenAnimaTui::Domain::Role::Thought);
     CHECK(model.messages[count - 3].text.find("It looks harmless.") != std::string::npos);
     CHECK_FALSE(model.messages[count - 3].continues);
 
-    CHECK(model.messages[count - 2].role == OpenAnimaTui::App::Role::Npc);
+    CHECK(model.messages[count - 2].role == OpenAnimaTui::Domain::Role::Npc);
     CHECK(model.messages[count - 2].text == "Good evening.");
     CHECK(model.messages[count - 2].continues);
 
-    CHECK(model.messages[count - 1].role == OpenAnimaTui::App::Role::System);
+    CHECK(model.messages[count - 1].role == OpenAnimaTui::Domain::Role::System);
     CHECK(model.messages[count - 1].text.rfind("[emote]", 0) == 0);
     CHECK(model.messages[count - 1].continues);
 }

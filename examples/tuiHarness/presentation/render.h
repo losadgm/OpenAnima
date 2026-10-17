@@ -5,11 +5,11 @@
 
 #include <cstddef>
 
-#include "app/model.h"
+#include "domain/model.h"
 #include "canvas.h"
 #include "selection.h"
 
-namespace OpenAnimaTui::Screen {
+namespace OpenAnimaTui::Presentation {
 
 /// Measurements the screen is laid out on.
 namespace Metrics {
@@ -90,8 +90,8 @@ struct RenderResult {
 /// @param selection What the mouse picked out, painted over everything else.
 /// @param pointer Where the pointer is, which decides what is lit up under it.
 /// @return The frame and where the caret goes.
-[[nodiscard]] RenderResult render(const App::Model& model, std::size_t width, std::size_t height,
+[[nodiscard]] RenderResult render(const Domain::Model& model, std::size_t width, std::size_t height,
                                   const Selection& selection = Selection{},
                                   const Pointer& pointer = Pointer{});
 
-}  // namespace OpenAnimaTui::Screen
+}  // namespace OpenAnimaTui::Presentation

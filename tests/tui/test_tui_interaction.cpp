@@ -8,10 +8,10 @@
 #include <string>
 #include <string_view>
 
-#include "app/model.h"
-#include "screen/render.h"
-#include "screen/selection.h"
-#include "shell/interaction.h"
+#include "application/interaction.h"
+#include "domain/model.h"
+#include "presentation/render.h"
+#include "presentation/selection.h"
 #include "terminal/terminal.h"
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
@@ -20,14 +20,14 @@ namespace {
 
 using OpenAnimaTui::Key;
 using OpenAnimaTui::Terminal;
-using OpenAnimaTui::App::Model;
-using OpenAnimaTui::App::Role;
-using OpenAnimaTui::Screen::Scope;
-using OpenAnimaTui::Shell::applyKey;
-using OpenAnimaTui::Shell::autoscrollAtEdge;
-using OpenAnimaTui::Shell::handleKey;
-using OpenAnimaTui::Shell::Interaction;
-using OpenAnimaTui::Shell::KeyResult;
+using OpenAnimaTui::Application::applyKey;
+using OpenAnimaTui::Application::autoscrollAtEdge;
+using OpenAnimaTui::Application::handleKey;
+using OpenAnimaTui::Application::Interaction;
+using OpenAnimaTui::Application::KeyResult;
+using OpenAnimaTui::Domain::Model;
+using OpenAnimaTui::Domain::Role;
+using OpenAnimaTui::Presentation::Scope;
 
 constexpr std::size_t Width = 40;
 constexpr std::size_t Height = 10;
@@ -83,8 +83,8 @@ Model longDraft(int lines) {
 
 /// Paints the model and leaves the interaction holding where every part of it sits.
 void layOut(Model& model, Interaction& interaction) {
-    interaction.shape = OpenAnimaTui::Screen::render(model, Width, Height, interaction.selection,
-                                                     interaction.pointer);
+    interaction.shape = OpenAnimaTui::Presentation::render(
+        model, Width, Height, interaction.selection, interaction.pointer);
 }
 
 Key mouse(Key::Kind kind, std::size_t column, std::size_t row) {
@@ -109,7 +109,7 @@ TEST_CASE("a press starts a span, a drag stretches it and the release lets go") 
     layOut(model, interaction);
 
     CHECK(send(interaction, model, mouse(Key::Kind::MousePress, 0, 0), clipboard, terminal).used);
-    CHECK(interaction.pullingSelection);
+    CHECK(interaction.drag == Interaction::Drag::Selection);
     CHECK(interaction.selection.contains(0, 0));
 
     (void)send(interaction, model, mouse(Key::Kind::MouseDrag, 3, 0), clipboard, terminal);
@@ -118,7 +118,7 @@ TEST_CASE("a press starts a span, a drag stretches it and the release lets go") 
     CHECK(interaction.selection.scope() == Scope::Conversation);
 
     (void)send(interaction, model, mouse(Key::Kind::MouseRelease, 3, 0), clipboard, terminal);
-    CHECK_FALSE(interaction.pullingSelection);
+    CHECK(interaction.drag == Interaction::Drag::None);
     CHECK(interaction.selection.contains(0, 3));
 }
 
@@ -163,7 +163,7 @@ TEST_CASE("dragging the bar of the conversation moves it") {
 
     // A press beside the thumb brings it under the pointer, which here is the top of the bar.
     (void)send(interaction, model, mouse(Key::Kind::MousePress, Width - 1, 0), clipboard, terminal);
-    CHECK(interaction.pullingBar);
+    CHECK(interaction.drag == Interaction::Drag::ConversationBar);
     CHECK(model.scrollOffset == interaction.shape.maxScrollOffset);
 
     (void)send(interaction, model,
@@ -173,7 +173,7 @@ TEST_CASE("dragging the bar of the conversation moves it") {
 
     (void)send(interaction, model, mouse(Key::Kind::MouseRelease, Width - 1, 0), clipboard,
                terminal);
-    CHECK_FALSE(interaction.pullingBar);
+    CHECK(interaction.drag == Interaction::Drag::None);
 }
 
 TEST_CASE("dragging the bar of the prompt moves the draft under it") {
