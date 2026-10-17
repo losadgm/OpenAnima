@@ -184,6 +184,9 @@ void Canvas::fill(std::size_t row, std::size_t column, std::size_t columns, cons
     for (std::size_t current = column; current < end; ++current) {
         detach(row, current);
         Cell& cell = m_cells[index(row, current)];
+        // A fill is a floor to paint on, so whatever was there goes: a panel laid over the
+        // conversation covers the words behind it instead of letting them show through.
+        setBlank(cell);
         cell.style = style;
         cell.furniture = true;
     }

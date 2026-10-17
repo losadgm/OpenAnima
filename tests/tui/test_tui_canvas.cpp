@@ -94,6 +94,15 @@ TEST_CASE("a fill lays a background down without writing characters") {
     CHECK(readRow(canvas, 0) == "     ");
 }
 
+TEST_CASE("a fill covers what was written under it") {
+    Canvas canvas{5, 1};
+    canvas.put(0, 0, "hola", Style{});
+    canvas.fill(0, 1, 3, Palette::panel());
+    CHECK(readRow(canvas, 0) == "h    ");
+    CHECK(canvas.at(0, 1).isBlank());
+    CHECK(canvas.at(0, 1).style.equals(Palette::panel()));
+}
+
 TEST_CASE("two rows compare equal when they paint the same, background included") {
     Canvas one{3, 1};
     Canvas other{3, 1};

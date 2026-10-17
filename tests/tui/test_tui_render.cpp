@@ -464,4 +464,53 @@ TEST_CASE("a row of the bar maps back to the scroll position the thumb stands fo
     CHECK(OpenAnimaTui::Screen::firstRowForThumb(100, 10, 99) == 90);
 }
 
+TEST_CASE("the hints float on a panel that takes a share of the width and no rows of its own") {
+    Model model;
+    for (int index = 0; index < 20; ++index) {
+        model.messages.push_back(
+            {OpenAnimaTui::App::Role::User, "row " + std::to_string(index), false});
+    }
+    const RenderResult quiet = render(model, 40, 12);
+    type(model, "/");
+    const RenderResult hinted = render(model, 40, 12);
+
+    // The conversation keeps the rows the panel floats on: it is anchored to the left edge and
+    // leaves the rest of the screen to what was said.
+    CHECK(hinted.scrollRows == quiet.scrollRows);
+    CHECK(hinted.hintColumns == 40 * OpenAnimaTui::Screen::Metrics::HintShare / 100);
+    REQUIRE(hinted.hintCount > 0);
+    CHECK(hinted.hintRow + hinted.hintCount == hinted.scrollRows);
+    CHECK(hinted.frame.at(hinted.hintRow, 0).style.background.equals(Palette::raisedColor()));
+    CHECK_FALSE(hinted.frame.at(hinted.hintRow, hinted.hintColumns)
+                    .style.background.equals(Palette::raisedColor()));
+}
+
+TEST_CASE("the panel of hints has a bar of its own, which lights up under the pointer") {
+    Model model;
+    type(model, "/");
+    const RenderResult plain = render(model, 40, 12);
+    REQUIRE(plain.hintTotal > plain.hintCount);
+    const std::size_t column = plain.hintColumns - 1;
+    // The first hint is selected, so the thumb begins at the top of the bar and the track is
+    // left under it.
+    CHECK(
+        plain.frame.at(plain.hintRow, column).style.foreground.equals(Palette::muted().foreground));
+    CHECK(plain.frame.at(plain.hintRow + plain.hintCount - 1, column).style.dim);
+
+    const RenderResult hovered = render(model, 40, 12, Selection{},
+                                        OpenAnimaTui::Screen::Pointer{true, plain.hintRow, column});
+    CHECK(hovered.frame.at(plain.hintRow, column)
+              .style.foreground.equals(Palette::accent().foreground));
+    CHECK(hovered.frame.at(plain.hintRow, column).style.bold);
+}
+
+TEST_CASE("a row of the bar of the hints stands for one of them") {
+    CHECK(OpenAnimaTui::Screen::hintThumbRow(8, 6, 0) == 0);
+    CHECK(OpenAnimaTui::Screen::hintThumbRow(8, 6, 7) == 2);
+    CHECK(OpenAnimaTui::Screen::hintAtThumbRow(8, 6, 0) == 0);
+    CHECK(OpenAnimaTui::Screen::hintAtThumbRow(8, 6, 1) == 4);
+    CHECK(OpenAnimaTui::Screen::hintAtThumbRow(8, 6, 2) == 7);
+    CHECK(OpenAnimaTui::Screen::hintAtThumbRow(6, 6, 5) == 0);  // Nothing to scroll.
+}
+
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

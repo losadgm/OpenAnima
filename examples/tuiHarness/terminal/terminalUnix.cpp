@@ -355,8 +355,12 @@ private:
             const auto column = static_cast<std::size_t>(
                 std::stoul(sequence.substr(first + 1, second - first - 1)));
             const auto row = static_cast<std::size_t>(std::stoul(sequence.substr(second + 1)));
-            if (const Key wheel = wheelKey(static_cast<unsigned char>(button));
+            if (Key wheel = wheelKey(static_cast<unsigned char>(button));
                 wheel.kind != Key::Kind::Unknown) {
+                // A wheel report carries the cell it happened on, which is what tells the client
+                // which of the two scrolls the user meant.
+                wheel.column = column > 0 ? column - 1 : 0;
+                wheel.row = row > 0 ? row - 1 : 0;
                 return wheel;
             }
 

@@ -120,7 +120,8 @@ struct ScreenState {
     OpenAnimaTui::Screen::Pointer pointer;      ///< Where the pointer is.
     OpenAnimaTui::Screen::RenderResult shape;   ///< The frame on screen and where its parts sit.
     std::size_t barGrab{0};                     ///< Row of the thumb the drag holds.
-    bool pullingBar{false};                     ///< Whether the bar is being dragged.
+    bool pullingBar{false};                     ///< Whether the bar of the conversation is dragged.
+    bool pullingHintBar{false};                 ///< Whether the bar of the hints is dragged.
 };
 
 /// @param state The screen as it is.
@@ -133,13 +134,52 @@ bool overScrollBar(const ScreenState& state, std::size_t column, std::size_t row
 }
 
 /// @param state The screen as it is.
+/// @param column Column the pointer is on.
 /// @param row Row the pointer is on.
-/// @return The hint that row holds, or nothing when the row holds no hint.
-std::optional<std::size_t> hintAt(const ScreenState& state, std::size_t row) {
-    if (row < state.shape.hintRow || row >= state.shape.hintRow + state.shape.hintCount) {
+/// @return Whether the pointer is over the bar of the hints, which is only there when the list
+///         is longer than the panel.
+bool overHintBar(const ScreenState& state, std::size_t column, std::size_t row) {
+    return state.shape.hintTotal > state.shape.hintCount && state.shape.hintCount > 0 &&
+           column + 1 == state.shape.hintColumns && row >= state.shape.hintRow &&
+           row < state.shape.hintRow + state.shape.hintCount;
+}
+
+/// @param state The screen as it is.
+/// @param column Column the pointer is on.
+/// @param row Row the pointer is on.
+/// @return The hint the pointer is over, or nothing when it is not on the panel.
+std::optional<std::size_t> hintAt(const ScreenState& state, std::size_t column, std::size_t row) {
+    if (column + 1 > state.shape.hintColumns || row < state.shape.hintRow ||
+        row >= state.shape.hintRow + state.shape.hintCount) {
         return std::nullopt;
     }
     return state.shape.hintOffset + (row - state.shape.hintRow);
+}
+
+/// Walks the hint selection, stopping at the ends of the list.
+/// @param model The model, which holds the selection.
+/// @param forward Whether it goes on to the next hint or back to the one before.
+void stepHint(Model& model, bool forward) {
+    const std::size_t count = OpenAnimaTui::App::hintsFor(model).size();
+    if (count == 0) {
+        return;
+    }
+    const std::size_t index = std::min(model.hintIndex, count - 1);
+    if (!forward) {
+        model.hintIndex = index > 0 ? index - 1 : 0;
+        return;
+    }
+    model.hintIndex = std::min(index + 1, count - 1);
+}
+
+/// Puts the thumb of the hints where the pointer is.
+/// @param state The screen as it is.
+/// @param model The model, which holds the selection.
+/// @param row Row the pointer is on.
+void dragHintBarTo(const ScreenState& state, Model& model, std::size_t row) {
+    const std::size_t offset = row >= state.shape.hintRow ? row - state.shape.hintRow : 0;
+    model.hintIndex =
+        OpenAnimaTui::Screen::hintAtThumbRow(state.shape.hintTotal, state.shape.hintCount, offset);
 }
 
 /// Puts the thumb of the bar where the pointer is, keeping the row it was grabbed by.
@@ -190,6 +230,83 @@ void movePointer(ScreenState& state, std::size_t row, std::size_t column) {
     state.pointer.column = column;
 }
 
+/// Starts what the left button does where it went down.
+/// @param key Key that arrived, which carries the position.
+/// @param state What the pointer has done to the screen.
+/// @param model The model, for the hints and the scroll.
+/// @param scrollStep Rows a page scroll takes, as `update` wants.
+void pressAt(const Key& key, ScreenState& state, Model& model, std::size_t scrollStep) {
+    // The bar of the hints takes hold first: dragging it walks the list the way dragging the
+    // bar of the conversation scrolls it.
+    if (overHintBar(state, key.column, key.row)) {
+        state.pullingHintBar = true;
+        dragHintBarTo(state, model, key.row);
+        return;
+    }
+    // A hint takes a click the way it takes tab: the one under the pointer is written into the
+    // draft, and the selection is dropped rather than started over the panel.
+    if (const std::optional<std::size_t> hint = hintAt(state, key.column, key.row);
+        hint.has_value()) {
+        model.hintIndex = *hint;
+        (void)OpenAnimaTui::App::update(model, Key{Key::Kind::Tab, 0}, scrollStep);
+        state.selection.clear();
+        return;
+    }
+    if (overScrollBar(state, key.column, key.row)) {
+        grabBar(state, model, key.row);
+        return;
+    }
+    // A second press on the same cell takes the word under it and a third takes the row,
+    // which is what picking text out means everywhere else.
+    const int count = state.clicks.press(key.row, key.column, std::chrono::steady_clock::now());
+    if (count == 2) {
+        state.selection = OpenAnimaTui::Screen::wordAt(state.shape.frame, key.row, key.column);
+        return;
+    }
+    if (count > 2) {
+        state.selection = OpenAnimaTui::Screen::lineAt(state.shape.frame, key.row);
+        return;
+    }
+    state.selection.begin(key.row, key.column);
+}
+
+/// Follows the pointer with whatever it is holding: a bar, or the far end of the selection.
+/// @param key Key that arrived, which carries the position.
+/// @param state What the pointer has done to the screen.
+/// @param model The model, which holds the scroll and the hints.
+void dragTo(const Key& key, ScreenState& state, Model& model) {
+    if (state.pullingHintBar) {
+        dragHintBarTo(state, model, key.row);
+        return;
+    }
+    if (state.pullingBar) {
+        dragBarTo(state, model, key.row);
+        return;
+    }
+    // A word or a row taken by a double click stays as it is: the pointer is still inside it.
+    if (state.clicks.count() < 2) {
+        state.selection.extend(key.row, key.column);
+    }
+}
+
+/// Scrolls with the wheel or the page keys, which move whatever the pointer is over.
+/// @param key Key that arrived.
+/// @param state What the pointer has done to the screen.
+/// @param model The model, which holds the hint selection.
+/// @return Whether the hints took it, which leaves the conversation where it is.
+bool scrollWith(const Key& key, const ScreenState& state, Model& model) {
+    // A wheel report carries the cell it happened on; the page keys do not, so they go by the
+    // last place the pointer was seen, which is the hover the panel is under.
+    const bool fromWheel = key.kind == Key::Kind::WheelUp || key.kind == Key::Kind::WheelDown;
+    const std::size_t row = fromWheel ? key.row : state.pointer.row;
+    const std::size_t column = fromWheel ? key.column : state.pointer.column;
+    if (!hintAt(state, column, row).has_value()) {
+        return false;
+    }
+    stepHint(model, key.kind == Key::Kind::WheelDown || key.kind == Key::Kind::PageDown);
+    return true;
+}
+
 /// Handles the keys that are about the screen rather than about the conversation: what the
 /// pointer lights up, what it picks out, and what is copied and pasted.
 /// @param key Key that arrived.
@@ -214,57 +331,32 @@ bool handleScreenKey(const Key& key, ScreenState& state, std::string& clipboard,
     }
 
     switch (key.kind) {
-    case Key::Kind::MousePress: {
-        // A hint takes a click the way it takes tab: the one under the pointer is written into
-        // the draft, and the selection is dropped rather than started over the panel.
-        if (const std::optional<std::size_t> hint = hintAt(state, key.row); hint.has_value()) {
-            model.hintIndex = *hint;
-            (void)OpenAnimaTui::App::update(model, Key{Key::Kind::Tab, 0}, scrollStep);
-            state.selection.clear();
-            return true;
-        }
-        if (overScrollBar(state, key.column, key.row)) {
-            grabBar(state, model, key.row);
-            return true;
-        }
-        // A second press on the same cell takes the word under it and a third takes the row,
-        // which is what picking text out means everywhere else.
-        const int count = state.clicks.press(key.row, key.column, std::chrono::steady_clock::now());
-        if (count == 2) {
-            state.selection = OpenAnimaTui::Screen::wordAt(state.shape.frame, key.row, key.column);
-        } else if (count > 2) {
-            state.selection = OpenAnimaTui::Screen::lineAt(state.shape.frame, key.row);
-        } else {
-            state.selection.begin(key.row, key.column);
-        }
+    case Key::Kind::MousePress:
+        pressAt(key, state, model, scrollStep);
         return true;
-    }
     case Key::Kind::MouseDrag:
-        if (state.pullingBar) {
-            dragBarTo(state, model, key.row);
-            return true;
-        }
-        // The drag moves the far end of the selection, and the release leaves it where the
-        // pointer is. A press and a release on one cell leave that cell picked out, which is
-        // the only way to take a single character. A word or a row taken by a double click
-        // stays as it is: the pointer is still inside it.
-        if (state.clicks.count() < 2) {
-            state.selection.extend(key.row, key.column);
-        }
+        dragTo(key, state, model);
         return true;
     case Key::Kind::MouseRelease:
+        if (state.pullingHintBar) {
+            state.pullingHintBar = false;
+            return true;
+        }
         if (state.pullingBar) {
             state.pullingBar = false;
             return true;
         }
-        if (state.clicks.count() < 2) {
-            state.selection.extend(key.row, key.column);
-        }
+        dragTo(key, state, model);
         return true;
     case Key::Kind::MouseMove:
         // Only what is under the pointer can have changed, and a frame that would look the same
         // is never written.
         return true;
+    case Key::Kind::WheelUp:
+    case Key::Kind::WheelDown:
+    case Key::Kind::PageUp:
+    case Key::Kind::PageDown:
+        return scrollWith(key, state, model);
     case Key::Kind::CtrlC:
         // The copy key, and nothing else. A client that leaves on it is a client someone leaves
         // by accident while reaching for a selection.

@@ -102,7 +102,7 @@ repeating the name or opening a gap.
 - The conversation lives in a viewport of its own. Page up and page down move it, the wheel
   moves it a row at a notch, and the prompt stays where it is, pinned under the transcript.
   A one-column bar on the right shows how much of the conversation is on screen and where in
-  it the viewport sits; it is a picture, and it takes no clicks and no keys.
+  it the viewport sits, and it can be dragged to move the view.
 - The prompt is the fixed part: the draft is drawn inside a frame of its own, with the command
   in its own colour while one is being typed, and the caret never leaves it. The frame runs
   along the inside edge of the panel with the one-eighth blocks and the legacy computing corners
@@ -113,9 +113,14 @@ repeating the name or opening a gap.
   text never sits against the frame. While the line is empty the frame says what can be done
   from there, which is not the same in the lobby as in a conversation, and the words go as soon
   as there is something to say.
-- The commands that complete what is being typed float above the frame on a lighter panel,
-  with the selected one in the accent colour. The arrows walk them, and tab takes the one that
-  is selected.
+- The commands that complete what is being typed float over the last rows of the conversation,
+  on a lighter panel of their own. The panel takes thirty per cent of the width and is anchored
+  to the left edge, so the rest of those rows still shows what was said, and it takes no rows
+  away from the viewport. The selected one is in the accent colour; the arrows walk them and
+  stop at the first and the last one instead of coming round, tab writes the selected one, and
+  a click writes the one under the pointer. When more commands match than the panel has rows,
+  its right edge carries a bar of its own, the same as the one of the conversation, which can be
+  dragged to walk the list.
 - Each role has its own colour: the player in muted gray, the NPC in the accent colour, and
   the thought quietly under the same name, so it reads as the NPC's and not as the client's.
 - A note is what the client says on its own, and it belongs to no speaker: it starts at the
@@ -133,16 +138,16 @@ repeating the name or opening a gap.
 | Enter | Sends the draft |
 | Ctrl+Enter, Ctrl+J, or a trailing `\` | Starts a new line instead of sending |
 | Tab | Completes the selected command |
-| Up, Down | Walks the command hints while they are showing, and the prompts of this scope otherwise |
+| Up, Down | Walks the command hints while they are showing, stopping at the ends, and the prompts of this scope otherwise |
 | Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Left, Right | Moves the cursor in the draft |
 | Ctrl+Left, Ctrl+Right | Moves a word at a time |
 | Backspace, Delete | Deletes the character before or after the cursor |
 | Ctrl+Backspace, Ctrl+Delete | Deletes a word at a time, and the gap around it |
 | Ctrl+P, Ctrl+N | Walks the prompts of this scope |
 | Page up, Page down | Scrolls the conversation |
-| Wheel | Scrolls the conversation, one row a notch |
-| Drag the scrollbar | Scrolls to where the thumb is put, following the button |
-| Hover a hint or the scrollbar | Lights it up: the hint goes lilac, bold and underlined, the thumb of the bar goes lilac and bold |
+| Wheel | Scrolls whatever the pointer is over: the conversation, or the hints |
+| Drag a scrollbar | Scrolls to where the thumb is put, following the button |
+| Hover a hint or a scrollbar | Lights it up: the hint goes lilac, bold and underlined, the thumb of the bar goes lilac and bold |
 | Click a hint | Writes it into the draft, the same as tab with the selected one |
 | Esc | Cancels the turn in flight, keeping what it had produced |
 | Drag over the conversation | Picks out those cells, painted reversed as the pointer moves |
@@ -182,12 +187,14 @@ the emulator opens with the copy and paste it offers.
 
 The pointer also lights up what it is over. A command hint under it turns lilac, bold and
 underlined, and a click on it writes it into the draft, which is what tab does with the one that
-was selected. A hint that is not under the
-pointer is quiet unless it is the selected one, which keeps the accent colour. The scrollbar on
-the right gives the pointer the thumb it would drag: the thumb turns lilac and bold, and the
-button drags it, which scrolls the conversation to the row it is left on. A press beside the
-thumb brings the thumb under the pointer first, and a drag that goes past either end stops
-there.
+was selected. A hint that is not under the pointer is quiet unless it is the selected one, which
+keeps the accent colour. The wheel and the page keys are the wheel of whatever is under the
+pointer: over the panel they walk the hints, stopping at the ends, and anywhere else they scroll
+the conversation. A
+scrollbar under it gives the pointer the thumb it would drag: the thumb turns lilac and bold,
+and the button drags it, which scrolls the conversation to the row it is left on, or walks the
+hints when it is the bar of the panel. A press beside a thumb brings the thumb under the pointer
+first, and a drag that goes past either end stops there.
 
 Anything a keyboard can send reaches the draft as bytes, so an enye, an accented vowel or a
 combining mark typed after a letter lands in the same cell as the letter it belongs to. Copying goes out as the terminal's own clipboard sequence and lives in

@@ -165,13 +165,17 @@ void editComplete(Model& model, const std::string& chosen) {
     model.hintIndex = 0;
 }
 
-/// Moves the command hint selection, wrapping around.
+/// Moves the command hint selection, stopping at the ends of the list.
 void moveHint(Model& model, std::size_t count, int direction) {
     if (count == 0) {
         return;
     }
     const std::size_t index = std::min(model.hintIndex, count - 1);
-    model.hintIndex = direction < 0 ? (index + count - 1) % count : (index + 1) % count;
+    if (direction < 0) {
+        model.hintIndex = index > 0 ? index - 1 : 0;
+        return;
+    }
+    model.hintIndex = std::min(index + 1, count - 1);
 }
 
 /// Walks the history of the scope being typed at, putting the draft aside on the way.

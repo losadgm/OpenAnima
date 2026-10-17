@@ -117,20 +117,30 @@ TEST_CASE("tab completes the hint that is selected") {
     CHECK(model.cursor == model.draft.size());
 }
 
-TEST_CASE("the arrows walk the hints while they are showing") {
+TEST_CASE("the arrows walk the hints while they are showing, and stop at the ends") {
     Model model;
     type(model, "/");
     CHECK(!OpenAnimaTui::App::hintsFor(model).empty());
 
+    // The first hint is the first one: going back from it stays there.
     (void)press(model, Key::Kind::ArrowUp);
     (void)press(model, Key::Kind::Tab);
-    CHECK(model.draft == "/quit ");
+    CHECK(model.draft == "/create ");
 
-    Model other;
-    type(other, "/");
-    (void)press(other, Key::Kind::ArrowDown);
-    (void)press(other, Key::Kind::Tab);
-    CHECK(other.draft == "/enter ");
+    Model next;
+    type(next, "/");
+    (void)press(next, Key::Kind::ArrowDown);
+    (void)press(next, Key::Kind::Tab);
+    CHECK(next.draft == "/enter ");
+
+    // And the last one is the last one: going on from it stays there.
+    Model last;
+    type(last, "/");
+    for (int step = 0; step < 20; ++step) {
+        (void)press(last, Key::Kind::ArrowDown);
+    }
+    (void)press(last, Key::Kind::Tab);
+    CHECK(last.draft == "/quit ");
 }
 
 TEST_CASE("the arrows walk the prompts of the scope while no hint is showing") {

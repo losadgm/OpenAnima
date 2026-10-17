@@ -23,6 +23,7 @@ using App::Model;
 using App::Role;
 using Metrics::BoxWidth;
 using Metrics::HintIndent;
+using Metrics::HintShare;
 using Metrics::MaxHints;
 using Metrics::PanelPad;
 using Metrics::PrefixWidth;
@@ -383,31 +384,71 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
     paintBoxBorder(frame, firstRow + panelRows + 1, width, false);
 }
 
-/// Paints the hints that float above the prompt, on a panel of their own.
+/// Where the panel of hints goes and what it holds.
+struct HintLayout {
+    std::size_t selected{0};  ///< Which hint is selected, counted in the whole list.
+    std::size_t first{0};     ///< Index in the whole list of the first hint of the window.
+    std::size_t total{0};     ///< Hints that match.
+    std::size_t firstRow{0};  ///< Row the first one goes on.
+    std::size_t columns{0};   ///< Columns the panel takes.
+};
+
+/// Paints the panel of hints: the commands that complete what is being typed, floating over the
+/// last rows of the conversation, anchored to the left edge.
 ///
-/// The selected one is in the accent colour, and the one under the pointer is lit up the same
-/// way with the underline and the weight that say a click would take it.
+/// The panel is not as wide as the screen on purpose: it covers a share of it, so the
+/// conversation stays readable beside it. The selected hint is in the accent colour, the one
+/// under the pointer is lit up the same way with the underline and the weight that say a click
+/// would write it, and the bar on its right edge scrolls a list longer than the panel.
 /// @param frame Canvas to paint on.
 /// @param hints Hints of the window, in order.
-/// @param highlighted Which of them is the selected one.
-/// @param firstRow Row the first one goes on.
-/// @param width Columns available.
+/// @param layout Where the panel goes and what it holds.
 /// @param pointer Where the pointer is.
-// The rows, the columns and the two counts are named at the only call site there is.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-void paintHints(Canvas& frame, const std::vector<std::string>& hints, std::size_t highlighted,
-                std::size_t firstRow, std::size_t width, const Pointer& pointer) {
-    std::size_t row = firstRow;
-    for (std::size_t index = 0; index < hints.size(); ++index) {
-        Style style = (index == highlighted ? Palette::accent() : Palette::muted())
-                          .withBackground(Palette::raisedColor());
-        if (pointer.onScreen && pointer.row == row) {
+void paintHints(Canvas& frame, const std::vector<std::string>& hints, const HintLayout& layout,
+                const Pointer& pointer) {
+    const std::size_t rows = hints.size();
+    if (rows == 0 || layout.columns < 2) {
+        return;
+    }
+    const std::size_t barColumn = layout.columns - 1;
+    const bool scrolls = layout.total > rows;
+    const bool barUnderPointer = pointer.onScreen && pointer.column + 1 == layout.columns &&
+                                 pointer.row >= layout.firstRow &&
+                                 pointer.row < layout.firstRow + rows;
+    const std::size_t textColumns = barColumn > HintIndent ? barColumn - HintIndent : 0;
+
+    for (std::size_t index = 0; index < rows; ++index) {
+        const std::size_t row = layout.firstRow + index;
+        Style style =
+            (layout.first + index == layout.selected ? Palette::accent() : Palette::muted())
+                .withBackground(Palette::raisedColor());
+        if (pointer.onScreen && pointer.row == row && pointer.column + 1 < layout.columns) {
             style =
                 Palette::accent().withBackground(Palette::raisedColor()).withBold().withUnderline();
         }
-        frame.fill(row, 0, width, Palette::raised());
-        frame.put(row, HintIndent, hints[index], style);
-        ++row;
+        frame.fill(row, 0, layout.columns, Palette::raised());
+        frame.put(row, HintIndent, std::string_view{hints[index]}.substr(0, textColumns), style);
+    }
+
+    if (scrolls) {
+        for (std::size_t index = 0; index < rows; ++index) {
+            frame.put(layout.firstRow + index, barColumn, Glyphs::ScrollBar,
+                      Palette::muted().withDim());
+        }
+        const std::size_t thumb = std::max<std::size_t>(1, rows * rows / layout.total);
+        const std::size_t top = hintThumbRow(layout.total, rows, layout.selected);
+        const Style style = barUnderPointer ? Palette::accent().withBold() : Palette::muted();
+        for (std::size_t index = 0; index < thumb && top + index < rows; ++index) {
+            frame.put(layout.firstRow + top + index, barColumn, Glyphs::ScrollBar, style);
+        }
+    }
+
+    // The panel is the client's own drawing, so neither a copy nor a selection takes it for
+    // something that was said.
+    for (std::size_t index = 0; index < rows; ++index) {
+        for (std::size_t column = 0; column < layout.columns; ++column) {
+            frame.at(layout.firstRow + index, column).furniture = true;
+        }
     }
 }
 
@@ -442,6 +483,34 @@ std::size_t firstRowForThumb(std::size_t transcriptRows, std::size_t viewRows, s
                     (wanted * (transcriptRows - viewRows) + travel - 1) / travel);
 }
 
+// As above: counts and a row, all named where they are used.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::size_t hintThumbRow(std::size_t total, std::size_t rows, std::size_t selected) {
+    if (total <= rows || rows == 0 || total < 2) {
+        return 0;
+    }
+    const std::size_t thumb = std::max<std::size_t>(1, rows * rows / total);
+    const std::size_t travel = rows - thumb;
+    if (travel == 0) {
+        return 0;
+    }
+    return std::min(selected, total - 1) * travel / (total - 1);
+}
+
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+std::size_t hintAtThumbRow(std::size_t total, std::size_t rows, std::size_t row) {
+    if (total <= rows || rows == 0 || total < 2) {
+        return 0;
+    }
+    const std::size_t thumb = std::max<std::size_t>(1, rows * rows / total);
+    const std::size_t travel = rows - thumb;
+    if (travel == 0) {
+        return 0;
+    }
+    const std::size_t wanted = std::min(row, travel);
+    return std::min(total - 1, (wanted * (total - 1) + travel / 2) / travel);
+}
+
 RenderResult render(const Model& model, std::size_t width, std::size_t height,
                     const Selection& selection, const Pointer& pointer) {
     RenderResult result{Canvas{width, height}, 0, 0};
@@ -465,10 +534,11 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     const std::vector<std::string> hints = hintWindow(all, selected, first);
 
     // The frame takes two rows of its own: the line being typed is the panel inside it, and the
-    // status row goes under the whole thing.
+    // status row goes under the whole thing. The hints float over the conversation, so they do
+    // not take rows of their own.
     const std::size_t boxRows = prompt.rows.size() + 2;
-    const bool withStatus = height > boxRows + hints.size();
-    const std::size_t bottomRows = boxRows + hints.size() + (withStatus ? 1 : 0);
+    const bool withStatus = height > boxRows;
+    const std::size_t bottomRows = boxRows + (withStatus ? 1 : 0);
     const std::size_t viewRows = height > bottomRows ? height - bottomRows : 0;
 
     // The transcript, and the column the scrollbar takes when the conversation does not fit.
@@ -507,17 +577,21 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     result.scrollRows = viewRows;
     result.transcriptRows = total;
 
-    // The hints float over the conversation, on their own panel. The one under the pointer is
-    // lit up the same way as the one that is selected, and underlined and bold, which is what
-    // says a click would take it.
-    const std::size_t highlighted = selected - first;
-    result.hintRow = viewRows;
-    result.hintCount = hints.size();
+    // The hints float over the last rows of the conversation, anchored to the left edge, on a
+    // panel of their own that leaves the rest of the screen to what was said.
+    const std::size_t hintColumns = std::max<std::size_t>(4, width * HintShare / 100);
+    const std::size_t hintRows = hints.size();
+    const std::size_t hintTop = viewRows > hintRows ? viewRows - hintRows : 0;
+    result.hintRow = hintTop;
+    result.hintCount = hintRows;
     result.hintOffset = first;
-    paintHints(frame, hints, highlighted, viewRows, width, pointer);
+    result.hintColumns = hintColumns;
+    result.hintTotal = all.size();
+    paintHints(frame, hints, HintLayout{selected, first, all.size(), hintTop, hintColumns},
+               pointer);
 
     // The prompt, framed, which is the part that stays put while the conversation moves.
-    std::size_t row = viewRows + hints.size();
+    std::size_t row = viewRows;
     paintPrompt(frame, model, prompt, row, width);
     row += prompt.rows.size() + 2;
 
@@ -526,7 +600,7 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     }
 
     const auto position = prompt.positions.at(std::min(model.cursor, model.draft.size()));
-    result.caretRow = viewRows + hints.size() + 1 + position.first;
+    result.caretRow = viewRows + 1 + position.first;
     result.caretColumn = BoxWidth + PanelPad + PromptWidth + position.second;
 
     pickOutSelection(frame, selection);

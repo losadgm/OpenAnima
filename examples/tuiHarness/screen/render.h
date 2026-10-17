@@ -20,6 +20,7 @@ constexpr std::size_t BoxWidth = 1;     ///< Columns the frame around the prompt
 constexpr std::size_t PanelPad = 1;     ///< Columns of panel kept empty inside the frame, a side.
 constexpr std::size_t MaxHints = 6;     ///< Command hints shown at once.
 constexpr std::size_t HintIndent = 2;   ///< Columns a hint is indented by.
+constexpr std::size_t HintShare = 30;   ///< Percent of the width the panel of hints takes.
 
 }  // namespace Metrics
 
@@ -37,9 +38,11 @@ struct RenderResult {
     std::size_t caretColumn{0};     ///< Column the caret belongs in.
     std::size_t scrollRows{0};      ///< Rows the conversation viewport has, which is the bar.
     std::size_t transcriptRows{0};  ///< Rows the whole conversation takes, on screen or not.
-    std::size_t hintRow{0};         ///< Row the hints start on, whether any is drawn or not.
-    std::size_t hintCount{0};       ///< Hints drawn, zero when none are.
-    std::size_t hintOffset{0};      ///< Index in the whole list of the first hint drawn.
+    std::size_t hintRow{0};         ///< First row of the panel the hints float on.
+    std::size_t hintCount{0};       ///< Hints the panel shows, zero when there are none.
+    std::size_t hintOffset{0};      ///< Index in the whole list of the first hint shown.
+    std::size_t hintColumns{0};     ///< Columns the panel takes, from the left edge.
+    std::size_t hintTotal{0};       ///< Hints that match, whether the panel shows them or not.
     /// Rows hidden above the viewport when it is scrolled all the way up, which is the
     /// largest offset the model can hold.
     std::size_t maxScrollOffset{0};
@@ -58,6 +61,19 @@ struct RenderResult {
 /// @return The first row of the conversation that puts the thumb there.
 [[nodiscard]] std::size_t firstRowForThumb(std::size_t transcriptRows, std::size_t viewRows,
                                            std::size_t row);
+
+/// @param total Hints that match.
+/// @param rows Rows the panel of hints has.
+/// @param selected Which hint is selected, counted in the whole list.
+/// @return The row of the panel the thumb of its bar begins at.
+[[nodiscard]] std::size_t hintThumbRow(std::size_t total, std::size_t rows, std::size_t selected);
+
+/// The hint a row of the panel stands for, which is where dragging the thumb takes it.
+/// @param total Hints that match.
+/// @param rows Rows the panel of hints has.
+/// @param row Row of the panel the thumb is dragged to.
+/// @return The hint that row is over, counted in the whole list.
+[[nodiscard]] std::size_t hintAtThumbRow(std::size_t total, std::size_t rows, std::size_t row);
 
 /// Paints a model into a canvas of a given size.
 ///
