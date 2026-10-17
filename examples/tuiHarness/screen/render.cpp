@@ -127,13 +127,15 @@ void appendMessage(std::vector<TranscriptRow>& rows, const Message& message,
     }
 }
 
-/// Adds a note, which belongs to no speaker: it starts at the left edge and is shown quietly.
+/// Adds a note, which belongs to no speaker: it starts at the left edge.
 /// @param rows Rows collected so far, appended to.
 /// @param text Note to lay out.
 /// @param width Columns available for the body.
-void appendNote(std::vector<TranscriptRow>& rows, const std::string& text, std::size_t width) {
+/// @param style How it is painted.
+void appendNote(std::vector<TranscriptRow>& rows, const std::string& text, std::size_t width,
+                const Style& style) {
     for (const std::string& line : wrap(text, width)) {
-        rows.push_back({{}, line, Palette::muted(), Palette::muted()});
+        rows.push_back({{}, line, style, style});
     }
 }
 
@@ -152,13 +154,19 @@ void appendGap(std::vector<TranscriptRow>& rows) {
 void appendTurn(std::vector<TranscriptRow>& rows, const Message& message, const std::string& npc,
                 std::size_t width) {
     const std::size_t bodyWidth = width > PrefixWidth ? width - PrefixWidth : 1;
+    if (message.role == Role::Speaker) {
+        // The name over what follows, painted like the name of a speaker: a raw turn is
+        // credited to the npc that wrote it without the document reading as something it said.
+        appendNote(rows, message.text, width, Palette::primary());
+        return;
+    }
     if (message.role == Role::System) {
         if (message.continues) {
             // An action line is part of the reply above it, so it lines up under it.
             appendMessage(rows, message, {}, Palette::muted(), Palette::muted(), bodyWidth);
             return;
         }
-        appendNote(rows, message.text, width);
+        appendNote(rows, message.text, width, Palette::muted());
         return;
     }
 
@@ -280,33 +288,44 @@ std::vector<std::string> hintWindow(const std::vector<std::string>& all, std::si
                                     all.begin() + static_cast<std::ptrdiff_t>(first + MaxHints)};
 }
 
-/// Paints the scrollbar: one column on the right, a picture of where the viewport sits and
-/// nothing else. The track is dim, the thumb is not, and the thumb is painted in the accent
-/// colour while the pointer is over the bar, which is what says it can be dragged.
+/// Where a bar goes and what it stands for.
+struct BarLayout {
+    std::size_t firstRow{0};  ///< Row its track starts on.
+    std::size_t rows{0};      ///< Rows the track takes.
+    std::size_t column{0};    ///< Column it is painted in.
+    std::size_t total{0};     ///< Rows the whole thing takes.
+    std::size_t start{0};     ///< First row that is shown.
+    Style track;              ///< How the track is painted.
+    Style thumb;              ///< How the thumb is painted.
+    Style lit;                ///< How the thumb is painted while the pointer is over the bar.
+};
+
+/// Paints a scrollbar: one column, a picture of where the viewport sits and nothing else. The
+/// track is dim, the thumb is not, and the thumb is painted in the accent colour while the
+/// pointer is over the bar, which is what says it can be moved.
 /// @param frame Canvas to paint on.
-/// @param viewRows Rows the conversation occupies.
-/// @param width Columns available.
-/// @param total Rows the whole conversation takes.
-/// @param start First row of the conversation that is on screen.
+/// @param bar Where it goes and what it stands for.
 /// @param hovered Whether the pointer is over the bar.
-// The rows, the columns and the two counts are named at the only call site there is.
-// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-void paintScrollBar(Canvas& frame, std::size_t viewRows, std::size_t width, std::size_t total,
-                    std::size_t start, bool hovered) {
-    if (total <= viewRows || viewRows == 0 || width < 2) {
+void paintBar(Canvas& frame, const BarLayout& bar, bool hovered) {
+    if (bar.total <= bar.rows || bar.rows == 0 || bar.column >= frame.width()) {
         return;
     }
 
-    const std::size_t column = width - 1;
-    for (std::size_t row = 0; row < viewRows; ++row) {
-        frame.put(row, column, Glyphs::ScrollBar, Palette::muted().withDim());
+    for (std::size_t row = 0; row < bar.rows; ++row) {
+        frame.put(bar.firstRow + row, bar.column, Glyphs::ScrollBar, bar.track);
     }
 
-    const std::size_t thumb = std::max<std::size_t>(1, viewRows * viewRows / total);
-    const std::size_t firstRow = thumbRow(total, viewRows, start);
-    const Style style = hovered ? Palette::accent().withBold() : Palette::muted();
-    for (std::size_t row = 0; row < thumb; ++row) {
-        frame.put(firstRow + row, column, Glyphs::ScrollBar, style);
+    const std::size_t thumb = std::max<std::size_t>(1, bar.rows * bar.rows / bar.total);
+    const std::size_t top = thumbRow(bar.total, bar.rows, bar.start);
+    for (std::size_t row = 0; row < thumb && top + row < bar.rows; ++row) {
+        frame.put(bar.firstRow + top + row, bar.column, Glyphs::ScrollBar,
+                  hovered ? bar.lit : bar.thumb);
+    }
+
+    // A bar is the client's own drawing, so neither a copy nor a selection takes it for
+    // something that was said.
+    for (std::size_t row = 0; row < bar.rows; ++row) {
+        frame.at(bar.firstRow + row, bar.column).furniture = true;
     }
 }
 
@@ -341,14 +360,48 @@ std::string placeholderOf(const Model& model) {
                                           : std::string{"/create <description> to make an npc"};
 }
 
+/// The window of the draft the panel shows.
+struct PromptWindow {
+    std::size_t rows{0};   ///< Rows of the draft the panel shows.
+    std::size_t first{0};  ///< Row of the draft the window starts on.
+};
+
+/// The box can only be as tall as the screen, so a draft taller than that is shown through a
+/// window that keeps the caret inside it.
+/// @param total Rows the draft takes.
+/// @param caret Row of the draft the caret is on.
+/// @param height Rows the screen has.
+/// @return The rows of the draft the panel shows, and the first one of them.
+// Three counts, each named where it is used.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+PromptWindow promptWindow(std::size_t total, std::size_t caret, std::size_t height) {
+    const std::size_t room = height > 3 ? height - 3 : 1;
+    const std::size_t rows = std::min(total, room);
+    std::size_t first = 0;
+    if (rows > 0 && caret >= rows) {
+        first = caret + 1 - rows;
+    }
+    return PromptWindow{rows, first};
+}
+
 /// Paints the prompt inside the frame that holds it, the frame's top border included.
+///
+/// The panel shows a window of the rows of the draft, since the box can only be as tall as the
+/// screen: the caret is always inside the window, so what is being typed never leaves the
+/// screen, and the bar in the padding column says how much of the draft is out of it.
 /// @param frame Canvas to paint on.
 /// @param model Model to read the draft and the placeholder from.
 /// @param prompt The draft as it was laid out.
 /// @param firstRow Row the top border goes on.
 /// @param width Columns available.
+/// @param firstShown Row of the draft that the window starts on.
+/// @param shownRows Rows the window takes.
+/// @param pointer Where the pointer is, which decides whether the bar is lit up.
+// The row of the border, the width and the rows of the window are all counts, and they are
+// named where they are used.
 void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, std::size_t firstRow,
-                 std::size_t width) {
+                 std::size_t width,  // NOLINT(bugprone-easily-swappable-parameters)
+                 std::size_t firstShown, std::size_t shownRows, const Pointer& pointer) {
     const std::size_t markerColumn = BoxWidth + PanelPad;
     const std::size_t textColumn = markerColumn + PromptWidth;
     const std::size_t commandLength = commandTokenLength(model.draft);
@@ -359,10 +412,9 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
 
     // The panel is the box and the frame runs along its inside edge: the strokes are the first
     // pixel of colour on every side, so the colour does not show outside them and the text sits
-    // in a band of it. The panel is as tall as the line being typed, with a column of it on each
-    // side.
-    const std::size_t panelRows = prompt.rows.size();
-    const std::size_t boxRows = panelRows + 2;
+    // in a band of it. The panel is as tall as the draft gets on the screen, with a column of it
+    // on each side.
+    const std::size_t boxRows = shownRows + 2;
     if (width > 0) {
         for (std::size_t row = firstRow; row < firstRow + boxRows; ++row) {
             frame.fill(row, 0, width, Palette::panel());
@@ -370,17 +422,18 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
     }
 
     paintBoxBorder(frame, firstRow, width, true);
-    for (std::size_t index = 0; index < panelRows; ++index) {
+    for (std::size_t index = 0; index < shownRows; ++index) {
+        const std::size_t source = firstShown + index;
         const std::size_t row = firstRow + 1 + index;
         frame.put(row, 0, Glyphs::BoxLeft, border);
         frame.put(row, width - 1, Glyphs::BoxRight, border);
-        if (index == 0) {
+        if (source == 0) {
             frame.put(row, markerColumn, Glyphs::PromptMarker,
                       Palette::accent().withBackground(Palette::panelColor()));
         }
 
-        const std::size_t rangeStart = prompt.ranges[index].first;
-        const std::string& text = prompt.rows[index];
+        const std::size_t rangeStart = prompt.ranges[source].first;
+        const std::string& text = prompt.rows[source];
         const std::size_t token =
             commandLength > rangeStart ? std::min(commandLength - rangeStart, text.size()) : 0;
         if (token > 0) {
@@ -389,14 +442,26 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
         }
         frame.put(row, textColumn + token, std::string_view{text}.substr(token),
                   Palette::text().withBackground(Palette::panelColor()));
-        if (index == 0 && model.draft.empty()) {
+        if (source == 0 && model.draft.empty()) {
             // What the empty prompt says is a line of its own: it is cut with an ellipsis rather
             // than allowed to run over the frame when the window is narrow.
             frame.put(row, textColumn, clip(placeholderOf(model), textColumns),
                       Palette::muted().withBackground(Palette::panelColor()));
         }
     }
-    paintBoxBorder(frame, firstRow + panelRows + 1, width, false);
+    paintBoxBorder(frame, firstRow + shownRows + 1, width, false);
+
+    // The bar goes in the padding column inside the frame, which is empty anyway, so the draft
+    // keeps the columns it had. It is only there when the draft is taller than the panel.
+    const std::size_t barColumn = width > BoxWidth + PanelPad ? width - BoxWidth - PanelPad : 0;
+    const bool hovered = pointer.onScreen && pointer.column == barColumn &&
+                         pointer.row > firstRow && pointer.row <= firstRow + shownRows;
+    paintBar(frame,
+             BarLayout{firstRow + 1, shownRows, barColumn, prompt.rows.size(), firstShown,
+                       Palette::muted().withDim().withBackground(Palette::panelColor()),
+                       Palette::muted().withBackground(Palette::panelColor()),
+                       Palette::accent().withBackground(Palette::panelColor()).withBold()},
+             hovered);
 }
 
 /// Where the panel of hints goes and what it holds.
@@ -561,15 +626,22 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     const std::size_t textColumns = lastColumn >= textColumn ? lastColumn - textColumn + 1 : 1;
     const DraftLayout prompt = layoutDraft(model.draft, textColumns);
 
+    // The caret decides which rows of the draft the panel shows: the line being typed is always
+    // inside the window, which is what makes typing past the height of the box work.
+    const std::size_t caret = std::min(model.cursor, model.draft.size());
+    const auto position = prompt.positions.at(caret);
+    const PromptWindow window = promptWindow(prompt.rows.size(), position.first, height);
+
     const std::vector<std::string> all = App::hintsFor(model);
     const std::size_t selected = all.empty() ? 0 : std::min(model.hintIndex, all.size() - 1);
     std::size_t first = 0;
     const std::vector<std::string> hints = hintWindow(all, selected, first);
 
     // The frame takes two rows of its own: the line being typed is the panel inside it, and the
-    // status row goes under the whole thing. The hints float over the conversation, so they do
-    // not take rows of their own.
-    const std::size_t boxRows = prompt.rows.size() + 2;
+    // status row goes under the whole thing. The box grows with the draft until it takes the
+    // screen, and the status keeps its row while there is room. The hints float over the
+    // conversation, so they do not take rows of their own.
+    const std::size_t boxRows = window.rows + 2;
     const bool withStatus = height > boxRows;
     const std::size_t bottomRows = boxRows + (withStatus ? 1 : 0);
     const std::size_t viewRows = height > bottomRows ? height - bottomRows : 0;
@@ -605,8 +677,12 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
             frame.put(row, measure(line.prefix), line.body, line.bodyStyle);
         }
     }
-    paintScrollBar(frame, viewRows, width, total, start,
-                   pointer.onScreen && pointer.column + 1 == width && pointer.row < viewRows);
+    if (width > 1) {
+        paintBar(frame,
+                 BarLayout{0, viewRows, width - 1, total, start, Palette::muted().withDim(),
+                           Palette::muted(), Palette::accent().withBold()},
+                 pointer.onScreen && pointer.column + 1 == width && pointer.row < viewRows);
+    }
     result.scrollRows = viewRows;
     result.transcriptRows = total;
 
@@ -625,8 +701,8 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
 
     // The prompt, framed, which is the part that stays put while the conversation moves.
     std::size_t row = viewRows;
-    paintPrompt(frame, model, prompt, row, width);
-    row += prompt.rows.size() + 2;
+    paintPrompt(frame, model, prompt, row, width, window.first, window.rows, pointer);
+    row += window.rows + 2;
 
     if (withStatus) {
         // The status is the last row, but it is cut all the same: it ends in an ellipsis rather
@@ -634,8 +710,7 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
         frame.put(row, 0, clip(statusRow(model), width), Palette::muted());
     }
 
-    const auto position = prompt.positions.at(std::min(model.cursor, model.draft.size()));
-    result.caretRow = viewRows + 1 + position.first;
+    result.caretRow = viewRows + 1 + (position.first - window.first);
     result.caretColumn = BoxWidth + PanelPad + PromptWidth + position.second;
 
     // What was picked out is painted inside the rows of its scope: a span of the conversation

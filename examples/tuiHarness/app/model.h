@@ -29,7 +29,8 @@ enum class Role : std::uint8_t {
     User,     ///< What the player typed.
     Npc,      ///< What the npc says out loud.
     Thought,  ///< What the npc thought first: named like the npc, painted quietly.
-    System    ///< A note from the client, belonging to no speaker.
+    System,   ///< A note from the client, belonging to no speaker.
+    Speaker   ///< The name of the npc on a line of its own, over what follows.
 };
 
 /// One finished turn of the conversation, oldest first.

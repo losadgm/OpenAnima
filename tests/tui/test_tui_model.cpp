@@ -415,6 +415,7 @@ TEST_CASE("raw mode names the npc that answered") {
     // The document comes last, with the name of the npc over it: the json says what the model
     // wrote, and the name says whose turn it was.
     REQUIRE(model.messages.size() >= 2);
+    CHECK(model.messages[model.messages.size() - 2].role == OpenAnimaTui::App::Role::Speaker);
     CHECK(model.messages[model.messages.size() - 2].text == "npc 1:");
     CHECK(model.messages.back().role == OpenAnimaTui::App::Role::System);
     CHECK(model.messages.back().text.find("\"dialogue\"") != std::string::npos);

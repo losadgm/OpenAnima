@@ -489,6 +489,61 @@ TEST_CASE("a picking of the prompt stays where it is, whether the text scrolls o
     CHECK_FALSE(rendered.frame.at(7, 8).style.reverse);
 }
 
+TEST_CASE("raw mode names the npc in the colour of a speaker, not in the quiet one") {
+    Model model;
+    model.raw = true;
+    model.messages.push_back({OpenAnimaTui::App::Role::Speaker, "npc 1:", false});
+    model.messages.push_back(
+        {OpenAnimaTui::App::Role::System, R"({"dialogue": "Good evening."})", false});
+
+    const RenderResult rendered = render(model, 40, 10);
+    CHECK(readRow(rendered.frame, 0).rfind("npc 1:", 0) == 0);
+    CHECK(rendered.frame.at(0, 0).style.foreground.equals(Palette::primary().foreground));
+
+    // The document under it stays quiet, which is what tells it apart from what was said.
+    REQUIRE(viewportRows(rendered) > 2);
+    CHECK(rendered.frame.at(2, 0).style.foreground.equals(Palette::muted().foreground));
+}
+
+TEST_CASE("a draft taller than the screen keeps a window of itself and a bar") {
+    Model model;
+    for (int line = 0; line < 20; ++line) {
+        type(model, "line " + std::to_string(line));
+        if (line + 1 < 20) {
+            (void)press(model, Key::Kind::CtrlEnter);
+        }
+    }
+    const RenderResult rendered = render(model, 40, 10);
+
+    // The line being typed is the last one, so the window followed the caret to it and the
+    // first lines are out of it.
+    const std::string screen = readAll(rendered.frame);
+    CHECK(screen.find("line 19") != std::string::npos);
+    CHECK(screen.find("line 13") != std::string::npos);
+    CHECK(screen.find("line 0") == std::string::npos);
+    CHECK(rendered.caretRow == 7);  // The last row of the panel, inside the box.
+
+    // The bar takes the padding column inside the frame, over the rows of the panel.
+    const std::size_t column = 38;
+    for (std::size_t row = 1; row <= 7; ++row) {
+        CHECK(isBarCell(rendered.frame.at(row, column)));
+    }
+    CHECK_FALSE(isBarCell(rendered.frame.at(8, column)));  // The bottom border is there.
+
+    // It lights up under the pointer, the same as the ones of the conversation and the hints.
+    const RenderResult hovered =
+        render(model, 40, 10, Selection{}, OpenAnimaTui::Screen::Pointer{true, 7, column});
+    CHECK(hovered.frame.at(7, column).style.bold);
+    CHECK(hovered.frame.at(7, column).style.foreground.equals(Palette::accent().foreground));
+    CHECK_FALSE(hovered.frame.at(1, column).style.bold);  // The track stays the track.
+
+    // A draft that fits the box needs no bar, and the padding column stays padding.
+    Model shortDraft;
+    type(shortDraft, "hola");
+    const RenderResult fits = render(shortDraft, 40, 10);
+    CHECK_FALSE(isBarCell(fits.frame.at(7, column)));
+}
+
 TEST_CASE("a hint lights up under the pointer, and the rows of the others do not") {
     Model model;
     type(model, "/");

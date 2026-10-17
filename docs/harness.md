@@ -29,7 +29,8 @@ contract defines it.
 - `--provider` picks the provider, and `rest` is the only one that exists today.
 - `--raw`, or `/raw` in a session, prints the reply document and nothing else: the three
   variables as the model wrote them, which is what to look at when a turn comes back wrong.
-  The name of the npc still goes over the document, so a transcript reads whose turn it was.
+  The name of the npc still goes over the document, in the colour a name is painted with, so a
+  transcript reads whose turn it was.
 - The session speaks the vocabulary of the console client: `/create`, `/enter`, `/npcs`,
   `/leave`, `/clear`, `/raw`, `/help` and `/quit`. Given an argument it does not take, each
   answers with its usage.
@@ -113,7 +114,10 @@ repeating the name or opening a gap.
   Mono does not. The band inside is the line itself, with a column of it on each side, so the
   text never sits against the frame. While the line is empty the frame says what can be done
   from there, which is not the same in the lobby as in a conversation, and the words go as soon
-  as there is something to say.
+  as there is something to say. The box grows with the draft, row by row, until it would be
+  taller than the window: past that the panel keeps a window of its rows that follows the caret,
+  so what is being typed is never off the screen, and the padding column inside the frame
+  carries a bar that says how much of the draft is out of it.
 - The commands that complete what is being typed float over the last rows of the conversation,
   on a lighter panel of their own. The panel is as wide as the longest command, its indent and
   the margin after it, anchored to the left edge, so the rest of those rows still shows what was
@@ -180,7 +184,8 @@ click takes the whole row, the way a terminal does it; a cell that is not part o
 word of its own. Picking is only over what was said: the box of the prompt, its padding, the
 marker beside it and the scrollbar on the right are the client's own drawing, so a drag across
 them paints the text and leaves them as they were, and a copy of that same selection holds the
-words without the box and comes out flush with the left edge.
+words without the box and comes out flush with the left edge. The bar inside the box is the
+client's drawing too, and the padding column it takes is not part of the draft.
 Any other key drops the picking, so a selection never sits over text that has been typed over.
 The wheel and the page keys are the exception: they move the conversation, and a picking made in
 it goes with the words it covers, so it stays over what was picked out while it scrolls, and it
