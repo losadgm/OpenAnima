@@ -215,8 +215,9 @@ TEST_CASE("the rows a pick really covers are clipped to its scope and the screen
 
     const std::optional<RowSpan> span = coveredRows(selection, Bounds{0, 5}, 10);
     REQUIRE(span.has_value());
-    CHECK(span->first == 2);
-    CHECK(span->last == 4);
+    const RowSpan rows = span.value_or(RowSpan{});
+    CHECK(rows.first == 2);
+    CHECK(rows.last == 4);
 
     // Pushed far above the top, nothing of it is there.
     selection.shift(-40);

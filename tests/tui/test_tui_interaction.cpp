@@ -42,10 +42,13 @@ public:
     [[nodiscard]] std::size_t height() const override {
         return Height;
     }
-    [[nodiscard]] std::optional<Key> readKey(std::chrono::milliseconds) override {
+    [[nodiscard]] std::optional<Key> readKey(std::chrono::milliseconds timeout) override {
+        (void)timeout;
         return std::nullopt;
     }
-    void write(std::string_view) override {}
+    void write(std::string_view text) override {
+        (void)text;
+    }
     [[nodiscard]] bool flush() override {
         return true;
     }
@@ -87,6 +90,12 @@ void layOut(Model& model, Interaction& interaction) {
         model, Width, Height, interaction.selection, interaction.pointer);
 }
 
+/// @param kind What the mouse did.
+/// @param column Column it happened at.
+/// @param row Row it happened at.
+/// @return The key the terminal would produce.
+// A position on the grid is a column and a row, and they are named where they are used.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 Key mouse(Key::Kind kind, std::size_t column, std::size_t row) {
     Key key{kind, 0};
     key.column = column;
@@ -188,12 +197,13 @@ TEST_CASE("dragging the bar of the prompt moves the draft under it") {
     const std::size_t top = interaction.shape.scrollRows + 1;
     (void)send(interaction, model, mouse(Key::Kind::MousePress, column, top), clipboard, terminal);
     REQUIRE(model.promptScroll.has_value());
-    CHECK(*model.promptScroll == 0);
+    CHECK(model.promptScroll.value_or(0) == 0);
 
     (void)send(interaction, model,
                mouse(Key::Kind::MouseDrag, column, top + interaction.shape.promptRows - 1),
                clipboard, terminal);
-    CHECK(*model.promptScroll == interaction.shape.promptTotal - interaction.shape.promptRows);
+    CHECK(model.promptScroll.value_or(0) ==
+          interaction.shape.promptTotal - interaction.shape.promptRows);
 }
 
 TEST_CASE("the wheel over the prompt moves the draft a row at a time") {
@@ -205,14 +215,14 @@ TEST_CASE("the wheel over the prompt moves the draft a row at a time") {
     REQUIRE(interaction.shape.promptTotal > interaction.shape.promptRows);
     const std::size_t row = interaction.shape.scrollRows + 2;
 
-    const Key up{Key::Kind::WheelUp, 0, 0, row};
-    CHECK(send(interaction, model, up, clipboard, terminal).used);
+    const Key wheelUp{Key::Kind::WheelUp, 0, 0, row};
+    CHECK(send(interaction, model, wheelUp, clipboard, terminal).used);
     REQUIRE(model.promptScroll.has_value());
-    CHECK(*model.promptScroll == interaction.shape.promptFirst - 1);
+    CHECK(model.promptScroll.value_or(0) == interaction.shape.promptFirst - 1);
 
-    const Key down{Key::Kind::WheelDown, 0, 0, row};
-    CHECK(send(interaction, model, down, clipboard, terminal).used);
-    CHECK(*model.promptScroll == interaction.shape.promptFirst);
+    const Key wheelDown{Key::Kind::WheelDown, 0, 0, row};
+    CHECK(send(interaction, model, wheelDown, clipboard, terminal).used);
+    CHECK(model.promptScroll.value_or(0) == interaction.shape.promptFirst);
 }
 
 TEST_CASE("a drag that waits at an edge of the prompt keeps the draft moving") {
@@ -232,7 +242,7 @@ TEST_CASE("a drag that waits at an edge of the prompt keeps the draft moving") {
 
     const auto start = std::chrono::steady_clock::now();
     CHECK(autoscrollAtEdge(interaction, model, start));
-    CHECK(*model.promptScroll == 5);
+    CHECK(model.promptScroll.value_or(0) == 5);
     // A drag at an edge moves a row at a time, not a row per turn of the loop.
     CHECK_FALSE(autoscrollAtEdge(interaction, model, start + std::chrono::milliseconds{10}));
 
@@ -247,7 +257,7 @@ TEST_CASE("a drag that waits at an edge of the prompt keeps the draft moving") {
                      interaction.shape.scrollRows + interaction.shape.promptRows),
                clipboard, terminal);
     CHECK(autoscrollAtEdge(interaction, model, start + std::chrono::milliseconds{60}));
-    CHECK(*model.promptScroll == 6);
+    CHECK(model.promptScroll.value_or(0) == 6);
 }
 
 TEST_CASE("a key that is not the screen's goes to the model, and drops what was picked out") {
@@ -284,3 +294,5 @@ TEST_CASE("the copy key takes what was picked out") {
     CHECK(terminal.copied == "you");
     CHECK_FALSE(interaction.selection.active());
 }
+
+// NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
