@@ -25,7 +25,6 @@ using OpenAnimaTui::App::Model;
 using OpenAnimaTui::Screen::render;
 using OpenAnimaTui::Screen::RenderResult;
 using OpenAnimaTui::Screen::Selection;
-using OpenAnimaTui::Screen::Metrics::BoxWidth;
 using OpenAnimaTui::Screen::Metrics::MaxHints;
 using namespace OpenAnimaTui::Tests;
 
@@ -88,10 +87,10 @@ bool isBarCell(const Cell& cell) {
 }
 
 /// @return How many rows the conversation occupies: everything above the frame of the prompt,
-///         whose top border is a hairline that starts where the vertical one is drawn.
+///         whose top border is a hairline all the way across.
 std::size_t viewportRows(const RenderResult& rendered) {
     for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
-        if (readRow(rendered.frame, row).find("\u2581") == BoxWidth) {
+        if (readRow(rendered.frame, row).rfind("\u2581", 0) == 0) {
             return row;
         }
     }
@@ -145,21 +144,21 @@ TEST_CASE("the prompt sits inside a frame, with the caret in it") {
 
     // Ten rows: four of conversation, the top border, a row of panel, the prompt, another row
     // of panel, the bottom border and the status.
-    CHECK(readRow(rendered.frame, 4).rfind(" \u2581", 0) == 0);
-    CHECK(readRow(rendered.frame, 8).rfind(" \u2594", 0) == 0);
+    CHECK(readRow(rendered.frame, 4).rfind("\u2581", 0) == 0);
+    CHECK(readRow(rendered.frame, 8).rfind("\u2594", 0) == 0);
 
     // The panel is the inside of the frame: the stroke is exactly where the colour changes.
     CHECK(rendered.frame.at(4, 1).style.background.kind == Color::Kind::Default);
-    CHECK(rendered.frame.at(5, 0).style.background.kind == Color::Kind::Default);
+    CHECK(rendered.frame.at(5, 0).style.background.equals(Palette::panelColor()));
     CHECK(rendered.frame.at(5, 1).style.background.equals(Palette::panelColor()));
     CHECK(rendered.frame.at(7, 1).style.background.equals(Palette::panelColor()));
 
-    const OpenAnimaTui::Screen::Cell& marker = rendered.frame.at(6, 2);
+    const OpenAnimaTui::Screen::Cell& marker = rendered.frame.at(6, 1);
     CHECK(std::string(marker.glyph.data(), marker.length) == "\u2771");
     CHECK(marker.style.foreground.equals(Palette::accent().foreground));
     CHECK(marker.style.background.equals(Palette::panelColor()));
     CHECK(rendered.caretRow == 6);
-    CHECK(rendered.caretColumn == 4 + 3);
+    CHECK(rendered.caretColumn == 3 + 3);
 }
 
 TEST_CASE("the status line sits under the frame, with no indent and no panel") {
@@ -168,7 +167,7 @@ TEST_CASE("the status line sits under the frame, with no indent and no panel") {
 
     CHECK(readRow(rendered.frame, 9).rfind("no npc", 0) == 0);
     CHECK(rendered.frame.at(9, 0).style.background.kind == Color::Kind::Default);
-    CHECK(readRow(rendered.frame, 8).rfind(" \u2594", 0) == 0);
+    CHECK(readRow(rendered.frame, 8).rfind("\u2594", 0) == 0);
 }
 
 TEST_CASE("the empty prompt says what can be done, and stops saying it when typed in") {
@@ -188,11 +187,11 @@ TEST_CASE("the empty prompt says what can be done, and stops saying it when type
 
 TEST_CASE("a long prompt wraps and the caret follows it down") {
     Model model;
-    type(model, std::string(30, 'x'));
+    type(model, std::string(31, 'x'));
     const RenderResult rendered = render(model, 20, 12);
-    // Inside the frame: the stroke, a column of panel, the marker and its space, fourteen of text.
+    // Inside the box: the stroke column, the marker and its space, fifteen columns of text.
     CHECK(rendered.caretRow == 8);
-    CHECK(rendered.caretColumn == 4 + (30 - 28));
+    CHECK(rendered.caretColumn == 3 + (31 - 30));
 }
 
 TEST_CASE("the conversation is a viewport over the turns") {
@@ -352,13 +351,13 @@ TEST_CASE("a character still arriving leaves the prompt clean") {
     type(model, "a");
     type(model, "\xc3");  // The first byte of an enye, with the one after it still on its way.
     RenderResult rendered = render(model, 40, 10);
-    CHECK(readRow(rendered.frame, 6).rfind("\u2595 \u2771 a", 0) == 0);
-    CHECK(rendered.frame.at(6, 5).isBlank());
+    CHECK(readRow(rendered.frame, 6).rfind("\u258E\u2771 a", 0) == 0);
+    CHECK(rendered.frame.at(6, 4).isBlank());
 
     type(model, "\xb1");
     rendered = render(model, 40, 10);
     CHECK(readRow(rendered.frame, 6).find("a\u00f1") != std::string::npos);
-    CHECK(rendered.frame.at(6, 5).length == 2);
+    CHECK(rendered.frame.at(6, 4).length == 2);
 }
 
 TEST_CASE("a turn in flight is shown as the answer arrives") {
