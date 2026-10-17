@@ -23,6 +23,7 @@ using App::Model;
 using App::Role;
 using Metrics::BoxWidth;
 using Metrics::HintIndent;
+using Metrics::HintPad;
 using Metrics::MaxHints;
 using Metrics::PanelPad;
 using Metrics::PrefixWidth;
@@ -399,10 +400,10 @@ struct HintLayout {
 
 /// Columns the panel of hints takes.
 ///
-/// The panel is as wide as the longest command, its indent and one column of margin at the end,
-/// which is the column the bar takes when the list does not fit the panel. A screen narrower
-/// than that keeps the panel inside itself: it takes what there is, and the commands that no
-/// longer fit whole are cut with an ellipsis.
+/// The panel is as wide as the longest command, its indent and the margin after it, which is
+/// where the bar goes when the list does not fit the panel. A screen narrower than that keeps
+/// the panel inside itself: it takes what there is, and the commands that no longer fit whole
+/// are cut with an ellipsis.
 /// @param hints Hints that match, whether the panel shows them or not.
 /// @param width Columns of the screen.
 /// @return The columns of the panel, never wider than the screen.
@@ -412,7 +413,7 @@ struct HintLayout {
     for (const std::string& hint : hints) {
         longest = std::max(longest, measure(hint));
     }
-    return std::min(width, HintIndent + longest + 1);
+    return std::min(width, HintIndent + longest + HintPad);
 }
 
 /// Paints the panel of hints: the commands that complete what is being typed, floating over the

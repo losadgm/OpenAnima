@@ -503,7 +503,8 @@ TEST_CASE("the hints float on a panel of their own that leaves the conversation 
     for (const std::string& hint : OpenAnimaTui::App::hintsFor(model)) {
         longest = std::max(longest, OpenAnimaTui::Screen::measure(hint));
     }
-    CHECK(hinted.hintColumns == OpenAnimaTui::Screen::Metrics::HintIndent + longest + 1);
+    CHECK(hinted.hintColumns == OpenAnimaTui::Screen::Metrics::HintIndent + longest +
+                                    OpenAnimaTui::Screen::Metrics::HintPad);
     REQUIRE(hinted.hintCount > 0);
     CHECK(hinted.hintRow + hinted.hintCount == hinted.scrollRows);
     CHECK(hinted.frame.at(hinted.hintRow, 0).style.background.equals(Palette::raisedColor()));
@@ -518,7 +519,8 @@ TEST_CASE("the panel of hints is as wide as its longest command, or as the scree
     for (const std::string& hint : OpenAnimaTui::App::hintsFor(model)) {
         longest = std::max(longest, OpenAnimaTui::Screen::measure(hint));
     }
-    const std::size_t needed = OpenAnimaTui::Screen::Metrics::HintIndent + longest + 1;
+    const std::size_t needed = OpenAnimaTui::Screen::Metrics::HintIndent + longest +
+                               OpenAnimaTui::Screen::Metrics::HintPad;
 
     // The command, its indent and a column of margin, whatever the screen is.
     CHECK(render(model, 200, 12).hintColumns == needed);

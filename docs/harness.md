@@ -116,7 +116,7 @@ repeating the name or opening a gap.
   as there is something to say.
 - The commands that complete what is being typed float over the last rows of the conversation,
   on a lighter panel of their own. The panel is as wide as the longest command, its indent and
-  a column of margin, anchored to the left edge, so the rest of those rows still shows what was
+  the margin after it, anchored to the left edge, so the rest of those rows still shows what was
   said. A screen narrower than that keeps the panel inside itself, and the commands that no
   longer fit whole are cut with an ellipsis. It takes no rows away from the viewport. The
   selected one is in the accent colour; the arrows walk them and stop at the first and the last

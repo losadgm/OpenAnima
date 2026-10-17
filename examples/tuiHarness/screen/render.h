@@ -20,6 +20,8 @@ constexpr std::size_t BoxWidth = 1;     ///< Columns the frame around the prompt
 constexpr std::size_t PanelPad = 1;     ///< Columns of panel kept empty inside the frame, a side.
 constexpr std::size_t MaxHints = 6;     ///< Command hints shown at once.
 constexpr std::size_t HintIndent = 2;   ///< Columns a hint is indented by.
+/// Columns kept empty after the longest hint, one of which the bar takes when there is one.
+constexpr std::size_t HintPad = 2;
 
 }  // namespace Metrics
 
