@@ -5,8 +5,8 @@
 
 #include <cstddef>
 
-#include "domain/model.h"
 #include "canvas.h"
+#include "domain/model.h"
 #include "selection.h"
 
 namespace OpenAnimaTui::Presentation {
