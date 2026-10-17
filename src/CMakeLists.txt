@@ -20,9 +20,11 @@ add_library(OpenAnima::OpenAnima ALIAS OpenAnima)
 
 target_compile_features(OpenAnima PUBLIC cxx_std_17)
 
-# SseReader.h is an implementation detail, so it lives next to its implementation
-# instead of in the public tree: including it as "OpenAnima/Provider/SseReader.h"
-# keeps the same shape a public header has without installing it.
+# Two headers are implementation details, Provider/SseReader.h and
+# Core/ReplyStream.h: they live next to their implementation instead of in the
+# public tree, and including them as "OpenAnima/Provider/SseReader.h" and
+# "OpenAnima/Core/ReplyStream.h" keeps the shape a public header has without
+# installing it.
 target_include_directories(OpenAnima
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR})
