@@ -101,6 +101,20 @@ RestProviderConfig readConfiguration(const Options& options) {
 void printTurnEnd(const Event& event, bool raw) {
     const NpcReply* reply = event.reply.has_value() ? &*event.reply : nullptr;
 
+    // Raw mode is the document and nothing else: what the model wrote, not what the client
+    // makes of it.
+    if (raw) {
+        if (reply == nullptr) {
+            std::cout << event.completion.text << '\n';
+        } else if (reply->document.is_null()) {
+            std::cout << "(no document: the turn was stopped before it was whole)\n";
+        } else {
+            std::cout << reply->document.dump(2) << '\n';
+        }
+        std::cout << std::flush;
+        return;
+    }
+
     if (reply == nullptr) {
         std::cout << event.completion.text << '\n';
     } else {
@@ -125,15 +139,6 @@ void printTurnEnd(const Event& event, bool raw) {
         std::cout << "(the reply hit the token limit)\n";
     } else if (event.completion.finishReason == FinishReason::ContentFilter) {
         std::cout << "(the provider trimmed the reply)\n";
-    }
-
-    if (raw && reply != nullptr) {
-        std::cout << "--- raw ---\n";
-        if (reply->document.is_null()) {
-            std::cout << "(no document: the turn was stopped before it was whole)\n";
-        } else {
-            std::cout << reply->document.dump(2) << '\n';
-        }
     }
     std::cout << std::flush;
 }

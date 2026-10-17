@@ -27,9 +27,8 @@ contract defines it.
   session. A prompt with nobody to answer it says how to make one instead of asking a model
   without a role.
 - `--provider` picks the provider, and `rest` is the only one that exists today.
-- `--raw`, or `/raw` in a session, prints the reply document as JSON after the dialogue: the
-  three variables as the model wrote them, which is what to look at when a turn comes back
-  wrong.
+- `--raw`, or `/raw` in a session, prints the reply document and nothing else: the three
+  variables as the model wrote them, which is what to look at when a turn comes back wrong.
 - The session speaks the vocabulary of the console client: `/create`, `/enter`, `/npcs`,
   `/leave`, `/clear`, `/raw`, `/help` and `/quit`. Given an argument it does not take, each
   answers with its usage.
@@ -89,7 +88,8 @@ what is happening and what can be pressed.
 ```
 
 The commands are listed while one is being typed, up to six of them, with the selected one in
-the accent colour, and the list is cut rather than pushed around when the window is short.
+the accent colour. When there are more than fit, the panel shows the ones around the
+selection, so a command reached with the arrows is never off the panel.
 
 A blank row separates every message from the one before it, so a conversation reads as turns
 instead of as one block of text.
@@ -154,6 +154,7 @@ talk to:
 | `/npcs` | Lists the NPCs, and which one is being talked to |
 | `/leave` | Leaves the conversation, keeping it |
 | `/clear` | Drops the active conversation, keeping the persona |
+| `/raw [on|off]` | Shows every turn as the JSON the model wrote, instead of the dialogue |
 | `/help` | Lists the keys and the commands |
 | `/quit` | Leaves |
 

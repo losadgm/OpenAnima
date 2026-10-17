@@ -77,6 +77,17 @@ void answer(Model& model, const std::string& text) {
     (void)OpenAnimaTui::App::applyEvent(model, finished());
 }
 
+/// A turn that came back as a reply, with the document the model wrote.
+OpenAnima::Core::Event finishedWithReply(const std::string& document) {
+    OpenAnima::Core::Event event = finished();
+    OpenAnima::Core::NpcReply reply;
+    reply.reasoning = "It looks harmless.";
+    reply.dialogue = "Good evening.";
+    reply.document = nlohmann::ordered_json::parse(document);
+    event.reply = reply;
+    return event;
+}
+
 }  // namespace
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
@@ -311,6 +322,62 @@ TEST_CASE("the clock only runs while a turn is in flight") {
     CHECK(OpenAnimaTui::App::elapsedTenths(model) == 0);
     CHECK(model.busy);
     CHECK(model.startedAt != std::chrono::steady_clock::time_point{});
+}
+
+TEST_CASE("/raw switches between the dialogue and the document") {
+    Model model = modelWithNpc();
+    CHECK_FALSE(model.raw);
+
+    (void)submit(model, "/raw");
+    CHECK(model.raw);
+    CHECK(model.messages.back().text == "raw json on");
+
+    (void)submit(model, "/raw off");
+    CHECK_FALSE(model.raw);
+    CHECK(model.messages.back().text == "raw json off");
+
+    (void)submit(model, "/raw maybe");
+    CHECK_FALSE(model.raw);
+    CHECK(model.messages.back().text == "usage: /raw [on|off]");
+}
+
+TEST_CASE("raw mode shows the turn as the document, once it is over") {
+    Model model = modelWithNpc();
+    (void)submit(model, "/raw on");
+    (void)submit(model, "hello");
+
+    // Nothing is painted while the turn runs: the document is the only thing that goes in.
+    (void)OpenAnimaTui::App::applyEvent(model, delta("Good "));
+    CHECK(model.answer.empty());
+
+    (void)OpenAnimaTui::App::applyEvent(
+        model,
+        finishedWithReply(
+            R"({"reasoning":"It looks harmless.","dialogue":"Good evening.","actions":[]})"));
+
+    CHECK_FALSE(model.busy);
+    CHECK(model.messages.back().role == OpenAnimaTui::App::Role::System);
+    CHECK(model.messages.back().text.find("\"dialogue\": \"Good evening.\"") != std::string::npos);
+
+    // The formatted view is not there: no muted reasoning and no dialogue of its own.
+    for (const Message& message : model.messages) {
+        CHECK(message.text.rfind("~ ", 0) != 0);
+        CHECK(message.text != "Good evening.");
+    }
+}
+
+TEST_CASE("raw mode says so when there is no document to show") {
+    Model model = modelWithNpc();
+    (void)submit(model, "/raw on");
+    (void)submit(model, "hello");
+
+    OpenAnima::Core::Event over = finished();
+    over.completion.finishReason = OpenAnima::Core::FinishReason::Cancelled;
+    over.reply = OpenAnima::Core::NpcReply{};
+    (void)OpenAnimaTui::App::applyEvent(model, over);
+
+    CHECK_FALSE(model.busy);
+    CHECK(model.messages.back().text.find("no document") != std::string::npos);
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

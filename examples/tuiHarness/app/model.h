@@ -65,6 +65,7 @@ struct Model {
     std::size_t hintIndex{0};     ///< Which of the command hints is selected.
     std::string answer;           ///< Text of the turn in flight.
     std::string modelName;        ///< Model that answers, for the status line.
+    bool raw{false};              ///< Show every turn as the JSON the model wrote.
     bool busy{false};             ///< A turn is in flight: the NPC is writing.
     bool cancelling{false};       ///< The turn in flight was asked to stop and has not ended yet.
     bool running{true};

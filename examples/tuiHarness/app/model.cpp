@@ -168,6 +168,7 @@ void showHelp(Model& model) {
     note(model, "  /npcs                 list the npcs");
     note(model, "  /leave                leave the conversation");
     note(model, "  /clear                drop the active conversation, keep the persona");
+    note(model, "  /raw [on|off]         show every turn as the JSON the model wrote");
     note(model, "  /help                 this list");
     note(model, "  /quit                 leave");
 }
@@ -256,6 +257,22 @@ void runCommand(Model& model, const std::string& rawDraft, std::vector<Effect>& 
         model.messages.clear();
         effects.push_back({EffectKind::ClearHistory, *model.world.active, {}});
         note(model, "conversation dropped, the persona stays");
+        return;
+    }
+
+    if (draft == "/raw") {
+        model.raw = !model.raw;
+        note(model, std::string{"raw json "} + (model.raw ? "on" : "off"));
+        return;
+    }
+    if (draft.rfind("/raw ", 0) == 0) {
+        const std::string argument = draft.substr(5);
+        if (argument != "on" && argument != "off") {
+            note(model, "usage: /raw [on|off]");
+            return;
+        }
+        model.raw = argument == "on";
+        note(model, std::string{"raw json "} + (model.raw ? "on" : "off"));
         return;
     }
 
@@ -454,16 +471,37 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
     return effects;
 }
 
+/// Writes the turn as the document the model wrote, which is all raw mode shows.
+/// @param model Model to write into.
+/// @param event Finished event of the turn.
+void noteRawTurn(Model& model, const Event& event) {
+    if (!event.reply.has_value() || event.reply->document.is_null()) {
+        note(model, "(no document: the turn was stopped before it was whole)");
+        return;
+    }
+    note(model, event.reply->document.dump(2));
+}
+
 bool applyEvent(Model& model, const Event& event) {
     switch (event.kind) {
     case OpenAnima::Core::EventKind::Started:
         return false;
     case OpenAnima::Core::EventKind::Delta:
+        // Raw mode shows the turn once it is over, so the dialogue is not painted while it
+        // arrives: the document is the only thing that goes in.
+        if (model.raw) {
+            return false;
+        }
         model.answer += event.text;
         return true;
     case OpenAnima::Core::EventKind::Finished:
         model.busy = false;
         model.cancelling = false;
+        if (model.raw) {
+            noteRawTurn(model, event);
+            model.answer.clear();
+            return true;
+        }
         // What it thought is shown before the line it belongs to, and what it asks for
         // after: both go in as notes, which is what the transcript paints muted.
         if (event.reply.has_value() && !event.reply->reasoning.empty()) {

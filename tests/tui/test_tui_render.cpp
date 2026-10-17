@@ -8,6 +8,7 @@
 
 #include "OpenAnima/Core/Event.h"
 
+#include "app/commands.h"
 #include "app/model.h"
 #include "screen/render.h"
 #include "screen/selection.h"
@@ -153,6 +154,23 @@ TEST_CASE("the hints float over the conversation and the selected one stands out
     REQUIRE(rows.size() == MaxHints);
     CHECK(rendered.frame.at(rows[1], 2).style.foreground.equals(Palette::accent().foreground));
     CHECK(rendered.frame.at(rows[0], 2).style.foreground.equals(Palette::muted().foreground));
+}
+
+TEST_CASE("the hint panel follows the selection when the list does not fit") {
+    Model model;
+    type(model, "/");
+    REQUIRE(OpenAnimaTui::App::commands().size() > MaxHints);
+
+    // Walk to the last command, which used to be cut off the bottom of the panel.
+    for (std::size_t step = 0; step + 1 < OpenAnimaTui::App::commands().size(); ++step) {
+        (void)press(model, Key::Kind::ArrowDown);
+    }
+    const RenderResult rendered = render(model, 40, 12);
+    const std::vector<std::size_t> rows = raisedRows(rendered);
+
+    REQUIRE(rows.size() == MaxHints);
+    CHECK(readRow(rendered.frame, rows.back()).find("/quit") != std::string::npos);
+    CHECK(rendered.frame.at(rows.back(), 2).style.foreground.equals(Palette::accent().foreground));
 }
 
 TEST_CASE("the status row changes once there is an npc to talk to") {

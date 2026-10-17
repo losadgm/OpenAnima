@@ -16,6 +16,7 @@ TEST_CASE("commandMatches finds what completes the typed prefix") {
           std::vector<std::string>{"/create", "/clear"});
     CHECK(OpenAnimaTui::App::commandMatches("/h", 2) == std::vector<std::string>{"/help"});
     CHECK(OpenAnimaTui::App::commandMatches("/e", 2) == std::vector<std::string>{"/enter"});
+    CHECK(OpenAnimaTui::App::commandMatches("/r", 2) == std::vector<std::string>{"/raw"});
     CHECK(OpenAnimaTui::App::commandMatches("/create a", 8).empty());
     CHECK(OpenAnimaTui::App::commandMatches("hello", 5).empty());
 }

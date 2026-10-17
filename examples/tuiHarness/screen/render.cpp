@@ -188,7 +188,8 @@ std::string statusRow(const Model& model) {
     const char* hint = model.world.active.has_value()
                            ? "ask something   /help for keys"
                            : "no npc   /create to make one   /help for keys";
-    return std::string(PrefixWidth, ' ') + model.modelName + "   " + hint;
+    const std::string mode = model.raw ? "   raw" : "";
+    return std::string(PrefixWidth, ' ') + model.modelName + "   " + hint + mode;
 }
 
 /// Paint what the mouse picked out, over whatever the frame holds there: a selection is about the
@@ -226,10 +227,19 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     const std::vector<TranscriptRow> transcript = transcriptRows(model, width);
     const DraftLayout prompt = layoutDraft(model.draft, width);
 
-    std::vector<std::string> hints = App::hintsFor(model);
-    if (hints.size() > MaxHints) {
-        hints.resize(MaxHints);
+    const std::vector<std::string> all = App::hintsFor(model);
+    const std::size_t selected = all.empty() ? 0 : std::min(model.hintIndex, all.size() - 1);
+
+    // The panel shows a window of the list, and the window follows the selection, so a
+    // command reached with the arrows is never off the panel.
+    std::size_t first = 0;
+    if (all.size() > MaxHints) {
+        first = selected >= MaxHints ? selected - MaxHints + 1 : 0;
+        first = std::min(first, all.size() - MaxHints);
     }
+    const std::size_t last = std::min(all.size(), first + MaxHints);
+    const std::vector<std::string> hints(all.begin() + static_cast<std::ptrdiff_t>(first),
+                                         all.begin() + static_cast<std::ptrdiff_t>(last));
 
     const bool withStatus = height > prompt.rows.size() + hints.size();
     const std::size_t bottomRows = prompt.rows.size() + hints.size() + (withStatus ? 1 : 0);
@@ -252,9 +262,9 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
 
     // The hints float over the conversation, on their own panel.
     std::size_t row = viewRows;
-    const std::size_t selected = hints.empty() ? 0 : std::min(model.hintIndex, hints.size() - 1);
+    const std::size_t highlighted = selected - first;
     for (std::size_t index = 0; index < hints.size(); ++index) {
-        const Style style = (index == selected ? Palette::accent() : Palette::muted())
+        const Style style = (index == highlighted ? Palette::accent() : Palette::muted())
                                 .withBackground(Palette::raisedColor());
         frame.fill(row, 0, width, Palette::raised());
         frame.put(row, HintIndent, hints[index], style);
