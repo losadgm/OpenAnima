@@ -6,7 +6,10 @@
 # -----------------------------------------------------------------------------
 add_library(OpenAnima
     OpenAnima/OpenAnima.cpp
+    OpenAnima/Core/ActionCatalogue.cpp
     OpenAnima/Core/NPCBrain.cpp
+    OpenAnima/Core/NpcReply.cpp
+    OpenAnima/Core/ReplyStream.cpp
     OpenAnima/Http/CurlHttpTransport.cpp
     OpenAnima/Http/HttpTransport.cpp
     OpenAnima/Provider/RestProvider.cpp

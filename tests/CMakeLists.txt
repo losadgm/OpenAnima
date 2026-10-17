@@ -2,7 +2,9 @@
 #  Test suite (Catch2 v3). Registered with CTest via catch_discover_tests.
 # -----------------------------------------------------------------------------
 add_executable(open_anima_tests
+    Core/test_action_catalogue.cpp
     Core/test_npc_brain.cpp
+    Core/test_npc_reply.cpp
     Provider/test_rest_provider_config.cpp
     Provider/test_rest_provider.cpp
     Provider/test_sse_reader.cpp
