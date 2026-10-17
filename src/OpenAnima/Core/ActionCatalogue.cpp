@@ -11,8 +11,8 @@ namespace {
 /// What the model reads about the inner voice. It is also the definition the library
 /// promises to the host, so the two say the same thing.
 constexpr const char* ReasoningDescription =
-    "The NPC's own thoughts before it answers, in character and in the first person. One "
-    "or two sentences. This is not part of what it says.";
+    "The NPC's own thoughts before it answers, in character and in the first person. "
+    "This is not part of what it says.";
 
 /// What the model reads about the spoken part.
 constexpr const char* DialogueDescription =
