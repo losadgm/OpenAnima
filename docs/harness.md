@@ -143,7 +143,7 @@ repeating the name or opening a gap.
 | Wheel | Scrolls the conversation, one row a notch |
 | Drag the scrollbar | Scrolls to where the thumb is put, following the button |
 | Hover a hint or the scrollbar | Lights it up: the hint goes lilac, bold and underlined, the thumb of the bar goes lilac and bold |
-| Click a hint | Takes it as the one tab writes |
+| Click a hint | Writes it into the draft, the same as tab with the selected one |
 | Esc | Cancels the turn in flight, keeping what it had produced |
 | Drag over the conversation | Picks out those cells, painted reversed as the pointer moves |
 | Press and release on one cell | Picks out that one character |
@@ -181,7 +181,8 @@ right button is left to the terminal: the client never uses it, so the menu of t
 the emulator opens with the copy and paste it offers.
 
 The pointer also lights up what it is over. A command hint under it turns lilac, bold and
-underlined, and a click on it takes it as the one tab writes. A hint that is not under the
+underlined, and a click on it writes it into the draft, which is what tab does with the one that
+was selected. A hint that is not under the
 pointer is quiet unless it is the selected one, which keeps the accent colour. The scrollbar on
 the right gives the pointer the thumb it would drag: the thumb turns lilac and bold, and the
 button drags it, which scrolls the conversation to the row it is left on. A press beside the

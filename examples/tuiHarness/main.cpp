@@ -215,10 +215,11 @@ bool handleScreenKey(const Key& key, ScreenState& state, std::string& clipboard,
 
     switch (key.kind) {
     case Key::Kind::MousePress: {
-        // A hint takes a click the way it takes the arrows: the one under the pointer becomes
-        // the one tab writes.
+        // A hint takes a click the way it takes tab: the one under the pointer is written into
+        // the draft, and the selection is dropped rather than started over the panel.
         if (const std::optional<std::size_t> hint = hintAt(state, key.row); hint.has_value()) {
             model.hintIndex = *hint;
+            (void)OpenAnimaTui::App::update(model, Key{Key::Kind::Tab, 0}, scrollStep);
             state.selection.clear();
             return true;
         }
