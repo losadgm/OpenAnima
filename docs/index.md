@@ -41,9 +41,11 @@ The conversation is one of three channels an NPC uses:
   OpenAI chat-completions contract. Ollama, llama.cpp and vLLM speak it too.
 - One HTTP boundary, `OpenAnima::Http::HttpTransport`, so providers can be tested without a
   network and the socket code lives in exactly one place.
-- Configuration read from the environment, validated, with the ranges checked.
-- An umbrella header, `OpenAnima/OpenAnima.h`, and a `makeNpc()` entry point that wires the
-  default stack in one call.
+- Configuration handed over in code as a `Provider::RestProviderConfig`, with every numeric
+  setting checked against its range. The library reads nothing from the environment: where a
+  value comes from is the decision of whoever builds the provider.
+- An umbrella header, `OpenAnima/OpenAnima.h`, and a `makeNpc(config)` entry point that wires
+  the default stack in one call.
 
 What is still missing is a strategy for the context of a long conversation, which grows until
 it no longer fits and is not trimmed yet. [The roadmap](roadmap.html) is what comes next.
@@ -58,7 +60,11 @@ it no longer fits and is not trimmed yet. [The roadmap](roadmap.html) is what co
 int main() {
     using namespace OpenAnima;
 
-    Core::NPCBrain brain = makeNpc();
+    Provider::RestProviderConfig config;
+    config.baseUrl = "http://localhost:11434/v1";
+    config.model = "qwen2.5:7b";
+
+    Core::NPCBrain brain = makeNpc(config);
     brain.setSystemPrompt("You are a blacksmith in a small village.");
 
     const Core::Completion answer = brain.ask("Do you have any iron daggers?");
@@ -70,9 +76,11 @@ int main() {
 }
 ```
 
-One include, one line of setup. When the pieces have to be told apart (a test, a local model,
-a custom transport), they are still there, one per header; `makeNpc()` just wires the default
-stack.
+One include, a configuration and one line of setup. The library takes the values and nothing
+else, so where they come from is a choice of the caller: the clients in `examples/` read their
+own environment variables, a test passes literals. When the pieces have to be told apart (a
+test, a local model, a custom transport), they are still there, one per header; `makeNpc()`
+just wires the default stack.
 
 ## Streaming and asynchronous calls
 
@@ -114,28 +122,35 @@ What comes with it:
 - A turn that failed leaves the conversation as it was, the same way a failed `ask()` does. One
   that was cancelled keeps what had been produced, so the agent remembers what the player
   actually read.
-- What `OPENANIMA_TIMEOUT_SECONDS` bounds is the silence, not the whole exchange: a model that
-  thinks for a minute is fine, one that goes quiet for a minute is not.
+- What `timeoutSeconds` bounds is the silence, not the whole exchange: a model that thinks for a
+  minute is fine, one that goes quiet for a minute is not.
 - A heartbeat from the server, a `data` field with nothing after it, is dropped. A chunk that
   cannot be read at all fails the turn with a `ParseError` rather than half an answer.
 
-The configuration comes from six environment variables, of which two are required:
+The configuration is a struct, and the defaults are picked so that a local model needs two
+lines of it:
 
-| Variable | Required | Default |
+| Field | Required | Default |
 | --- | --- | --- |
-| `OPENANIMA_BASE_URL` | yes | - |
-| `OPENANIMA_MODEL` | yes | - |
-| `OPENANIMA_API_KEY` | no | empty, sent only when set |
-| `OPENANIMA_TIMEOUT_SECONDS` | no | `60` |
-| `OPENANIMA_TEMPERATURE` | no | `0.7` |
-| `OPENANIMA_MAX_TOKENS` | no | `512` |
+| `baseUrl` | yes | - |
+| `model` | yes | - |
+| `apiKey` | no | empty, sent only when set |
+| `timeoutSeconds` | no | `60`, from 1 to 3600 |
+| `temperature` | no | `0.7`, from 0 to 2 |
+| `maxTokens` | no | `512`, from 1 to 200000 |
 
 A local server needs no key at all:
 
-```bash
-export OPENANIMA_BASE_URL=http://localhost:11434/v1
-export OPENANIMA_MODEL=llama3.1
+```cpp
+Provider::RestProviderConfig config;
+config.baseUrl = "http://localhost:11434/v1";
+config.model = "llama3.1";
 ```
+
+The clients in `examples/` fill the same struct from their own variables, prefixed with the
+name of the client: `OPENANIMA_CLI_*` for the command line and `OPENANIMA_TUI_*` for the
+console one, so the two can point at different models. [The harnesses page](harness.html) has
+the names.
 
 ## Errors
 

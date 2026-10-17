@@ -6,6 +6,7 @@
 // One include: the umbrella re-exports the whole public API.
 #include "OpenAnima/OpenAnima.h"
 
+#include "common/apiSettings.h"
 #include "common/dotenv.h"
 
 using OpenAnima::Core::NPCBrain;
@@ -63,7 +64,7 @@ int main(int argc, char** argv) {
 
     RestProviderConfig config;
     try {
-        config = RestProviderConfig::fromEnvironment();
+        config = OpenAnimaExample::readApiSettings("OPENANIMA_CLI");
     } catch (const OpenAnima::ConfigError& error) {
         std::cerr << "configuration error: " << error.what() << "\n\n"
                   << "usage: open_anima_cli [prompt words...]\n"
@@ -72,14 +73,14 @@ int main(int argc, char** argv) {
                   << "Without arguments, reads prompts from stdin until end of input.\n"
                   << "\n"
                   << "Required variables:\n"
-                  << "  OPENANIMA_BASE_URL           API root, for example "
+                  << "  OPENANIMA_CLI_BASE_URL           API root, for example "
                      "http://localhost:11434/v1\n"
-                  << "  OPENANIMA_MODEL              model name, for example qwen2.5:7b\n"
+                  << "  OPENANIMA_CLI_MODEL              model name, for example qwen2.5:7b\n"
                   << "Optional variables:\n"
-                  << "  OPENANIMA_API_KEY            bearer token, empty for local servers\n"
-                  << "  OPENANIMA_TIMEOUT_SECONDS    per-request budget, default 60\n"
-                  << "  OPENANIMA_TEMPERATURE        sampling temperature, default 0.7\n"
-                  << "  OPENANIMA_MAX_TOKENS         reply length bound, default 512\n"
+                  << "  OPENANIMA_CLI_API_KEY            bearer token, empty for local servers\n"
+                  << "  OPENANIMA_CLI_TIMEOUT_SECONDS    per-request budget, default 60\n"
+                  << "  OPENANIMA_CLI_TEMPERATURE        sampling temperature, default 0.7\n"
+                  << "  OPENANIMA_CLI_MAX_TOKENS         reply length bound, default 512\n"
                   << "\n"
                   << "A .env file in the working directory or in any parent directory is\n"
                   << "loaded before the environment is read.\n";

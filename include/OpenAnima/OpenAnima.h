@@ -22,15 +22,10 @@
 
 namespace OpenAnima {
 
-/// Builds an NPC from the process environment on the default stack: environment
-/// configuration, REST provider and libcurl transport.
-/// @return An NPC ready to ask.
-/// @throws ConfigError when a required variable is missing or malformed.
-Core::NPCBrain makeNpc();
-
 /// Builds an NPC with an explicit configuration on the default transport.
 /// @param config Endpoint, model and generation settings.
 /// @return An NPC ready to ask.
+/// @throws ConfigError when a numeric setting falls outside its accepted range.
 Core::NPCBrain makeNpc(Provider::RestProviderConfig config);
 
 /// Builds an NPC on an explicit transport.

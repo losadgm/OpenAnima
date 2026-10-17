@@ -17,6 +17,7 @@
 #include "OpenAnima/OpenAnima.h"
 
 #include "app/model.h"
+#include "common/apiSettings.h"
 #include "common/dotenv.h"
 #include "screen/diff.h"
 #include "screen/render.h"
@@ -167,7 +168,7 @@ int main() {
 
     RestProviderConfig config;
     try {
-        config = RestProviderConfig::fromEnvironment();
+        config = OpenAnimaExample::readApiSettings("OPENANIMA_TUI");
     } catch (const OpenAnima::OpenAnimaError& error) {
         std::cerr << "configuration error: " << error.what() << '\n';
         return 2;

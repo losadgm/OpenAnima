@@ -1,10 +1,12 @@
 # -----------------------------------------------------------------------------
 #  Example programs. `cliHarness` is the command-line client: it reads the
 #  environment, keeps the conversation and prints the answer as it arrives.
-#  `common/` holds what both clients use: today, the loader for `.env`.
+#  `common/` holds what both clients use: the API settings read from their
+#  prefixed variables, and the loader for `.env`.
 # -----------------------------------------------------------------------------
 add_executable(open_anima_cli
     cliHarness/main.cpp
+    common/apiSettings.cpp
     common/dotenv.cpp)
 
 target_include_directories(open_anima_cli
@@ -36,6 +38,7 @@ add_executable(open_anima_tui
     tuiHarness/screen/text.cpp
     tuiHarness/terminal/terminalUnix.cpp
     tuiHarness/terminal/terminalWindows.cpp
+    common/apiSettings.cpp
     common/dotenv.cpp)
 
 target_include_directories(open_anima_tui
