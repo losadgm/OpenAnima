@@ -126,20 +126,49 @@ void appendMessage(std::vector<TranscriptRow>& rows, const Message& message,
     }
 }
 
-/// Adds a note, which belongs to no speaker and is shown quietly.
+/// Adds a note, which belongs to no speaker: it starts at the left edge and is shown quietly.
 /// @param rows Rows collected so far, appended to.
 /// @param text Note to lay out.
 /// @param width Columns available for the body.
 void appendNote(std::vector<TranscriptRow>& rows, const std::string& text, std::size_t width) {
     for (const std::string& line : wrap(text, width)) {
-        rows.push_back({std::string(PrefixWidth, ' '), line, Palette::muted(), Palette::muted()});
+        rows.push_back({{}, line, Palette::muted(), Palette::muted()});
     }
 }
 
 /// Adds the blank row that keeps a message from running into the one before it.
 /// @param rows Rows collected so far, appended to.
 void appendGap(std::vector<TranscriptRow>& rows) {
-    rows.push_back({std::string(PrefixWidth, ' '), {}, Palette::text(), Palette::text()});
+    rows.push_back({{}, {}, Palette::text(), Palette::text()});
+}
+
+/// Adds the rows of one message: a note at the left edge, or a line under the name of whoever
+/// is speaking, which only the first line of a block carries.
+/// @param rows Rows collected so far, appended to.
+/// @param message Message to lay out.
+/// @param npc Name the active npc is shown under.
+/// @param width Columns available.
+void appendTurn(std::vector<TranscriptRow>& rows, const Message& message, const std::string& npc,
+                std::size_t width) {
+    const std::size_t bodyWidth = width > PrefixWidth ? width - PrefixWidth : 1;
+    if (message.role == Role::System) {
+        if (message.continues) {
+            // An action line is part of the reply above it, so it lines up under it.
+            appendMessage(rows, message, {}, Palette::muted(), Palette::muted(), bodyWidth);
+            return;
+        }
+        appendNote(rows, message.text, width);
+        return;
+    }
+
+    const bool fromUser = message.role == Role::User;
+    std::string speaker;
+    if (!message.continues) {
+        speaker = fromUser ? "you" : npc;
+    }
+    const Style nameStyle = fromUser ? Palette::muted() : Palette::primary();
+    const Style bodyStyle = message.role == Role::Thought ? Palette::muted() : Palette::text();
+    appendMessage(rows, message, speaker, nameStyle, bodyStyle, bodyWidth);
 }
 
 /// The conversation as display rows: finished turns first, the in-flight answer last.
@@ -158,18 +187,7 @@ std::vector<TranscriptRow> transcriptRows(const Model& model, std::size_t width)
         if (!rows.empty() && !message.continues) {
             appendGap(rows);
         }
-        if (message.role == Role::System) {
-            appendNote(rows, message.text, bodyWidth);
-            continue;
-        }
-        const bool fromUser = message.role == Role::User;
-        std::string speaker;
-        if (!message.continues) {
-            speaker = fromUser ? "you" : npc;
-        }
-        const Style nameStyle = fromUser ? Palette::muted() : Palette::primary();
-        const Style bodyStyle = message.role == Role::Thought ? Palette::muted() : Palette::text();
-        appendMessage(rows, message, speaker, nameStyle, bodyStyle, bodyWidth);
+        appendTurn(rows, message, npc, width);
     }
     if (model.busy || !model.answer.empty()) {
         if (!rows.empty()) {
@@ -408,8 +426,10 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     for (std::size_t row = 0; row < viewRows; ++row) {
         if (row < total) {
             const TranscriptRow& line = transcript[start + row];
+            // A note has no prefix, so it starts at the left edge; a speaker's name pushes the
+            // body to the column the name leaves.
             frame.put(row, 0, line.prefix, line.prefixStyle);
-            frame.put(row, PrefixWidth, line.body, line.bodyStyle);
+            frame.put(row, measure(line.prefix), line.body, line.bodyStyle);
         }
     }
     paintScrollBar(frame, viewRows, width, total, start);

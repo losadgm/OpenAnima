@@ -118,6 +118,9 @@ repeating the name or opening a gap.
   is selected.
 - Each role has its own colour: the player in muted gray, the NPC in the accent colour, and
   the thought quietly under the same name, so it reads as the NPC's and not as the client's.
+- A note is what the client says on its own, and it belongs to no speaker: it starts at the
+  left edge of the transcript, painted quietly, while what an NPC says and does stays lined up
+  under its name.
 - The look borrows the OpenCode theme: a purple accent for the prompt marker and the spinner,
   a warm peach for the persona, muted gray for the quiet text, and the same braille spinner.
 - The status line sits under the frame and carries the state: which model answered, how long

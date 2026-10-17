@@ -285,13 +285,12 @@ TEST_CASE("the status row changes once there is an npc to talk to") {
     CHECK(readAll(render(model, 40, 10).frame).find("ask something") != std::string::npos);
 }
 
-TEST_CASE("a note from the world is indented and quiet") {
+TEST_CASE("a note from the world sits at the left edge and is quiet") {
     Model model;
     submit(model, "/create a smith");
     const RenderResult rendered = render(model, 40, 10);
-    CHECK(readRow(rendered.frame, 0).substr(0, 8) == "        ");
-    CHECK(readRow(rendered.frame, 0).find("created npc 1") != std::string::npos);
-    CHECK(rendered.frame.at(0, 8).style.equals(Palette::muted()));
+    CHECK(readRow(rendered.frame, 0).find("created npc 1") == 0);
+    CHECK(rendered.frame.at(0, 0).style.equals(Palette::muted()));
 }
 
 TEST_CASE("the speaker of a line is named in the prefix and the text follows it") {
