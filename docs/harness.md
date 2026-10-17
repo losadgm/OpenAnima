@@ -108,10 +108,10 @@ repeating the name or opening a gap.
   along the inside edge of the panel, out of the one-eighth blocks and the legacy computing
   corners that join two of them, so the colour reaches the edge of the box and none of it shows
   outside the strokes; those four corners need a font that covers U+1FB00 to U+1FBFF, which
-  DejaVu Sans Mono does not. The band inside keeps a row empty above the line and another one
-  below, and a column on each side, so the text never sits against it. While the line is empty
-  the frame says what can be done from there, which is not the same in the lobby as in a
-  conversation, and the words go as soon as there is something to say.
+  DejaVu Sans Mono does not. The band inside is the line itself, with a column of it on each
+  side, so the text never sits against the frame. While the line is empty the frame says what
+  can be done from there, which is not the same in the lobby as in a conversation, and the
+  words go as soon as there is something to say.
 - The commands that complete what is being typed float above the frame on a lighter panel,
   with the selected one in the accent colour. The arrows walk them, and tab takes the one that
   is selected.
