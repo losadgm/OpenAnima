@@ -152,7 +152,7 @@ TEST_CASE("what the client draws for itself is not copied") {
     Canvas frame{12, 3};
     const Style frameStyle = Palette::muted().withBackground(Palette::panelColor());
     frame.put(0, 0, "\U0001FB7D\u2594\u2594", frameStyle);
-    frame.put(1, 0, "\u258F \u2771 hi", Palette::text().withBackground(Palette::panelColor()));
+    frame.put(1, 0, "\u258E \u2771 hi", Palette::text().withBackground(Palette::panelColor()));
     frame.put(2, 0, "\U0001FB7C\u2581\u2581", frameStyle);
     frame.put(1, 11, OpenAnimaTui::Screen::Glyphs::ScrollBar, Palette::muted());
 
