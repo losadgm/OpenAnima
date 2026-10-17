@@ -404,6 +404,22 @@ TEST_CASE("raw mode shows the turn as the document, once it is over") {
     }
 }
 
+TEST_CASE("raw mode names the npc that answered") {
+    Model model = modelWithNpc();
+    (void)submit(model, "/raw on");
+    (void)submit(model, "hello");
+    (void)OpenAnimaTui::App::applyEvent(
+        model, finishedWithReply(R"({"reasoning":"It looks harmless.","dialogue":"Good evening.",)"
+                                 R"("actions":[]})"));
+
+    // The document comes last, with the name of the npc over it: the json says what the model
+    // wrote, and the name says whose turn it was.
+    REQUIRE(model.messages.size() >= 2);
+    CHECK(model.messages[model.messages.size() - 2].text == "npc 1:");
+    CHECK(model.messages.back().role == OpenAnimaTui::App::Role::System);
+    CHECK(model.messages.back().text.find("\"dialogue\"") != std::string::npos);
+}
+
 TEST_CASE("raw mode says so when there is no document to show") {
     Model model = modelWithNpc();
     (void)submit(model, "/raw on");

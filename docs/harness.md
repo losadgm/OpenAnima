@@ -29,6 +29,7 @@ contract defines it.
 - `--provider` picks the provider, and `rest` is the only one that exists today.
 - `--raw`, or `/raw` in a session, prints the reply document and nothing else: the three
   variables as the model wrote them, which is what to look at when a turn comes back wrong.
+  The name of the npc still goes over the document, so a transcript reads whose turn it was.
 - The session speaks the vocabulary of the console client: `/create`, `/enter`, `/npcs`,
   `/leave`, `/clear`, `/raw`, `/help` and `/quit`. Given an argument it does not take, each
   answers with its usage.
@@ -114,14 +115,14 @@ repeating the name or opening a gap.
   from there, which is not the same in the lobby as in a conversation, and the words go as soon
   as there is something to say.
 - The commands that complete what is being typed float over the last rows of the conversation,
-  on a lighter panel of their own. The panel aims for thirty per cent of the width, anchored to
-  the left edge, so the rest of those rows still shows what was said, and it grows to what the
-  longest hint needs when the window is too narrow for that share, so the hints stay whole on a
-  small screen. It takes no rows away from the viewport. The selected one is in the accent
-  colour; the arrows walk them and stop at the first and the last one instead of coming round,
-  tab writes the selected one, and a click writes the one under the pointer. When more commands
-  match than the panel has rows, its right edge carries a bar of its own, the same as the one of
-  the conversation, which can be dragged to walk the list.
+  on a lighter panel of their own. The panel is as wide as the longest command, its indent and
+  a column of margin, anchored to the left edge, so the rest of those rows still shows what was
+  said. A screen narrower than that keeps the panel inside itself, and the commands that no
+  longer fit whole are cut with an ellipsis. It takes no rows away from the viewport. The
+  selected one is in the accent colour; the arrows walk them and stop at the first and the last
+  one instead of coming round, tab writes the selected one, and a click writes the one under
+  the pointer. When more commands match than the panel has rows, its right edge carries a bar
+  of its own, the same as the one of the conversation, which can be dragged to walk the list.
 - Each role has its own colour: the player in muted gray, the NPC in the accent colour, and
   the thought quietly under the same name, so it reads as the NPC's and not as the client's.
 - A note is what the client says on its own, and it belongs to no speaker: it starts at the

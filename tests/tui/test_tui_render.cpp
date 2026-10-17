@@ -486,7 +486,7 @@ TEST_CASE("a row of the bar maps back to the scroll position the thumb stands fo
     CHECK(OpenAnimaTui::Screen::firstRowForThumb(100, 10, 99) == 90);
 }
 
-TEST_CASE("the hints float on a panel that takes a share of the width and no rows of its own") {
+TEST_CASE("the hints float on a panel of their own that leaves the conversation in view") {
     Model model;
     for (int index = 0; index < 20; ++index) {
         model.messages.push_back(
@@ -499,7 +499,11 @@ TEST_CASE("the hints float on a panel that takes a share of the width and no row
     // The conversation keeps the rows the panel floats on: it is anchored to the left edge and
     // leaves the rest of the screen to what was said.
     CHECK(hinted.scrollRows == quiet.scrollRows);
-    CHECK(hinted.hintColumns == 100 * OpenAnimaTui::Screen::Metrics::HintShare / 100);
+    std::size_t longest = 0;
+    for (const std::string& hint : OpenAnimaTui::App::hintsFor(model)) {
+        longest = std::max(longest, OpenAnimaTui::Screen::measure(hint));
+    }
+    CHECK(hinted.hintColumns == OpenAnimaTui::Screen::Metrics::HintIndent + longest + 1);
     REQUIRE(hinted.hintCount > 0);
     CHECK(hinted.hintRow + hinted.hintCount == hinted.scrollRows);
     CHECK(hinted.frame.at(hinted.hintRow, 0).style.background.equals(Palette::raisedColor()));
@@ -507,7 +511,7 @@ TEST_CASE("the hints float on a panel that takes a share of the width and no row
                     .style.background.equals(Palette::raisedColor()));
 }
 
-TEST_CASE("a narrow screen widens the panel so the hints are still whole") {
+TEST_CASE("the panel of hints is as wide as its longest command, or as the screen") {
     Model model;
     type(model, "/");
     std::size_t longest = 0;
@@ -515,16 +519,14 @@ TEST_CASE("a narrow screen widens the panel so the hints are still whole") {
         longest = std::max(longest, OpenAnimaTui::Screen::measure(hint));
     }
     const std::size_t needed = OpenAnimaTui::Screen::Metrics::HintIndent + longest + 1;
-    const std::size_t share = OpenAnimaTui::Screen::Metrics::HintShare;
 
-    // A share of a wide screen already leaves room for the words, so the share is what it takes.
-    CHECK(render(model, 200, 12).hintColumns == 200 * share / 100);
-    CHECK(render(model, 40, 12).hintColumns == 40 * share / 100);
-    // A share of a narrow one does not, so the panel grows to what the hints need.
-    REQUIRE(needed > 30 * share / 100);
-    CHECK(render(model, 30, 12).hintColumns == needed);
-    // And it is never wider than the screen, however narrow that is.
-    CHECK(render(model, 8, 12).hintColumns == 8);
+    // The command, its indent and a column of margin, whatever the screen is.
+    CHECK(render(model, 200, 12).hintColumns == needed);
+    CHECK(render(model, 40, 12).hintColumns == needed);
+    // A screen narrower than that keeps the panel inside itself, and the commands are cut.
+    const RenderResult narrow = render(model, 8, 12);
+    CHECK(narrow.hintColumns == 8);
+    CHECK(readRow(narrow.frame, narrow.hintRow).find("...") != std::string::npos);
 }
 
 TEST_CASE("the panel of hints has a bar of its own, which lights up under the pointer") {

@@ -550,9 +550,16 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
 }
 
 /// Writes the turn as the document the model wrote, which is all raw mode shows.
+///
+/// The painted reply is thrown away, but who answered is not: the name of the npc goes over
+/// the document, so a reader knows whose turn it is without reading the json for a clue.
 /// @param model Model to write into.
 /// @param event Finished event of the turn.
 void noteRawTurn(Model& model, const Event& event) {
+    const std::string speaker = model.world.active.has_value()
+                                    ? "npc " + std::to_string(*model.world.active)
+                                    : std::string{"npc"};
+    note(model, speaker + ":");
     if (!event.reply.has_value() || event.reply->document.is_null()) {
         note(model, "(no document: the turn was stopped before it was whole)");
         return;
