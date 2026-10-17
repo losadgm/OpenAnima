@@ -14,6 +14,7 @@ namespace OpenAnima::TestSupport {
 using OpenAnima::Core::ChatMessage;
 using OpenAnima::Core::Completion;
 using OpenAnima::Core::FinishReason;
+using OpenAnima::Core::ResponseFormat;
 using OpenAnima::Provider::Call;
 using OpenAnima::Provider::IProvider;
 
@@ -28,6 +29,7 @@ public:
 
     Completion complete(const std::vector<ChatMessage>& messages, const Call& call) override {
         requests.push_back(messages);
+        formats.push_back(call.format);
         if (failure != nullptr) {
             throw OpenAnimaError(failure);
         }
@@ -50,13 +52,24 @@ public:
                 call.onDelta(piece);
             }
         }
-        return answer;
+
+        Completion done = answer;
+        if (call.format.kind != ResponseFormat::Kind::Text) {
+            // What the shipped provider does once the answer is whole: read it as JSON.
+            try {
+                done.json = nlohmann::json::parse(done.text);
+            } catch (const nlohmann::json::exception&) {
+                throw ParseError("the answer was asked for as JSON and is not: " + done.text);
+            }
+        }
+        return done;
     }
 
     /// Keeps the convenience overloads of the interface reachable through this type.
     using IProvider::complete;
 
     std::vector<std::vector<ChatMessage>> requests;  ///< Every conversation received, in order.
+    std::vector<ResponseFormat> formats;             ///< Shape asked for by every call, in order.
     Completion answer;                               ///< Answer replayed for every call.
     std::vector<std::string> deltas;        ///< Pieces reported to the sink before answering.
     const char* failure{nullptr};           ///< When set, complete() throws.

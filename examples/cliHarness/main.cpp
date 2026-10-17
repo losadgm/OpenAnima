@@ -25,12 +25,25 @@ std::string joinArguments(int argc, char** argv) {
     return prompt;
 }
 
-/// Sends a prompt and prints the answer while the provider is still producing it.
+/// Sends a prompt and prints the dialogue while the provider is still producing it, then
+/// what the NPC thought and what it asked for.
 /// @param brain Npc to talk to.
 /// @param prompt Text to send.
 void printAnswer(NPCBrain& brain, const std::string& prompt) {
-    brain.ask(prompt, [](std::string_view piece) { std::cout << piece << std::flush; });
+    const OpenAnima::Core::NpcReply reply =
+        brain.askTurn(prompt, [](std::string_view piece) { std::cout << piece << std::flush; });
     std::cout << '\n';
+
+    if (!reply.reasoning.empty()) {
+        std::cout << "~ " << reply.reasoning << '\n';
+    }
+    for (const OpenAnima::Core::NpcAction& action : reply.actions) {
+        std::cout << "  [" << action.name << ']';
+        if (!action.arguments.empty()) {
+            std::cout << ' ' << action.arguments.dump();
+        }
+        std::cout << '\n';
+    }
 }
 
 }  // namespace

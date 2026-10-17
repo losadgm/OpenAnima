@@ -22,8 +22,9 @@ prints the answer as it arrives, piece by piece.
 in [the configuration table](index.html#a-request-end-to-end), and `.env` is loaded on its own
 from the working directory or from up to three of its parents, which is what makes the editor
 buttons work with no wiring. The loader is `examples/common/dotenv`, shared with the terminal
-client. The client is the reference for the streamed call: `ask()` with a sink, and nothing
-else.
+client. The client is the reference for the streamed reply: `askTurn()` with a sink, the
+dialogue arriving as it is written, the reasoning printed muted above it and the actions
+listed after it.
 
 ## tuiHarness
 

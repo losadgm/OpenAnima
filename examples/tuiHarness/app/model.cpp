@@ -464,8 +464,23 @@ bool applyEvent(Model& model, const Event& event) {
     case OpenAnima::Core::EventKind::Finished:
         model.busy = false;
         model.cancelling = false;
+        // What it thought is shown before the line it belongs to, and what it asks for
+        // after: both go in as notes, which is what the transcript paints muted.
+        if (event.reply.has_value() && !event.reply->reasoning.empty()) {
+            note(model, "~ " + event.reply->reasoning);
+        }
         if (!model.answer.empty()) {
             model.messages.push_back({Role::Npc, model.answer});
+        }
+        if (event.reply.has_value()) {
+            for (const OpenAnima::Core::NpcAction& action : event.reply->actions) {
+                std::string line = "[" + action.name + "]";
+                if (!action.arguments.empty()) {
+                    line += " ";
+                    line += action.arguments.dump();
+                }
+                note(model, line);
+            }
         }
         if (event.completion.finishReason == OpenAnima::Core::FinishReason::Cancelled) {
             note(model, "(cancelled, what it had is kept)");

@@ -7,10 +7,13 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "OpenAnima/Core/ActionCatalogue.h"
 #include "OpenAnima/Core/Completion.h"
 #include "OpenAnima/Core/Event.h"
+#include "OpenAnima/Core/NpcReply.h"
 #include "OpenAnima/Core/Types.h"
 #include "OpenAnima/Provider/IProvider.h"
 
@@ -51,6 +54,16 @@ public:
     /// @param prompt Instruction sent as the leading system message.
     void setSystemPrompt(std::string prompt);
 
+    /// Sets the actions this NPC may take, and with them the shape of its answers.
+    /// The base catalogue is used until this is called.
+    /// @param catalogue Actions the NPC may take.
+    void setReplyCatalogue(ActionCatalogue catalogue);
+
+    /// @return The actions this NPC may take.
+    [[nodiscard]] const ActionCatalogue& replyCatalogue() const noexcept {
+        return m_catalogue;
+    }
+
     /// Sends a prompt and returns the answer, with what the call produced.
     /// The prompt and the answer text join the history only when the call succeeds.
     /// @param prompt Text produced by the player or by the client application.
@@ -77,6 +90,40 @@ public:
     Completion ask(const std::string& prompt, const Provider::DeltaSink& onDelta) {
         return ask(prompt, Provider::Call{onDelta, {}, {}});
     }
+
+    /// Asks for a turn as a reply: what the NPC thought, what it says and what it does.
+    ///
+    /// The answer is asked for as JSON, following the schema built from the catalogue,
+    /// and read back from there. The contract also travels in the instruction that goes
+    /// with the prompt, so a provider that ignores the schema still answers in it. The
+    /// whole document joins the history as the assistant turn, which is what lets the
+    /// NPC read its own thoughts on the next one.
+    /// @param prompt Text produced by the player or by the client application.
+    /// @return The reply, with the document and the provider metadata.
+    /// @throws OpenAnimaError when no backend is attached, the call fails, or the answer
+    ///         is not the reply that was asked for.
+    NpcReply askTurn(const std::string& prompt);
+
+    /// Asks for a turn as a reply and reports the dialogue while it is written.
+    /// @param prompt Text produced by the player or by the client application.
+    /// @param onDialogue Called with the dialogue as it arrives. Reasoning is not
+    ///        streamed: it comes with the reply, once the turn is over.
+    /// @return The reply, with the document and the provider metadata.
+    /// @throws OpenAnimaError when no backend is attached, the call fails, or the answer
+    ///         is not the reply that was asked for.
+    NpcReply askTurn(const std::string& prompt, const Provider::DeltaSink& onDialogue);
+
+    /// Asks for a reply turn and returns at once, without waiting for the answer.
+    ///
+    /// Its events are the ones of askAsync(), with one difference: a Delta carries the
+    /// dialogue as it is written, not the JSON that is being written, and the Finished
+    /// event carries the reply. A turn cut before the document was whole leaves the
+    /// history as it was.
+    /// @param prompt Text produced by the player or by the client application.
+    /// @return The id that names this turn in the events that follow.
+    /// @throws OpenAnimaError when no backend is attached, or when a turn is
+    ///         already in flight on this brain.
+    RequestId askTurnAsync(std::string prompt);
 
     /// Asks for a turn and returns at once, without waiting for the answer.
     ///
@@ -130,11 +177,20 @@ private:
     /// that threads stay out of this header.
     class TurnWorker;
 
+    /// Builds the request of one turn.
+    /// @param prompt Text the turn answers.
+    /// @param instruction Contract that goes with the prompt, empty when there is none.
+    /// @return The messages to send, the system prompt first.
+    [[nodiscard]] std::vector<ChatMessage> buildRequest(const std::string& prompt,
+                                                        std::string_view instruction) const;
+
     std::vector<ChatMessage> m_history;  ///< Conversation context owned by this brain.
     std::shared_ptr<OpenAnima::Provider::IProvider> m_provider;  ///< Backend for every request.
     std::string m_systemPrompt;            ///< Instruction leading every request.
     std::unique_ptr<TurnWorker> m_worker;  ///< Runs the async turns, created on first use.
     std::string m_pendingPrompt;  ///< Prompt of the turn in flight, waiting for its answer.
+    bool m_pendingTurn{false};    ///< Whether the turn in flight asks for a reply.
+    ActionCatalogue m_catalogue{ActionCatalogue::base()};  ///< Actions this NPC may take.
 };
 
 }  // namespace OpenAnima::Core

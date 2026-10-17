@@ -5,23 +5,36 @@
 #include <mutex>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "OpenAnima/Core/ActionCatalogue.h"
 #include "OpenAnima/Core/Event.h"
 #include "OpenAnima/Core/NPCBrain.h"
+#include "OpenAnima/Core/NpcReply.h"
 #include "OpenAnima/Core/Types.h"
 #include "OpenAnima/Errors.h"
 
 #include "support/fake_provider.h"
 
 using OpenAnima::OpenAnimaError;
+using OpenAnima::ParseError;
+using OpenAnima::Core::ActionCatalogue;
+using OpenAnima::Core::ActionSpec;
 using OpenAnima::Core::Event;
 using OpenAnima::Core::EventKind;
 using OpenAnima::Core::FinishReason;
 using OpenAnima::Core::NPCBrain;
+using OpenAnima::Core::NpcReply;
 using OpenAnima::Core::RequestId;
+using OpenAnima::Core::ResponseFormat;
 using OpenAnima::Core::Role;
 using OpenAnima::TestSupport::FakeProvider;
+
+/// A reply as the model would write it: one thought, one line and one action.
+constexpr const char* ReplyDocument =
+    R"({"reasoning":"He looks harmless.","dialogue":"Good evening.",)"
+    R"("actions":[{"name":"emote","arguments":{"kind":"nod"}}]})";
 
 // Catch2 assertions expand into do-while blocks, test cases are long by design, and the
 // analyzer cannot see through REQUIRE(), so an optional it has just seen checked still
@@ -290,6 +303,157 @@ TEST_CASE("NPCBrain::poll reports nothing when there is nothing to report", "[np
     (void)brain.askAsync("hi");
     CHECK(drain(brain).back().kind == EventKind::Finished);
     CHECK_FALSE(brain.poll().has_value());
+}
+
+TEST_CASE("NPCBrain::askTurn splits the answer into its three variables", "[npcbrain]") {
+    auto provider = std::make_shared<FakeProvider>();
+    provider->answer.text = ReplyDocument;
+    NPCBrain brain{provider};
+
+    const NpcReply reply = brain.askTurn("hello");
+
+    CHECK(reply.reasoning == "He looks harmless.");
+    CHECK(reply.dialogue == "Good evening.");
+    REQUIRE(reply.actions.size() == 1);
+    CHECK(reply.actions[0].name == "emote");
+    CHECK(reply.actions[0].arguments["kind"] == "nod");
+    CHECK(reply.document.is_object());
+    CHECK(reply.completion.text == ReplyDocument);
+
+    // The whole document joins the conversation, not the dialogue: that is what the NPC
+    // reads back on the next turn.
+    REQUIRE(brain.history().size() == 2);
+    CHECK(brain.history()[0].content == "hello");
+    CHECK(brain.history()[1].content == ReplyDocument);
+}
+
+TEST_CASE("NPCBrain::askTurn asks for a reply and sends the contract with the turn", "[npcbrain]") {
+    auto provider = std::make_shared<FakeProvider>();
+    provider->answer.text = ReplyDocument;
+    NPCBrain brain{provider};
+
+    (void)brain.askTurn("hello");
+
+    REQUIRE(provider->formats.size() == 1);
+    CHECK(provider->formats[0].kind == ResponseFormat::Kind::JsonSchema);
+    CHECK(provider->formats[0].schema["properties"]["dialogue"]["type"] == "string");
+
+    REQUIRE(provider->requests.size() == 1);
+    const std::string& sent = provider->requests[0].back().content;
+    CHECK(sent.rfind("hello", 0) == 0);
+    CHECK(sent.find("json") != std::string::npos);
+    CHECK(sent.find("reasoning") != std::string::npos);
+    CHECK(sent.find("- emote:") != std::string::npos);
+
+    // The contract travels with the request, not into the history.
+    CHECK(brain.history()[0].content == "hello");
+}
+
+TEST_CASE("NPCBrain::askTurn reports the dialogue and not the document", "[npcbrain]") {
+    auto provider = std::make_shared<FakeProvider>();
+    provider->answer.text = ReplyDocument;
+    provider->deltas = {R"({"reasoning":"He looks harmless.","dialogue":"Good )", R"(evening.",)",
+                        R"("actions":[{"name":"emote","arguments":{"kind":"nod"}}]})"};
+    NPCBrain brain{provider};
+
+    std::string painted;
+    const NpcReply reply =
+        brain.askTurn("hello", [&painted](std::string_view piece) { painted.append(piece); });
+
+    CHECK(painted == "Good evening.");
+    CHECK(reply.dialogue == "Good evening.");
+}
+
+TEST_CASE("NPCBrain::askTurn refuses an answer that is not a reply", "[npcbrain]") {
+    auto provider = std::make_shared<FakeProvider>();
+    provider->answer.text = R"({"reasoning":"x","actions":[]})";
+    NPCBrain brain{provider};
+
+    CHECK_THROWS_AS(brain.askTurn("hello"), ParseError);
+    CHECK(brain.history().empty());
+}
+
+TEST_CASE("NPCBrain::setReplyCatalogue gives the NPC its own actions", "[npcbrain]") {
+    auto provider = std::make_shared<FakeProvider>();
+    provider->answer.text = ReplyDocument;
+    NPCBrain brain{provider};
+
+    ActionCatalogue catalogue = ActionCatalogue::base();
+    catalogue.add(ActionSpec{"open", "Open a door.", nlohmann::json{}});
+    brain.setReplyCatalogue(catalogue);
+
+    CHECK(brain.replyCatalogue().actions().size() == 4);
+
+    (void)brain.askTurn("hello");
+    REQUIRE(provider->formats.size() == 1);
+    CHECK(provider->formats[0].schema["properties"]["actions"]["items"]["oneOf"].size() == 4);
+    CHECK(provider->requests[0].back().content.find("- open:") != std::string::npos);
+}
+
+TEST_CASE("NPCBrain::askTurnAsync reports the dialogue and ends with the reply", "[npcbrain]") {
+    auto provider = std::make_shared<FakeProvider>();
+    provider->answer.text = ReplyDocument;
+    provider->deltas = {R"({"reasoning":"He looks harmless.","dialogue":"Good )", R"(evening.",)",
+                        R"("actions":[{"name":"emote","arguments":{"kind":"nod"}}]})"};
+    NPCBrain brain{provider};
+
+    const RequestId turnId = brain.askTurnAsync("hello");
+    const std::vector<Event> events = drain(brain);
+
+    REQUIRE(events.size() == 4);
+    CHECK(events[0].kind == EventKind::Started);
+    CHECK(events[1].kind == EventKind::Delta);
+    CHECK(events[1].text == "Good ");
+    CHECK(events[2].kind == EventKind::Delta);
+    CHECK(events[2].text == "evening.");
+    CHECK(events[3].kind == EventKind::Finished);
+    REQUIRE(events[3].reply.has_value());
+    // The assertion above is the check; the analyzer cannot see through it.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const NpcReply& reply = events[3].reply.value();
+    CHECK(reply.reasoning == "He looks harmless.");
+    CHECK(reply.dialogue == "Good evening.");
+    REQUIRE(reply.actions.size() == 1);
+    CHECK(reply.actions[0].name == "emote");
+    for (const Event& event : events) {
+        CHECK(event.id == turnId);
+    }
+
+    REQUIRE(brain.history().size() == 2);
+    CHECK(brain.history()[1].content == ReplyDocument);
+}
+
+TEST_CASE("NPCBrain::askTurnAsync keeps half a document out of the history", "[npcbrain]") {
+    auto provider = std::make_shared<FakeProvider>();
+    provider->answer.text = ReplyDocument;
+    provider->deltas = {R"({"reasoning":"","dialogue":"Good )", R"(evening.","actions":[]})"};
+    Halt halt{2};  // The backend waits before its second piece.
+    provider->beforeEachDelta = [&halt] { halt(); };
+    NPCBrain brain{provider};
+
+    const RequestId turnId = brain.askTurnAsync("hello");
+
+    std::optional<Event> seen = brain.poll(std::chrono::milliseconds{5000});
+    while (seen.has_value() && seen.value().kind != EventKind::Delta) {
+        seen = brain.poll(std::chrono::milliseconds{5000});
+    }
+    REQUIRE(seen.has_value());
+
+    brain.cancel(turnId);
+    halt.release();
+
+    const std::vector<Event> events = drain(brain);
+    REQUIRE(events.size() == 1);
+    REQUIRE(events[0].reply.has_value());
+    // The assertion above is the check; the analyzer cannot see through it.
+    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+    const NpcReply& cut = events[0].reply.value();
+    CHECK(cut.dialogue == "Good ");
+    CHECK(cut.document.is_null());
+    CHECK(cut.completion.finishReason == FinishReason::Cancelled);
+
+    // Half a document is not a turn the model could read back.
+    CHECK(brain.history().empty());
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
