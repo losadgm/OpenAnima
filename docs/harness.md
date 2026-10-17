@@ -129,6 +129,8 @@ repeating the name or opening a gap.
 | Esc | Cancels the turn in flight, keeping what it had produced |
 | Drag over the conversation | Picks out those cells, painted reversed as the pointer moves |
 | Press and release on one cell | Picks out that one character |
+| Double click | Picks out the word under the pointer |
+| Triple click | Picks out the whole row |
 | Ctrl+C | Copies what is picked out and drops the picking. It never leaves the client, which is what keeps a reach for the copy key from ending the session |
 | Ctrl+V | Types what was copied last |
 | Ctrl+D | Leaves |
@@ -138,10 +140,14 @@ eight to the terminal, and the two disagreeing is what tore the row apart.
 
 The picking out follows the button for as long as it is held: the cells are painted as the
 pointer passes over them, the paint grows and shrinks with it, and the last one stays painted
-when the button comes back up. Everything the conversation holds can be picked out, the prompt,
-the panels and the hints included, because what is read back is what was painted. While the
-client runs the mouse is the client's, which is the price of the wheel scrolling the
-conversation; holding shift asks the terminal for its own selection back in most of them.
+when the button comes back up. A double click takes the word under the pointer and a triple
+click takes the whole row, the way a terminal does it; a cell that is not part of a word is a
+word of its own. What is copied is what was painted, except the two things the client draws
+for itself: the prompt marker and the scrollbar stay out of the text, so a selection across
+them comes out clean. Any other key drops the picking, so a selection never sits over text
+that has moved under it. While the client runs the mouse is the client's, which is the price
+of the wheel scrolling the conversation; holding shift asks the terminal for its own selection
+back in most of them.
 
 Anything a keyboard can send reaches the draft as bytes, so an enye, an accented vowel or a
 combining mark typed after a letter lands in the same cell as the letter it belongs to. Copying goes out as the terminal's own clipboard sequence and lives in

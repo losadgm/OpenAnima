@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <chrono>
 #include <cstddef>
 #include <string>
 
@@ -64,9 +65,53 @@ private:
 ///
 /// Rows are joined by line breaks, trailing blanks of each row are dropped, and the right half of
 /// a wide character contributes nothing because the character itself already covers the columns.
+/// What the client draws for itself, the prompt marker and the scrollbar, is not part of what is
+/// copied: a reader copies what is said, not the frame it is said on.
 /// @param frame Frame the selection was made on.
 /// @param selection Region to read.
 /// @return The text, empty when nothing is covered.
 [[nodiscard]] std::string selectedText(const Canvas& frame, const Selection& selection);
+
+/// The word under a position, the way a terminal picks one out on a double click.
+///
+/// Letters, digits and underscores run together, and so does anything that is not ASCII. A cell
+/// that is not part of a word is a word of its own, so a double click on a comma takes the comma.
+/// @param frame Frame that was painted.
+/// @param row Row the pointer is on.
+/// @param column Column the pointer is on.
+/// @return The selection that covers the word, empty when the position is off the frame.
+// As everywhere here: a row and a column, both named where they are used.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+[[nodiscard]] Selection wordAt(const Canvas& frame, std::size_t row, std::size_t column);
+
+/// The whole row under a position, the way a terminal picks one out on a triple click.
+/// @param frame Frame that was painted.
+/// @param row Row the pointer is on.
+/// @return The selection that covers the row, empty when the position is off the frame.
+[[nodiscard]] Selection lineAt(const Canvas& frame, std::size_t row);
+
+/// Counts presses that come fast and in the same cell, which is what a double click is.
+class Clicks {
+public:
+    /// Records a press.
+    /// @param row Row pressed.
+    /// @param column Column pressed.
+    /// @param when When it was pressed.
+    /// @return How many presses in a row this one makes: one, two, three or more.
+    // As everywhere here: a row and a column, both named where they are used.
+    // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+    int press(std::size_t row, std::size_t column, std::chrono::steady_clock::time_point when);
+
+    /// @return How many presses the last one made.
+    [[nodiscard]] int count() const noexcept {
+        return m_count;
+    }
+
+private:
+    std::chrono::steady_clock::time_point m_at;  ///< When the last press happened.
+    std::size_t m_row{0};                        ///< Row of the last press.
+    std::size_t m_column{0};                     ///< Column of the last press.
+    int m_count{0};                              ///< Presses in the run so far.
+};
 
 }  // namespace OpenAnimaTui::Screen

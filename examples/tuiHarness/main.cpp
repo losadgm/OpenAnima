@@ -115,25 +115,40 @@ void insertText(Model& model, const std::string& text, std::size_t scrollStep) {
 /// out with the mouse, copying it and pasting what was copied last.
 /// @param key Key that arrived.
 /// @param selection What the mouse has picked out so far.
+/// @param clicks Presses counted so far, which is what tells a double click from two clicks.
 /// @param painted The frame on screen.
 /// @param clipboard What was copied last.
 /// @param model The model, for the paste and for the step a scroll takes.
 /// @param terminal Terminal the clipboard sequence goes to.
 /// @return Whether the key was used here, so the model does not see it as well.
 bool handleScreenKey(const Key& key, OpenAnimaTui::Screen::Selection& selection,
+                     OpenAnimaTui::Screen::Clicks& clicks,
                      const OpenAnimaTui::Screen::Canvas& painted, std::string& clipboard,
                      Model& model, OpenAnimaTui::Terminal& terminal) {
     const std::size_t scrollStep = terminal.height() / 2;
     switch (key.kind) {
-    case Key::Kind::MousePress:
-        selection.begin(key.row, key.column);
+    case Key::Kind::MousePress: {
+        // A second press on the same cell takes the word under it and a third takes the row,
+        // which is what picking text out means everywhere else.
+        const int count = clicks.press(key.row, key.column, std::chrono::steady_clock::now());
+        if (count == 2) {
+            selection = OpenAnimaTui::Screen::wordAt(painted, key.row, key.column);
+        } else if (count > 2) {
+            selection = OpenAnimaTui::Screen::lineAt(painted, key.row);
+        } else {
+            selection.begin(key.row, key.column);
+        }
         return true;
+    }
     case Key::Kind::MouseDrag:
     case Key::Kind::MouseRelease:
         // The drag moves the far end of the selection, and the release leaves it where the
         // pointer is. A press and a release on the same cell leave that cell picked out, which
-        // is the only way to take a single character.
-        selection.extend(key.row, key.column);
+        // is the only way to take a single character. A word or a row taken by a double click
+        // stays as it is: the pointer is still inside it.
+        if (clicks.count() < 2) {
+            selection.extend(key.row, key.column);
+        }
         return true;
     case Key::Kind::CtrlC:
         // The copy key, and nothing else. A client that leaves on it is a client someone leaves
@@ -185,6 +200,7 @@ int main() {
     // What the mouse picked out, and what the client copied last. Both are about the screen,
     // which is the shell's business: the model never hears about a position.
     OpenAnimaTui::Screen::Selection selection;
+    OpenAnimaTui::Screen::Clicks clicks;
     OpenAnimaTui::Screen::Canvas painted{terminal->width(), terminal->height()};
     std::string clipboard;
 
@@ -195,10 +211,15 @@ int main() {
         const bool drained = terminal->flush();
 
         if (const auto key = terminal->readKey(std::chrono::milliseconds{20})) {
-            if (!handleScreenKey(*key, selection, painted, clipboard, model, *terminal)) {
-                runEffects(OpenAnimaTui::App::update(model, *key, terminal->height() / 2), brains,
-                           config, turn);
+            if (handleScreenKey(*key, selection, clicks, painted, clipboard, model, *terminal)) {
+                dirty = true;
+                continue;
             }
+            // Anything else is the reader moving on: what was picked out is dropped, so a
+            // selection never sits there over text that has changed under it.
+            selection.clear();
+            runEffects(OpenAnimaTui::App::update(model, *key, terminal->height() / 2), brains,
+                       config, turn);
             dirty = true;
         }
 

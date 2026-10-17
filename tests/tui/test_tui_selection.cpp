@@ -2,6 +2,7 @@
 /// @brief What the mouse picked out: which cells are inside it and what text they hold.
 
 #include <catch2/catch_test_macros.hpp>
+#include <chrono>
 #include <cstddef>
 #include <string>
 
@@ -14,8 +15,11 @@
 namespace {
 
 using namespace OpenAnimaTui::Tests;
+using OpenAnimaTui::Screen::Clicks;
+using OpenAnimaTui::Screen::lineAt;
 using OpenAnimaTui::Screen::selectedText;
 using OpenAnimaTui::Screen::Selection;
+using OpenAnimaTui::Screen::wordAt;
 
 /// A frame with three lines of text on it.
 Canvas painted() {
@@ -112,6 +116,66 @@ TEST_CASE("clearing a selection leaves nothing picked out") {
     selection.clear();
     CHECK_FALSE(selection.active());
     CHECK_FALSE(selection.contains(1, 1));
+}
+
+TEST_CASE("a double click takes the word under the pointer") {
+    const Canvas frame = painted();
+
+    // Row 1 reads "npc 1   well met".
+    CHECK(selectedText(frame, wordAt(frame, 1, 10)) == "well");
+    CHECK(selectedText(frame, wordAt(frame, 1, 14)) == "met");
+
+    // A cell that is not part of a word is a word of its own.
+    const Selection space = wordAt(frame, 1, 12);
+    CHECK(space.contains(1, 12));
+    CHECK_FALSE(space.contains(1, 11));
+
+    // Off the frame there is nothing to take.
+    CHECK(wordAt(frame, 9, 0).empty());
+}
+
+TEST_CASE("a word is letters, digits and underscores, and anything not ASCII") {
+    Canvas frame{20, 4};
+    frame.put(0, 0, "el ca\xc3\xb1on_2 del 2024", Palette::text());
+
+    CHECK(selectedText(frame, wordAt(frame, 0, 4)) == "ca\xc3\xb1on_2");
+    CHECK(selectedText(frame, wordAt(frame, 0, 17)) == "2024");
+}
+
+TEST_CASE("a triple click takes the whole row") {
+    const Canvas frame = painted();
+    CHECK(selectedText(frame, lineAt(frame, 1)) == "npc 1   well met");
+    CHECK(lineAt(frame, 9).empty());
+}
+
+TEST_CASE("what the client draws for itself is not copied") {
+    Canvas frame{12, 2};
+    frame.put(0, 0, "\u2771 hello", Palette::text());
+    frame.put(1, 0, "note", Palette::text());
+    frame.put(1, 11, OpenAnimaTui::Screen::Glyphs::ScrollBar, Palette::muted());
+
+    Selection all;
+    all.begin(0, 0);
+    all.extend(1, 11);
+
+    // The prompt marker and the scrollbar stay out of it: a selection across them comes out
+    // with the words and nothing else.
+    CHECK(selectedText(frame, all) == " hello\nnote");
+}
+
+TEST_CASE("presses in the same cell in a row are counted as clicks") {
+    using Clock = std::chrono::steady_clock;
+    const Clock::time_point start{};
+    Clicks clicks;
+
+    CHECK(clicks.press(2, 5, start) == 1);
+    CHECK(clicks.press(2, 5, start + std::chrono::milliseconds{200}) == 2);
+    CHECK(clicks.count() == 2);
+    CHECK(clicks.press(2, 5, start + std::chrono::milliseconds{300}) == 3);
+
+    // A slow press starts over, and so does one in another cell.
+    CHECK(clicks.press(2, 5, start + std::chrono::milliseconds{2000}) == 1);
+    CHECK(clicks.press(2, 6, start + std::chrono::milliseconds{2100}) == 1);
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)
