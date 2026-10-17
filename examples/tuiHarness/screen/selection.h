@@ -11,6 +11,16 @@
 
 namespace OpenAnimaTui::Screen {
 
+/// Where a selection lives.
+///
+/// The conversation scrolls and the prompt does not, so a span of one is not a span of the
+/// other: a selection made in the conversation moves with the text and is read inside the
+/// viewport, and one made on the prompt stays where it is and is read on the whole screen.
+enum class Scope : std::uint8_t {
+    Conversation,  ///< Inside the viewport of the conversation, which scrolls.
+    Screen         ///< The prompt and what surrounds it, which stays where it is.
+};
+
 /// A span of the screen, from where the button went down to where the mouse is now.
 ///
 /// The client draws the screen, so it is the only one that can say what a region of it holds:
@@ -21,9 +31,10 @@ public:
     /// Starts a selection at a position.
     /// @param row Row where the button went down.
     /// @param column Column where the button went down.
+    /// @param scope Where the row is, which decides what the selection does when text scrolls.
     // A position on the screen is a row and a column, and they are named at every call site.
     // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-    void begin(std::size_t row, std::size_t column);
+    void begin(std::size_t row, std::size_t column, Scope scope = Scope::Conversation);
 
     /// Moves the moving end of the selection.
     /// @param row Row the mouse is at.
@@ -37,10 +48,10 @@ public:
 
     /// Moves the selection with the text as the conversation scrolls.
     ///
-    /// What is picked out is a span of the screen, and scrolling moves the words under it
-    /// without moving the screen: the span follows the words, so it stays over what was picked
-    /// out. A span pushed past the top of the screen is dropped, because nothing of it is left
-    /// to pick out, and one that is only partly past keeps the part that is still on screen.
+    /// Only a selection made in the conversation moves: the prompt does not scroll. The span
+    /// keeps the rows it was made on, which may be outside the viewport for a while, so it is
+    /// there again when the text comes back. A selection of the rest of the screen is left
+    /// alone.
     /// @param rows Rows the text moved down, negative when it moved up.
     void shift(std::ptrdiff_t rows);
 
@@ -56,18 +67,22 @@ public:
     /// @return Whether the cell is inside the selection.
     [[nodiscard]] bool contains(std::size_t row, std::size_t column) const;
 
-    /// @return First row the selection touches.
-    [[nodiscard]] std::size_t firstRow() const;
+    /// @return Where the selection lives, which is what it moves with.
+    [[nodiscard]] Scope scope() const;
 
-    /// @return Last row the selection touches.
-    [[nodiscard]] std::size_t lastRow() const;
+    /// @return First row the selection touches, which may be above the screen.
+    [[nodiscard]] std::ptrdiff_t firstRow() const;
+
+    /// @return Last row the selection touches, which may be below the screen.
+    [[nodiscard]] std::ptrdiff_t lastRow() const;
 
 private:
-    bool m_active{false};           ///< Whether the mouse picked something out.
-    std::size_t m_anchorRow{0};     ///< Row where the button went down.
-    std::size_t m_anchorColumn{0};  ///< Column where the button went down.
-    std::size_t m_cursorRow{0};     ///< Row the mouse is at.
-    std::size_t m_cursorColumn{0};  ///< Column the mouse is at.
+    bool m_active{false};                ///< Whether the mouse picked something out.
+    Scope m_scope{Scope::Conversation};  ///< Where the selection lives.
+    std::ptrdiff_t m_anchorRow{0};       ///< Row where the button went down.
+    std::size_t m_anchorColumn{0};       ///< Column where the button went down.
+    std::ptrdiff_t m_cursorRow{0};       ///< Row the mouse is at.
+    std::size_t m_cursorColumn{0};       ///< Column the mouse is at.
 };
 
 /// Reads what a selection covers off the frame that was painted.
@@ -76,11 +91,14 @@ private:
 /// means the frame, the prompt marker, the indentation before a name, the blank rows between
 /// turns and the empty columns of a panel. The right half of a wide character contributes
 /// nothing either, because the character itself already covers the columns. Rows are joined by
-/// line breaks and trailing blanks are dropped.
+/// line breaks and trailing blanks are dropped, and only the rows of the scope are read: a
+/// conversation selection never reads the prompt.
 /// @param frame Frame the selection was made on.
 /// @param selection Region to read.
+/// @param rows Rows the scope of the selection has on the screen.
 /// @return The text, empty when nothing is covered.
-[[nodiscard]] std::string selectedText(const Canvas& frame, const Selection& selection);
+[[nodiscard]] std::string selectedText(const Canvas& frame, const Selection& selection,
+                                       std::size_t rows);
 
 /// The word under a position, the way a terminal picks one out on a double click.
 ///
@@ -89,16 +107,20 @@ private:
 /// @param frame Frame that was painted.
 /// @param row Row the pointer is on.
 /// @param column Column the pointer is on.
+/// @param scope Where the row is, which the selection it returns belongs to.
 /// @return The selection that covers the word, empty when the position is off the frame.
 // As everywhere here: a row and a column, both named where they are used.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-[[nodiscard]] Selection wordAt(const Canvas& frame, std::size_t row, std::size_t column);
+[[nodiscard]] Selection wordAt(const Canvas& frame, std::size_t row, std::size_t column,
+                               Scope scope = Scope::Conversation);
 
 /// The whole row under a position, the way a terminal picks one out on a triple click.
 /// @param frame Frame that was painted.
 /// @param row Row the pointer is on.
+/// @param scope Where the row is, which the selection it returns belongs to.
 /// @return The selection that covers the row, empty when the position is off the frame.
-[[nodiscard]] Selection lineAt(const Canvas& frame, std::size_t row);
+[[nodiscard]] Selection lineAt(const Canvas& frame, std::size_t row,
+                               Scope scope = Scope::Conversation);
 
 /// Whether a cell is layout rather than something that was said.
 ///

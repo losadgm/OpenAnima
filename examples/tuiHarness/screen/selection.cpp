@@ -19,12 +19,12 @@ namespace {
 constexpr std::chrono::milliseconds DoubleClickTime{400};
 
 /// Packs a position into one number, so two of them can be ordered the way a reader would.
-/// @param row Row.
+/// @param row Row, which is below zero for a selection that has scrolled out of the viewport.
 /// @param column Column.
 /// @return A number that grows down the screen and to the right.
-std::size_t rank(std::size_t row, std::size_t column) {
-    constexpr std::size_t ColumnsPerRow = 1U << 20U;
-    return (row * ColumnsPerRow) + column;
+long long rank(std::ptrdiff_t row, std::size_t column) {
+    constexpr long long ColumnsPerRow = 1LL << 20LL;
+    return (row * ColumnsPerRow) + static_cast<long long>(column);
 }
 
 /// @param cell Cell to look at.
@@ -81,11 +81,12 @@ bool isLayout(const Canvas& frame, const Cell& cell, std::size_t column) {
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-void Selection::begin(std::size_t row, std::size_t column) {
+void Selection::begin(std::size_t row, std::size_t column, Scope scope) {
     m_active = true;
-    m_anchorRow = row;
+    m_scope = scope;
+    m_anchorRow = static_cast<std::ptrdiff_t>(row);
     m_anchorColumn = column;
-    m_cursorRow = row;
+    m_cursorRow = static_cast<std::ptrdiff_t>(row);
     m_cursorColumn = column;
 }
 
@@ -94,7 +95,7 @@ void Selection::extend(std::size_t row, std::size_t column) {
     if (!m_active) {
         return;
     }
-    m_cursorRow = row;
+    m_cursorRow = static_cast<std::ptrdiff_t>(row);
     m_cursorColumn = column;
 }
 
@@ -103,18 +104,13 @@ void Selection::clear() {
 }
 
 void Selection::shift(std::ptrdiff_t rows) {
-    if (!m_active) {
+    if (!m_active || m_scope == Scope::Screen) {
         return;
     }
-    const std::ptrdiff_t anchor = static_cast<std::ptrdiff_t>(m_anchorRow) + rows;
-    const std::ptrdiff_t cursor = static_cast<std::ptrdiff_t>(m_cursorRow) + rows;
-    if (std::max(anchor, cursor) < 0) {
-        clear();  // It went off the top: there is nothing of it left on the screen.
-        return;
-    }
-    // The rows that left the top are dropped, and the rest keeps covering the same words.
-    m_anchorRow = static_cast<std::size_t>(std::max<std::ptrdiff_t>(anchor, 0));
-    m_cursorRow = static_cast<std::size_t>(std::max<std::ptrdiff_t>(cursor, 0));
+    // The rows are kept as they are, even when they leave the viewport: the span belongs to the
+    // text, and it is there again as soon as the text is.
+    m_anchorRow += rows;
+    m_cursorRow += rows;
 }
 
 bool Selection::active() const {
@@ -129,28 +125,38 @@ bool Selection::contains(std::size_t row, std::size_t column) const {
     if (!m_active) {
         return false;
     }
-    const std::size_t here = rank(row, column);
-    const std::size_t anchor = rank(m_anchorRow, m_anchorColumn);
-    const std::size_t cursor = rank(m_cursorRow, m_cursorColumn);
+    const long long here = rank(static_cast<std::ptrdiff_t>(row), column);
+    const long long anchor = rank(m_anchorRow, m_anchorColumn);
+    const long long cursor = rank(m_cursorRow, m_cursorColumn);
     return here >= std::min(anchor, cursor) && here <= std::max(anchor, cursor);
 }
 
-std::size_t Selection::firstRow() const {
+Scope Selection::scope() const {
+    return m_scope;
+}
+
+std::ptrdiff_t Selection::firstRow() const {
     return std::min(m_anchorRow, m_cursorRow);
 }
 
-std::size_t Selection::lastRow() const {
+std::ptrdiff_t Selection::lastRow() const {
     return std::max(m_anchorRow, m_cursorRow);
 }
 
-std::string selectedText(const Canvas& frame, const Selection& selection) {
-    if (selection.empty()) {
+std::string selectedText(const Canvas& frame, const Selection& selection, std::size_t rows) {
+    const std::size_t limit = std::min(rows, frame.height());
+    if (selection.empty() || limit == 0 || selection.lastRow() < 0) {
         return {};
     }
 
+    // Only the rows of the scope are read: a span of the conversation never reaches into the
+    // prompt, however far it has been scrolled.
+    const std::size_t first =
+        static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.firstRow(), 0));
+    const std::size_t last = std::min(static_cast<std::size_t>(selection.lastRow()), limit - 1);
+
     std::string text;
-    const std::size_t last = std::min(selection.lastRow(), frame.height() - 1);
-    for (std::size_t row = selection.firstRow(); row <= last; ++row) {
+    for (std::size_t row = first; row <= last; ++row) {
         std::string line;
         for (std::size_t column = 0; column < frame.width(); ++column) {
             if (!selection.contains(row, column)) {
@@ -183,13 +189,13 @@ std::string selectedText(const Canvas& frame, const Selection& selection) {
 }
 
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
-Selection wordAt(const Canvas& frame, std::size_t row, std::size_t column) {
+Selection wordAt(const Canvas& frame, std::size_t row, std::size_t column, Scope scope) {
     Selection selection;
     if (row >= frame.height() || column >= frame.width()) {
         return selection;
     }
 
-    selection.begin(row, column);
+    selection.begin(row, column, scope);
     if (!isWordCell(frame.at(row, column))) {
         return selection;
     }
@@ -202,17 +208,17 @@ Selection wordAt(const Canvas& frame, std::size_t row, std::size_t column) {
     while (last + 1 < frame.width() && isWordCell(frame.at(row, last + 1))) {
         ++last;
     }
-    selection.begin(row, first);
+    selection.begin(row, first, scope);
     selection.extend(row, last);
     return selection;
 }
 
-Selection lineAt(const Canvas& frame, std::size_t row) {
+Selection lineAt(const Canvas& frame, std::size_t row, Scope scope) {
     Selection selection;
     if (row >= frame.height() || frame.width() == 0) {
         return selection;
     }
-    selection.begin(row, 0);
+    selection.begin(row, 0, scope);
     selection.extend(row, frame.width() - 1);
     return selection;
 }

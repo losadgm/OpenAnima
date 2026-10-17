@@ -25,6 +25,7 @@ using OpenAnimaTui::App::Effect;
 using OpenAnimaTui::App::Model;
 using OpenAnimaTui::Screen::render;
 using OpenAnimaTui::Screen::RenderResult;
+using OpenAnimaTui::Screen::Scope;
 using OpenAnimaTui::Screen::Selection;
 using OpenAnimaTui::Screen::Metrics::MaxHints;
 using namespace OpenAnimaTui::Tests;
@@ -398,8 +399,9 @@ TEST_CASE("what the mouse is holding is painted, down to the cell it went down o
     Model model;
     type(model, "hola");
 
+    // The status row is outside the conversation, so it is picked out as part of the screen.
     Selection selection;
-    selection.begin(9, 2);
+    selection.begin(9, 2, Scope::Screen);
     selection.extend(9, 5);
     RenderResult rendered = render(model, 40, 10, selection);
     CHECK(rendered.frame.at(9, 2).style.reverse);
@@ -419,9 +421,9 @@ TEST_CASE("picking out marks the words and leaves the frame of the prompt alone"
     Model model;
     type(model, "hola");
 
-    // The whole box, borders and padding included.
+    // The whole box, borders and padding included, which is the screen and not the conversation.
     Selection selection;
-    selection.begin(6, 0);
+    selection.begin(6, 0, Scope::Screen);
     selection.extend(8, 39);
     const RenderResult rendered = render(model, 40, 10, selection);
 
@@ -431,6 +433,41 @@ TEST_CASE("picking out marks the words and leaves the frame of the prompt alone"
     CHECK_FALSE(rendered.frame.at(7, 0).style.reverse);  // Its left stroke.
     CHECK_FALSE(rendered.frame.at(7, 2).style.reverse);  // The marker in front of the draft.
     CHECK_FALSE(rendered.frame.at(7, 3).style.reverse);  // The panel between the two.
+}
+
+TEST_CASE("what is picked out in the conversation is never painted over the prompt") {
+    Model model;
+    type(model, "hola");
+
+    // The span is made on the last row of the viewport, and the text under it scrolls away,
+    // which would leave it over the box if the scope did not stop it.
+    Selection selection;
+    selection.begin(5, 0);
+    selection.extend(5, 10);
+    selection.shift(3);
+
+    const RenderResult rendered = render(model, 40, 10, selection);
+    REQUIRE(rendered.scrollRows < rendered.frame.height());
+    for (std::size_t row = rendered.scrollRows; row < rendered.frame.height(); ++row) {
+        for (std::size_t column = 0; column < rendered.frame.width(); ++column) {
+            CHECK_FALSE(rendered.frame.at(row, column).style.reverse);
+        }
+    }
+}
+
+TEST_CASE("a picking of the prompt stays where it is, whether the text scrolls or not") {
+    Model model;
+    type(model, "hola");
+
+    Selection selection;
+    selection.begin(7, 4, Scope::Screen);  // The first letter of the draft.
+    selection.extend(7, 7);
+    selection.shift(5);  // The conversation moves; the prompt does not.
+
+    const RenderResult rendered = render(model, 40, 10, selection);
+    CHECK(rendered.frame.at(7, 4).style.reverse);
+    CHECK(rendered.frame.at(7, 7).style.reverse);
+    CHECK_FALSE(rendered.frame.at(7, 8).style.reverse);
 }
 
 TEST_CASE("a hint lights up under the pointer, and the rows of the others do not") {

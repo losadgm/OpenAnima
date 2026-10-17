@@ -88,12 +88,13 @@ bool drainEvents(Model& model, std::map<std::size_t, NPCBrain>& brains) {
 /// Copies what the mouse picked out, to the terminal and to hand for a later paste.
 /// @param selection What is picked out.
 /// @param painted The frame on screen, which is where the text is read from.
+/// @param rows Rows the scope of the selection has on the screen.
 /// @param clipboard Where the text is kept for the next paste.
 /// @param terminal Terminal the clipboard sequence goes to.
 void copySelection(const OpenAnimaTui::Screen::Selection& selection,
-                   const OpenAnimaTui::Screen::Canvas& painted, std::string& clipboard,
-                   OpenAnimaTui::Terminal& terminal) {
-    clipboard = OpenAnimaTui::Screen::selectedText(painted, selection);
+                   const OpenAnimaTui::Screen::Canvas& painted, std::size_t rows,
+                   std::string& clipboard, OpenAnimaTui::Terminal& terminal) {
+    clipboard = OpenAnimaTui::Screen::selectedText(painted, selection, rows);
     if (clipboard.empty()) {
         return;
     }
@@ -237,6 +238,24 @@ void movePointer(ScreenState& state, std::size_t row, std::size_t column) {
     state.pointer.column = column;
 }
 
+/// @param state The screen as it is.
+/// @param row Row the pointer is on.
+/// @return Where a selection made on that row lives: the conversation scrolls under it, and
+///         the prompt and what surrounds it do not.
+OpenAnimaTui::Screen::Scope scopeAt(const ScreenState& state, std::size_t row) {
+    return row < state.shape.scrollRows ? OpenAnimaTui::Screen::Scope::Conversation
+                                        : OpenAnimaTui::Screen::Scope::Screen;
+}
+
+/// @param state The screen as it is.
+/// @param selection What is picked out.
+/// @return Rows the scope of the selection has on the screen.
+std::size_t rowsOf(const ScreenState& state, const OpenAnimaTui::Screen::Selection& selection) {
+    return selection.scope() == OpenAnimaTui::Screen::Scope::Conversation
+               ? state.shape.scrollRows
+               : state.shape.frame.height();
+}
+
 /// Starts what the left button does where it went down.
 /// @param key Key that arrived, which carries the position.
 /// @param state What the pointer has done to the screen.
@@ -264,17 +283,20 @@ void pressAt(const Key& key, ScreenState& state, Model& model, std::size_t scrol
         return;
     }
     // A second press on the same cell takes the word under it and a third takes the row,
-    // which is what picking text out means everywhere else.
+    // which is what picking text out means everywhere else. The rows of the viewport are the
+    // conversation's, which scrolls; the rest of the screen stays where it is.
     const int count = state.clicks.press(key.row, key.column, std::chrono::steady_clock::now());
+    const OpenAnimaTui::Screen::Scope scope = scopeAt(state, key.row);
     if (count == 2) {
-        state.selection = OpenAnimaTui::Screen::wordAt(state.shape.frame, key.row, key.column);
+        state.selection =
+            OpenAnimaTui::Screen::wordAt(state.shape.frame, key.row, key.column, scope);
         return;
     }
     if (count > 2) {
-        state.selection = OpenAnimaTui::Screen::lineAt(state.shape.frame, key.row);
+        state.selection = OpenAnimaTui::Screen::lineAt(state.shape.frame, key.row, scope);
         return;
     }
-    state.selection.begin(key.row, key.column);
+    state.selection.begin(key.row, key.column, scope);
 }
 
 /// Follows the pointer with whatever it is holding: a bar, or the far end of the selection.
@@ -367,7 +389,8 @@ bool handleScreenKey(const Key& key, ScreenState& state, std::string& clipboard,
     case Key::Kind::CtrlC:
         // The copy key, and nothing else. A client that leaves on it is a client someone leaves
         // by accident while reaching for a selection.
-        copySelection(state.selection, state.shape.frame, clipboard, terminal);
+        copySelection(state.selection, state.shape.frame, rowsOf(state, state.selection), clipboard,
+                      terminal);
         state.selection.clear();
         return true;
     case Key::Kind::CtrlV:
