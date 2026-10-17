@@ -7,7 +7,6 @@
 #include <exception>
 #include <sstream>
 #include <string>
-#include <utility>
 #include <vector>
 
 #include "OpenAnima/Provider/RestProviderConfig.h"

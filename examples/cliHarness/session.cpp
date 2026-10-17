@@ -10,9 +10,6 @@
 namespace OpenAnimaCli {
 namespace {
 
-/// The most characters of a persona the prompt shows.
-constexpr std::size_t MaxPersonaInPrompt = 24;
-
 /// Trims the spaces at both ends of a line.
 /// @param text Text to trim.
 /// @return The text without leading or trailing blanks.
@@ -23,15 +20,6 @@ std::string trim(const std::string& text) {
     }
     const std::size_t last = text.find_last_not_of(" \t\r\n");
     return text.substr(first, last - first + 1);
-}
-
-/// @return The first line of a persona, cut when it is too long for the prompt.
-std::string shortName(const std::string& persona) {
-    std::string text = trim(persona.substr(0, persona.find('\n')));
-    if (text.size() > MaxPersonaInPrompt) {
-        text = text.substr(0, MaxPersonaInPrompt - 3) + "...";
-    }
-    return text;
 }
 
 /// @return How a command is written, as the help lists it.
@@ -160,10 +148,9 @@ std::string Session::prompt() const {
     if (!m_active.has_value()) {
         return "[lobby] > ";
     }
-    const auto persona = m_personas.find(*m_active);
-    const std::string name =
-        persona == m_personas.end() ? std::string{} : shortName(persona->second);
-    return "[" + std::to_string(*m_active) + " " + name + "] > ";
+    // The id and nothing else: the persona is as long as the player wanted it to be, and a
+    // prompt is a place to type, not a place to read.
+    return "[npc " + std::to_string(*m_active) + "] > ";
 }
 
 Step Session::createCommand(const std::string& argument) {

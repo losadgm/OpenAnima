@@ -38,8 +38,8 @@ TEST_CASE("an npc is created and talked to", "[cli]") {
 
     REQUIRE(npcId == 1);
     REQUIRE(session.active() == npcId);
-    // The prompt shows enough of the persona to tell the npcs apart, not all of it.
-    REQUIRE(session.prompt() == "[1 a blacksmith of the v...] > ");
+    // The prompt carries the id, never the persona: that one is as long as it wants to be.
+    REQUIRE(session.prompt() == "[npc 1] > ");
 }
 
 TEST_CASE("an empty line asks for nothing", "[cli]") {
