@@ -14,6 +14,8 @@
 namespace {
 
 using namespace OpenAnimaTui::Tests;
+using OpenAnimaTui::Screen::Bounds;
+using OpenAnimaTui::Screen::boundsOf;
 using OpenAnimaTui::Screen::Clicks;
 using OpenAnimaTui::Screen::lineAt;
 using OpenAnimaTui::Screen::Scope;
@@ -28,6 +30,12 @@ Canvas painted() {
     frame.put(1, 0, "npc 1   well met", Palette::primary());
     frame.put(2, 0, "  a note", Palette::muted());
     return frame;
+}
+
+/// @param frame Frame that was painted.
+/// @return Every row of it, which is as far as a span of the whole screen reaches.
+Bounds allRows(const Canvas& frame) {
+    return Bounds{0, frame.height()};
 }
 
 }  // namespace
@@ -83,23 +91,23 @@ TEST_CASE("the text of a selection is what the frame shows there") {
     Selection oneRow;
     oneRow.begin(0, 0);
     oneRow.extend(0, 11);
-    CHECK(selectedText(frame, oneRow, frame.height()) == "you     hell");
+    CHECK(selectedText(frame, oneRow, allRows(frame)) == "you     hell");
 
     Selection severalRows;
     severalRows.begin(0, 8);
     severalRows.extend(1, 11);
-    CHECK(selectedText(frame, severalRows, frame.height()) == "hello\nnpc 1   well");
+    CHECK(selectedText(frame, severalRows, allRows(frame)) == "hello\nnpc 1   well");
 
     Selection wholeRows;
     wholeRows.begin(0, 0);
     wholeRows.extend(2, 19);
-    CHECK(selectedText(frame, wholeRows, frame.height()) ==
+    CHECK(selectedText(frame, wholeRows, allRows(frame)) ==
           "you     hello\nnpc 1   well met\n  a note");
 
     // One cell is a selection: it is how a single character is taken.
     Selection oneCell;
     oneCell.begin(1, 10);
-    CHECK(selectedText(frame, oneCell, frame.height()) == "l");
+    CHECK(selectedText(frame, oneCell, allRows(frame)) == "l");
 }
 
 TEST_CASE("blank layout around the text is not part of what was selected") {
@@ -107,7 +115,7 @@ TEST_CASE("blank layout around the text is not part of what was selected") {
     Selection selection;
     selection.begin(0, 13);
     selection.extend(1, 19);
-    CHECK(selectedText(frame, selection, frame.height()) == "npc 1   well met");
+    CHECK(selectedText(frame, selection, allRows(frame)) == "npc 1   well met");
 }
 
 TEST_CASE("scrolling takes the selection with the words it covers") {
@@ -174,13 +182,39 @@ TEST_CASE("what is read stops at the rows of the scope") {
     selection.begin(1, 0);
     selection.extend(3, 19);
 
-    CHECK(selectedText(frame, selection, 3) == "npc 1   well met\n  a note");
-    CHECK(selectedText(frame, selection, 2) == "npc 1   well met");
-    CHECK(selectedText(frame, selection, 0).empty());
+    CHECK(selectedText(frame, selection, Bounds{0, 3}) == "npc 1   well met\n  a note");
+    CHECK(selectedText(frame, selection, Bounds{0, 2}) == "npc 1   well met");
+    CHECK(selectedText(frame, selection, Bounds{0, 0}).empty());
 
     // A span pushed above the top reads from the first row that is still on the screen.
     selection.shift(-3);
-    CHECK(selectedText(frame, selection, 4) == "you     hello");
+    CHECK(selectedText(frame, selection, Bounds{0, 4}) == "you     hello");
+}
+
+TEST_CASE("each scope takes its own rows of the screen") {
+    CHECK(boundsOf(Scope::Conversation, 6, 10).first == 0);
+    CHECK(boundsOf(Scope::Conversation, 6, 10).count == 6);
+    CHECK(boundsOf(Scope::Screen, 6, 10).first == 6);
+    CHECK(boundsOf(Scope::Screen, 6, 10).count == 4);
+    CHECK(boundsOf(Scope::Screen, 6, 10).end() == 10);
+
+    // A screen with no room for the conversation leaves nothing of it, and the prompt keeps
+    // whatever is left.
+    CHECK(boundsOf(Scope::Conversation, 0, 10).empty());
+    CHECK(boundsOf(Scope::Screen, 0, 10).count == 10);
+    CHECK(boundsOf(Scope::Screen, 80, 10).empty());
+}
+
+TEST_CASE("a span of the prompt does not read what is said above it") {
+    const Canvas frame = painted();
+    Selection selection;
+    selection.begin(1, 0, Scope::Screen);
+    selection.extend(3, 19);
+
+    // The conversation takes the first two rows and the rest of the screen is below them, so
+    // a drag that came up from the prompt reads only what is under it.
+    CHECK(selectedText(frame, selection, Bounds{2, 2}) == "  a note");
+    CHECK(selectedText(frame, selection, Bounds{4, 0}).empty());
 }
 
 TEST_CASE("scrolling leaves a selection that is not there alone") {
@@ -202,8 +236,8 @@ TEST_CASE("a double click takes the word under the pointer") {
     const Canvas frame = painted();
 
     // Row 1 reads "npc 1   well met".
-    CHECK(selectedText(frame, wordAt(frame, 1, 10), frame.height()) == "well");
-    CHECK(selectedText(frame, wordAt(frame, 1, 14), frame.height()) == "met");
+    CHECK(selectedText(frame, wordAt(frame, 1, 10), allRows(frame)) == "well");
+    CHECK(selectedText(frame, wordAt(frame, 1, 14), allRows(frame)) == "met");
 
     // A cell that is not part of a word is a word of its own.
     const Selection space = wordAt(frame, 1, 12);
@@ -218,13 +252,13 @@ TEST_CASE("a word is letters, digits and underscores, and anything not ASCII") {
     Canvas frame{20, 4};
     frame.put(0, 0, "el ca\xc3\xb1on_2 del 2024", Palette::text());
 
-    CHECK(selectedText(frame, wordAt(frame, 0, 4), frame.height()) == "ca\xc3\xb1on_2");
-    CHECK(selectedText(frame, wordAt(frame, 0, 17), frame.height()) == "2024");
+    CHECK(selectedText(frame, wordAt(frame, 0, 4), allRows(frame)) == "ca\xc3\xb1on_2");
+    CHECK(selectedText(frame, wordAt(frame, 0, 17), allRows(frame)) == "2024");
 }
 
 TEST_CASE("a triple click takes the whole row") {
     const Canvas frame = painted();
-    CHECK(selectedText(frame, lineAt(frame, 1), frame.height()) == "npc 1   well met");
+    CHECK(selectedText(frame, lineAt(frame, 1), allRows(frame)) == "npc 1   well met");
     CHECK(lineAt(frame, 9).empty());
 }
 
@@ -245,7 +279,7 @@ TEST_CASE("what the client draws for itself is not copied") {
 
     // The frame, the prompt marker, the scrollbar and the blank layout stay out of it: a
     // selection across them comes out with the words and nothing else.
-    CHECK(selectedText(frame, all, frame.height()) == "hi");
+    CHECK(selectedText(frame, all, allRows(frame)) == "hi");
 }
 
 TEST_CASE("presses in the same cell in a row are counted as clicks") {

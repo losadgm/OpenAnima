@@ -21,6 +21,27 @@ enum class Scope : std::uint8_t {
     Screen         ///< The prompt and what surrounds it, which stays where it is.
 };
 
+/// The rows of the screen a scope takes, which is as far as a selection of it reaches.
+///
+/// The two scopes do not share a row: the conversation sits at the top of the screen and the
+/// prompt and the rows around it take the rest, so a pick of one never touches the other.
+struct Bounds {
+    std::size_t first{0};  ///< First row of the scope.
+    std::size_t count{0};  ///< Rows it takes, which may be none on a screen with no room.
+
+    /// @return Row after the last one of the scope.
+    [[nodiscard]] std::size_t end() const;
+
+    /// @return Whether the scope has no row at all.
+    [[nodiscard]] bool empty() const;
+};
+
+/// @param scope Where a selection lives.
+/// @param scrollRows Rows the conversation takes at the top of the screen.
+/// @param height Rows the screen has.
+/// @return The rows of the screen the scope takes.
+[[nodiscard]] Bounds boundsOf(Scope scope, std::size_t scrollRows, std::size_t height);
+
 /// A span of the screen, from where the button went down to where the mouse is now.
 ///
 /// The client draws the screen, so it is the only one that can say what a region of it holds:
@@ -92,13 +113,14 @@ private:
 /// turns and the empty columns of a panel. The right half of a wide character contributes
 /// nothing either, because the character itself already covers the columns. Rows are joined by
 /// line breaks and trailing blanks are dropped, and only the rows of the scope are read: a
-/// conversation selection never reads the prompt.
+/// selection of the conversation never reads the prompt, and one of the prompt never reads the
+/// conversation.
 /// @param frame Frame the selection was made on.
 /// @param selection Region to read.
-/// @param rows Rows the scope of the selection has on the screen.
+/// @param rows Rows of the screen the scope of the selection takes.
 /// @return The text, empty when nothing is covered.
 [[nodiscard]] std::string selectedText(const Canvas& frame, const Selection& selection,
-                                       std::size_t rows);
+                                       Bounds rows);
 
 /// The word under a position, the way a terminal picks one out on a double click.
 ///

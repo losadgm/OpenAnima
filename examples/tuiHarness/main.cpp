@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <iostream>
 #include <map>
@@ -88,11 +89,11 @@ bool drainEvents(Model& model, std::map<std::size_t, NPCBrain>& brains) {
 /// Copies what the mouse picked out, to the terminal and to hand for a later paste.
 /// @param selection What is picked out.
 /// @param painted The frame on screen, which is where the text is read from.
-/// @param rows Rows the scope of the selection has on the screen.
+/// @param rows Rows of the screen the scope of the selection takes.
 /// @param clipboard Where the text is kept for the next paste.
 /// @param terminal Terminal the clipboard sequence goes to.
 void copySelection(const OpenAnimaTui::Screen::Selection& selection,
-                   const OpenAnimaTui::Screen::Canvas& painted, std::size_t rows,
+                   const OpenAnimaTui::Screen::Canvas& painted, OpenAnimaTui::Screen::Bounds rows,
                    std::string& clipboard, OpenAnimaTui::Terminal& terminal) {
     clipboard = OpenAnimaTui::Screen::selectedText(painted, selection, rows);
     if (clipboard.empty()) {
@@ -130,7 +131,16 @@ struct ScreenState {
     std::size_t barGrab{0};                     ///< Row of the thumb the drag holds.
     bool pullingBar{false};                     ///< Whether the bar of the conversation is dragged.
     bool pullingHintBar{false};                 ///< Whether the bar of the hints is dragged.
+    bool pullingSelection{false};               ///< Whether the drag stretches a selection.
+    std::chrono::steady_clock::time_point nextAutoScroll;  ///< When the edge may move it on.
 };
+
+/// Rows at an edge of the viewport that, while a selection is dragged over them, move the
+/// conversation on their own.
+constexpr std::size_t AutoScrollMargin = 1;
+
+/// How long a drag waiting at an edge takes to move another row.
+constexpr std::chrono::milliseconds AutoScrollStep{50};
 
 /// @param state The screen as it is.
 /// @param column Column the pointer is on.
@@ -249,11 +259,73 @@ OpenAnimaTui::Screen::Scope scopeAt(const ScreenState& state, std::size_t row) {
 
 /// @param state The screen as it is.
 /// @param selection What is picked out.
-/// @return Rows the scope of the selection has on the screen.
-std::size_t rowsOf(const ScreenState& state, const OpenAnimaTui::Screen::Selection& selection) {
-    return selection.scope() == OpenAnimaTui::Screen::Scope::Conversation
-               ? state.shape.scrollRows
-               : state.shape.frame.height();
+/// @return Rows of the screen the scope of the selection takes, which is as far as it reaches.
+OpenAnimaTui::Screen::Bounds rowsOf(const ScreenState& state,
+                                    const OpenAnimaTui::Screen::Selection& selection) {
+    return OpenAnimaTui::Screen::boundsOf(selection.scope(), state.shape.scrollRows,
+                                          state.shape.frame.height());
+}
+
+/// Where a drag that waits at an edge of the viewport wants the conversation to go.
+enum class EdgeScroll : std::uint8_t {
+    None,     ///< No selection is dragged against an edge.
+    Earlier,  ///< The pointer is at the top: the view moves towards what was said first.
+    Later     ///< The pointer is at the bottom: it moves towards what was said last.
+};
+
+/// @param state The screen as it is.
+/// @return Where the drag is pushing the conversation, which is nothing when the pointer is not
+///         holding a selection against an edge of the viewport.
+EdgeScroll edgeScrollOf(const ScreenState& state) {
+    if (!state.pullingSelection || state.selection.empty() ||
+        state.selection.scope() != OpenAnimaTui::Screen::Scope::Conversation ||
+        state.shape.scrollRows == 0) {
+        return EdgeScroll::None;
+    }
+    if (state.pointer.row < AutoScrollMargin) {
+        return EdgeScroll::Earlier;
+    }
+    if (state.pointer.row + AutoScrollMargin >= state.shape.scrollRows) {
+        return EdgeScroll::Later;
+    }
+    return EdgeScroll::None;
+}
+
+/// Moves the conversation a row, taking the end of the selection that is tied to the text with
+/// it while the end under the pointer stays where it is.
+/// @param model The model, which holds the offset.
+/// @param state What the pointer has done to the screen.
+/// @param direction Where the conversation goes.
+/// @return Whether the conversation moved.
+bool autoScroll(Model& model, ScreenState& state, EdgeScroll direction) {
+    const std::size_t before = model.scrollOffset;
+    if (direction == EdgeScroll::Earlier) {
+        model.scrollOffset = std::min(before + 1, state.shape.maxScrollOffset);
+    } else if (before > 0) {
+        model.scrollOffset = before - 1;
+    }
+    if (model.scrollOffset == before) {
+        return false;
+    }
+    state.selection.shift(static_cast<std::ptrdiff_t>(model.scrollOffset) -
+                          static_cast<std::ptrdiff_t>(before));
+    // The pointer has not moved, so only the end tied to the text follows it: the moving end
+    // goes back to the cell the mouse is waiting on.
+    state.selection.extend(state.pointer.row, state.pointer.column);
+    return true;
+}
+
+/// Moves the conversation on when a drag is waiting at an edge of the viewport.
+/// @param model The model, which holds the offset.
+/// @param state What the pointer has done to the screen.
+/// @return Whether the screen has to be repainted.
+bool autoscrollAtEdge(Model& model, ScreenState& state) {
+    const EdgeScroll direction = edgeScrollOf(state);
+    if (direction == EdgeScroll::None || std::chrono::steady_clock::now() < state.nextAutoScroll) {
+        return false;
+    }
+    state.nextAutoScroll = std::chrono::steady_clock::now() + AutoScrollStep;
+    return autoScroll(model, state, direction);
 }
 
 /// Starts what the left button does where it went down.
@@ -262,6 +334,7 @@ std::size_t rowsOf(const ScreenState& state, const OpenAnimaTui::Screen::Selecti
 /// @param model The model, for the hints and the scroll.
 /// @param scrollStep Rows a page scroll takes, as `update` wants.
 void pressAt(const Key& key, ScreenState& state, Model& model, std::size_t scrollStep) {
+    state.pullingSelection = false;
     // The bar of the hints takes hold first: dragging it walks the list the way dragging the
     // bar of the conversation scrolls it.
     if (overHintBar(state, key.column, key.row)) {
@@ -297,6 +370,9 @@ void pressAt(const Key& key, ScreenState& state, Model& model, std::size_t scrol
         return;
     }
     state.selection.begin(key.row, key.column, scope);
+    // A plain press holds the far end of the selection: it is what a drag stretches, and what
+    // keeps the conversation moving while the pointer waits at an edge of the viewport.
+    state.pullingSelection = true;
 }
 
 /// Follows the pointer with whatever it is holding: a bar, or the far end of the selection.
@@ -367,6 +443,7 @@ bool handleScreenKey(const Key& key, ScreenState& state, std::string& clipboard,
         dragTo(key, state, model);
         return true;
     case Key::Kind::MouseRelease:
+        state.pullingSelection = false;
         if (state.pullingHintBar) {
             state.pullingHintBar = false;
             return true;
@@ -477,6 +554,10 @@ int main() {
             }
             dirty = true;
         }
+
+        // A drag that runs into an edge of the viewport keeps the conversation moving while the
+        // pointer waits there, so a span can reach past what is on screen.
+        dirty = autoscrollAtEdge(model, state) || dirty;
 
         if (drainEvents(model, brains)) {
             dirty = true;

@@ -80,6 +80,22 @@ bool isLayout(const Canvas& frame, const Cell& cell, std::size_t column) {
     return cell.furniture || isFurniture(frame, cell, column);
 }
 
+std::size_t Bounds::end() const {
+    return first + count;
+}
+
+bool Bounds::empty() const {
+    return count == 0;
+}
+
+Bounds boundsOf(Scope scope, std::size_t scrollRows, std::size_t height) {
+    const std::size_t split = std::min(scrollRows, height);
+    if (scope == Scope::Conversation) {
+        return Bounds{0, split};
+    }
+    return Bounds{split, height - split};
+}
+
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void Selection::begin(std::size_t row, std::size_t column, Scope scope) {
     m_active = true;
@@ -143,17 +159,21 @@ std::ptrdiff_t Selection::lastRow() const {
     return std::max(m_anchorRow, m_cursorRow);
 }
 
-std::string selectedText(const Canvas& frame, const Selection& selection, std::size_t rows) {
-    const std::size_t limit = std::min(rows, frame.height());
-    if (selection.empty() || limit == 0 || selection.lastRow() < 0) {
+std::string selectedText(const Canvas& frame, const Selection& selection, Bounds rows) {
+    if (selection.empty() || rows.empty() || frame.height() == 0 || selection.lastRow() < 0) {
         return {};
     }
 
     // Only the rows of the scope are read: a span of the conversation never reaches into the
-    // prompt, however far it has been scrolled.
-    const std::size_t first =
-        static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.firstRow(), 0));
-    const std::size_t last = std::min(static_cast<std::size_t>(selection.lastRow()), limit - 1);
+    // prompt, however far it has been scrolled, and a span of the prompt never reaches back.
+    const std::size_t first = std::max(
+        static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.firstRow(), 0)), rows.first);
+    const std::size_t last =
+        std::min(static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.lastRow(), 0)),
+                 std::min(rows.end(), frame.height()) - 1);
+    if (first > last) {
+        return {};
+    }
 
     std::string text;
     for (std::size_t row = first; row <= last; ++row) {

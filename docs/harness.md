@@ -152,7 +152,7 @@ repeating the name or opening a gap.
 | Hover a hint or a scrollbar | Lights it up: the hint goes lilac, bold and underlined, the thumb of the bar goes lilac and bold |
 | Click a hint | Writes it into the draft, the same as tab with the selected one |
 | Esc | Cancels the turn in flight, keeping what it had produced |
-| Drag over the conversation | Picks out those cells, painted reversed as the pointer moves |
+| Drag over the conversation | Picks out those cells, painted reversed as the pointer moves, and moves the conversation on when it is held against an edge of the viewport |
 | Press and release on one cell | Picks out that one character |
 | Double click | Picks out the word under the pointer |
 | Triple click | Picks out the whole row |
@@ -184,9 +184,15 @@ words without the box and comes out flush with the left edge.
 Any other key drops the picking, so a selection never sits over text that has been typed over.
 The wheel and the page keys are the exception: they move the conversation, and a picking made in
 it goes with the words it covers, so it stays over what was picked out while it scrolls, and it
-is there again when the words come back. A picking belongs to the part of the screen it was made
-on: one of the conversation is read and painted inside the viewport and never reaches the
-prompt, and one of the prompt stays where it is while the conversation moves under it.
+is there again when the words come back.
+A drag that reaches an edge of the viewport and waits there moves the conversation a row at a
+time, so a span can be taken past what is on screen without letting go. The end tied to the text
+goes with it and the end under the pointer waits on the edge, which means the span grows for as
+long as the button is held there.
+A picking belongs to the part of the screen it was made on: one of the conversation is read and
+painted inside the viewport and never reaches the prompt, and one of the prompt stays where it
+is while the conversation moves under it. A drag that starts on the prompt and comes up over the
+conversation therefore takes the draft and leaves what was said above it alone.
 While the client runs the mouse is the client's, which is the price of the wheel scrolling the
 conversation; holding shift asks the terminal for its own selection back in most of them. The
 right button is left to the terminal: the client never uses it, so the menu of the editor or of

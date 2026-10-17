@@ -231,16 +231,21 @@ std::string statusRow(const Model& model) {
 /// something worth copying.
 /// @param frame Frame to paint on.
 /// @param selection Cells the mouse picked out.
-/// @param rows Rows the scope of the selection has on the screen: nothing outside them is
-///        painted, so a pick of the conversation never marks the prompt.
-void pickOutSelection(Canvas& frame, const Selection& selection, std::size_t rows) {
-    const std::size_t limit = std::min(rows, frame.height());
-    if (!selection.active() || limit == 0 || selection.lastRow() < 0) {
+/// @param rows Rows of the screen the scope of the selection takes: nothing outside them is
+///        painted, so a pick of the conversation never marks the prompt and one of the prompt
+///        never marks what is said above it.
+void pickOutSelection(Canvas& frame, const Selection& selection, Bounds rows) {
+    if (!selection.active() || rows.empty() || frame.height() == 0 || selection.lastRow() < 0) {
         return;
     }
-    const std::size_t first =
-        static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.firstRow(), 0));
-    const std::size_t last = std::min(static_cast<std::size_t>(selection.lastRow()), limit - 1);
+    const std::size_t first = std::max(
+        static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.firstRow(), 0)), rows.first);
+    const std::size_t last =
+        std::min(static_cast<std::size_t>(std::max<std::ptrdiff_t>(selection.lastRow(), 0)),
+                 std::min(rows.end(), frame.height()) - 1);
+    if (first > last) {
+        return;
+    }
     for (std::size_t picked = first; picked <= last; ++picked) {
         for (std::size_t column = 0; column < frame.width(); ++column) {
             if (!selection.contains(picked, column)) {
@@ -634,10 +639,9 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     result.caretColumn = BoxWidth + PanelPad + PromptWidth + position.second;
 
     // What was picked out is painted inside the rows of its scope: a span of the conversation
-    // is never painted over the prompt, however far the text under it has scrolled.
-    const std::size_t scopeRows =
-        selection.scope() == Scope::Conversation ? viewRows : frame.height();
-    pickOutSelection(frame, selection, scopeRows);
+    // is never painted over the prompt, however far the text under it has scrolled, and a span
+    // of the prompt is never painted over the conversation it was dragged across.
+    pickOutSelection(frame, selection, boundsOf(selection.scope(), viewRows, frame.height()));
     return result;
 }
 

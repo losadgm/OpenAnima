@@ -455,6 +455,25 @@ TEST_CASE("what is picked out in the conversation is never painted over the prom
     }
 }
 
+TEST_CASE("a picking that starts on the prompt does not reach into the conversation") {
+    Model model = longConversation();
+
+    // The button went down on the draft and the pointer came up over the conversation, which a
+    // span of the prompt does not cover.
+    Selection selection;
+    selection.begin(7, 4, Scope::Screen);
+    selection.extend(1, 4);
+
+    const RenderResult rendered = render(model, 40, 10, selection);
+    REQUIRE(rendered.scrollRows > 1);
+    CHECK(readAll(rendered.frame).find("a7") != std::string::npos);  // There is text up there.
+    for (std::size_t row = 0; row < rendered.scrollRows; ++row) {
+        for (std::size_t column = 0; column < rendered.frame.width(); ++column) {
+            CHECK_FALSE(rendered.frame.at(row, column).style.reverse);
+        }
+    }
+}
+
 TEST_CASE("a picking of the prompt stays where it is, whether the text scrolls or not") {
     Model model;
     type(model, "hola");
