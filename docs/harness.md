@@ -316,14 +316,16 @@ for the answer, and says so.
 - The pieces: `tests/tui/` covers the text (columns, wrapping, cutting), the canvas (clipping,
   wide characters, combining marks), the frame writer (what it sends, and whether a terminal
   that applies it ends up showing the frame it came from), the commands (matching and
-  completing), the model (every key, the world, the events) and the screen (panels, hints,
+  completing), the model (every key, the world, the events), the pointer (clicks, drags, the
+  three bars, the wheel, and what a drag at an edge does) and the screen (panels, hints,
   viewport, caret, and what the mouse picked out). No terminal is involved.
-- The client itself: driven over a pseudo-terminal, sending keys and reading what comes back,
-  with a throwaway server that streams the answer word by word. The keys, the wheel, the
-  accented characters, the picking out and the clipboard are checked that way, and so is the
-  rule that nothing but whole characters ever leaves the client towards the terminal. PTY on
-  Unix and ConPTY on Windows is where this is going, so the same test runs on all three
-  platforms.
+- The client itself: driven over a pseudo-terminal by hand, sending keys and reading what
+  comes back, with a throwaway server that streams the answer word by word. The keys, the
+  wheel, the accented characters, the picking out and the clipboard are checked that way, and
+  so is the rule that nothing but whole characters ever leaves the client towards the
+  terminal. The case that does it inside the suite is what the roadmap still lists for this
+  point; PTY on Unix and ConPTY on Windows is where it is going, so the same test runs on all
+  three platforms.
 
 ### The plan
 
