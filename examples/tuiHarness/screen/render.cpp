@@ -181,6 +181,8 @@ std::vector<TranscriptRow> transcriptRows(const Model& model, std::size_t width)
 }
 
 /// The one status row: what is working while a turn runs, or the model and what can be done.
+/// It starts at the left edge, where the frame of the prompt starts, and sits on the plain
+/// background rather than on a panel of its own.
 /// @param model Model to show.
 /// @return The row, painted later.
 std::string statusRow(const Model& model) {
@@ -188,14 +190,17 @@ std::string statusRow(const Model& model) {
         const std::size_t tenths = App::elapsedTenths(model);
         const std::size_t frame = tenths % Glyphs::Spinner.size();
         const std::string tail = model.cancelling ? "   cancelling" : "   esc to cancel";
-        return std::string(PrefixWidth - 1, ' ') + Glyphs::Spinner.at(frame) + " " + "working " +
-               std::to_string(tenths / 10) + "." + std::to_string(tenths % 10) + "s" + tail;
+        return Glyphs::Spinner.at(frame) + std::string{" working "} + std::to_string(tenths / 10) +
+               "." + std::to_string(tenths % 10) + "s" + tail;
     }
     const char* hint = model.world.active.has_value()
                            ? "ask something   /help for keys"
                            : "no npc   /create to make one   /help for keys";
     const std::string mode = model.raw ? "   raw" : "";
-    return std::string(PrefixWidth, ' ') + model.modelName + "   " + hint + mode;
+    if (model.modelName.empty()) {
+        return std::string{hint} + mode;
+    }
+    return model.modelName + "   " + hint + mode;
 }
 
 /// Paint what the mouse picked out, over whatever the frame holds there: a selection is about the
@@ -270,13 +275,15 @@ void paintScrollBar(Canvas& frame, std::size_t viewRows, std::size_t width, std:
 }
 
 /// Paints one horizontal border of the frame around the prompt.
+///
+/// The border sits on the plain background, so the change of colour is exactly where the frame
+/// is: everything inside it is the panel, everything outside is not.
 /// @param frame Canvas to paint on.
 /// @param row Row to paint.
 /// @param width Columns available.
 /// @param top Whether it is the upper border.
 void paintBoxBorder(Canvas& frame, std::size_t row, std::size_t width, bool top) {
-    const Style border = Palette::muted().withBackground(Palette::panelColor());
-    frame.fill(row, 0, width, Palette::panel());
+    const Style border = Palette::muted();
     frame.put(row, 0, top ? Glyphs::BoxTopLeft : Glyphs::BoxBottomLeft, border);
     for (std::size_t column = 1; column + 1 < width; ++column) {
         frame.put(row, column, Glyphs::BoxHorizontal, border);
@@ -303,12 +310,15 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
                  std::size_t width) {
     const std::size_t textColumn = BoxWidth + PromptWidth;
     const std::size_t commandLength = commandTokenLength(model.draft);
-    const Style border = Palette::muted().withBackground(Palette::panelColor());
+    const Style border = Palette::muted();
 
     paintBoxBorder(frame, firstRow, width, true);
     std::size_t row = firstRow + 1;
     for (std::size_t index = 0; index < prompt.rows.size(); ++index) {
-        frame.fill(row, 0, width, Palette::panel());
+        // The panel is the inside of the frame and nothing else: the stroke is the edge of it.
+        if (width > (2 * BoxWidth)) {
+            frame.fill(row, BoxWidth, width - (2 * BoxWidth), Palette::panel());
+        }
         frame.put(row, 0, Glyphs::BoxVertical, border);
         if (index == 0) {
             frame.put(row, BoxWidth, Glyphs::PromptMarker,
@@ -401,8 +411,7 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     row += prompt.rows.size() + 2;
 
     if (withStatus) {
-        frame.fill(row, 0, width, Palette::panel());
-        frame.put(row, 0, statusRow(model), Palette::muted().withBackground(Palette::panelColor()));
+        frame.put(row, 0, statusRow(model), Palette::muted());
     }
 
     const auto position = prompt.positions.at(std::min(model.cursor, model.draft.size()));

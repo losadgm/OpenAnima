@@ -80,19 +80,29 @@ std::vector<std::size_t> raisedRows(const RenderResult& rendered) {
     return rows;
 }
 
-/// Whether the cell holds the stroke the scrollbar is drawn with, and nothing else paints it:
-/// the frame around the prompt uses the same stroke, with the panel behind it.
+/// Whether the cell holds the stroke the scrollbar is drawn with.
 bool isBarCell(const Cell& cell) {
     return !cell.isBlank() &&
-           std::string(cell.glyph.data(), cell.length) == OpenAnimaTui::Screen::Glyphs::ScrollBar &&
-           cell.style.background.kind == Color::Kind::Default;
+           std::string(cell.glyph.data(), cell.length) == OpenAnimaTui::Screen::Glyphs::ScrollBar;
+}
+
+/// @return How many rows the conversation occupies: everything above the frame of the prompt,
+///         which is drawn with the same stroke as the scrollbar.
+std::size_t viewportRows(const RenderResult& rendered) {
+    for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
+        if (readRow(rendered.frame, row).rfind("\u250C", 0) == 0) {
+            return row;
+        }
+    }
+    return rendered.frame.height();
 }
 
 /// The rows where the scrollbar is shown at all, read off the last column.
 std::vector<std::size_t> barRows(const RenderResult& rendered) {
     std::vector<std::size_t> rows;
     const std::size_t column = rendered.frame.width() - 1;
-    for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
+    const std::size_t last = viewportRows(rendered);
+    for (std::size_t row = 0; row < last; ++row) {
         if (isBarCell(rendered.frame.at(row, column))) {
             rows.push_back(row);
         }
@@ -104,7 +114,8 @@ std::vector<std::size_t> barRows(const RenderResult& rendered) {
 std::vector<std::size_t> thumbRows(const RenderResult& rendered) {
     std::vector<std::size_t> rows;
     const std::size_t column = rendered.frame.width() - 1;
-    for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
+    const std::size_t last = viewportRows(rendered);
+    for (std::size_t row = 0; row < last; ++row) {
         const Cell& cell = rendered.frame.at(row, column);
         if (isBarCell(cell) && !cell.style.dim) {
             rows.push_back(row);
@@ -135,20 +146,25 @@ TEST_CASE("the prompt sits inside a frame, with the caret in it") {
     CHECK(readRow(rendered.frame, 6).rfind("\u250C", 0) == 0);
     CHECK(readRow(rendered.frame, 8).rfind("\u2514", 0) == 0);
 
+    // The panel is the inside of the frame: the stroke is exactly where the colour changes.
+    CHECK(rendered.frame.at(6, 1).style.background.kind == Color::Kind::Default);
+    CHECK(rendered.frame.at(7, 0).style.background.kind == Color::Kind::Default);
+    CHECK(rendered.frame.at(7, 2).style.background.equals(Palette::panelColor()));
+
     const OpenAnimaTui::Screen::Cell& marker = rendered.frame.at(7, 1);
     CHECK(std::string(marker.glyph.data(), marker.length) == "\u2771");
     CHECK(marker.style.foreground.equals(Palette::accent().foreground));
     CHECK(marker.style.background.equals(Palette::panelColor()));
-    CHECK(rendered.frame.at(7, 2).style.equals(Palette::panel()));
     CHECK(rendered.caretRow == 7);
     CHECK(rendered.caretColumn == 3 + 3);
 }
 
-TEST_CASE("the status line sits under the frame") {
+TEST_CASE("the status line sits under the frame, with no indent and no panel") {
     Model model;
     const RenderResult rendered = render(model, 40, 10);
 
-    CHECK(readRow(rendered.frame, 9).find("no npc") != std::string::npos);
+    CHECK(readRow(rendered.frame, 9).rfind("no npc", 0) == 0);
+    CHECK(rendered.frame.at(9, 0).style.background.kind == Color::Kind::Default);
     CHECK(readRow(rendered.frame, 8).rfind("\u2514", 0) == 0);
 }
 
