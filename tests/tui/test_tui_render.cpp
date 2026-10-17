@@ -90,7 +90,7 @@ bool isBarCell(const Cell& cell) {
 ///         which is drawn with the same stroke as the scrollbar.
 std::size_t viewportRows(const RenderResult& rendered) {
     for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
-        if (readRow(rendered.frame, row).rfind("\u250C", 0) == 0) {
+        if (readRow(rendered.frame, row).rfind("\u2597", 0) == 0) {
             return row;
         }
     }
@@ -143,8 +143,8 @@ TEST_CASE("the prompt sits inside a frame, with the caret in it") {
     const RenderResult rendered = render(model, 40, 10);
 
     // Ten rows: six of conversation, the top border, the prompt, the bottom border, the status.
-    CHECK(readRow(rendered.frame, 6).rfind("\u250C", 0) == 0);
-    CHECK(readRow(rendered.frame, 8).rfind("\u2514", 0) == 0);
+    CHECK(readRow(rendered.frame, 6).rfind("\u2597", 0) == 0);
+    CHECK(readRow(rendered.frame, 8).rfind("\u259D", 0) == 0);
 
     // The panel is the inside of the frame: the stroke is exactly where the colour changes.
     CHECK(rendered.frame.at(6, 1).style.background.kind == Color::Kind::Default);
@@ -165,7 +165,7 @@ TEST_CASE("the status line sits under the frame, with no indent and no panel") {
 
     CHECK(readRow(rendered.frame, 9).rfind("no npc", 0) == 0);
     CHECK(rendered.frame.at(9, 0).style.background.kind == Color::Kind::Default);
-    CHECK(readRow(rendered.frame, 8).rfind("\u2514", 0) == 0);
+    CHECK(readRow(rendered.frame, 8).rfind("\u259D", 0) == 0);
 }
 
 TEST_CASE("the empty prompt says what can be done, and stops saying it when typed in") {
@@ -349,7 +349,7 @@ TEST_CASE("a character still arriving leaves the prompt clean") {
     type(model, "a");
     type(model, "\xc3");  // The first byte of an enye, with the one after it still on its way.
     RenderResult rendered = render(model, 40, 10);
-    CHECK(readRow(rendered.frame, 7).rfind("\u2502\u2771 a", 0) == 0);
+    CHECK(readRow(rendered.frame, 7).rfind("\u2590\u2771 a", 0) == 0);
     CHECK(rendered.frame.at(7, 4).isBlank());
 
     type(model, "\xb1");

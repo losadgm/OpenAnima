@@ -286,7 +286,7 @@ void paintBoxBorder(Canvas& frame, std::size_t row, std::size_t width, bool top)
     const Style border = Palette::muted();
     frame.put(row, 0, top ? Glyphs::BoxTopLeft : Glyphs::BoxBottomLeft, border);
     for (std::size_t column = 1; column + 1 < width; ++column) {
-        frame.put(row, column, Glyphs::BoxHorizontal, border);
+        frame.put(row, column, top ? Glyphs::BoxTop : Glyphs::BoxBottom, border);
     }
     frame.put(row, width - 1, top ? Glyphs::BoxTopRight : Glyphs::BoxBottomRight, border);
 }
@@ -319,7 +319,7 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
         if (width > (2 * BoxWidth)) {
             frame.fill(row, BoxWidth, width - (2 * BoxWidth), Palette::panel());
         }
-        frame.put(row, 0, Glyphs::BoxVertical, border);
+        frame.put(row, 0, Glyphs::BoxLeft, border);
         if (index == 0) {
             frame.put(row, BoxWidth, Glyphs::PromptMarker,
                       Palette::accent().withBackground(Palette::panelColor()));
@@ -339,7 +339,7 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
             frame.put(row, textColumn, placeholderOf(model),
                       Palette::muted().withBackground(Palette::panelColor()));
         }
-        frame.put(row, width - 1, Glyphs::BoxVertical, border);
+        frame.put(row, width - 1, Glyphs::BoxRight, border);
         ++row;
     }
     paintBoxBorder(frame, row, width, false);

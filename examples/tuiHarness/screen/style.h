@@ -95,13 +95,20 @@ inline constexpr std::array<const char*, 10> Spinner = {"\u280B", "\u2819", "\u2
 /// The stroke the scrollbar on the right is drawn with.
 inline constexpr const char* ScrollBar = "\u2502";
 
-/// The corners and strokes of the frame around the prompt.
-inline constexpr const char* BoxTopLeft = "\u250C";
-inline constexpr const char* BoxHorizontal = "\u2500";
-inline constexpr const char* BoxTopRight = "\u2510";
-inline constexpr const char* BoxVertical = "\u2502";
-inline constexpr const char* BoxBottomLeft = "\u2514";
-inline constexpr const char* BoxBottomRight = "\u2518";
+/// The strokes of the frame around the prompt.
+///
+/// They are half blocks, not lines: a line drawn by the font sits in the middle of the cell, so
+/// it would leave half a cell between itself and the colour it is meant to be the edge of. A
+/// half block paints the half of the cell that touches the panel, and the band lands on the
+/// border of the rectangle exactly.
+inline constexpr const char* BoxTopLeft = "\u2597";      ///< Lower right quadrant.
+inline constexpr const char* BoxTop = "\u2584";          ///< Lower half block.
+inline constexpr const char* BoxTopRight = "\u2596";     ///< Lower left quadrant.
+inline constexpr const char* BoxLeft = "\u2590";         ///< Right half block.
+inline constexpr const char* BoxRight = "\u258C";        ///< Left half block.
+inline constexpr const char* BoxBottomLeft = "\u259D";   ///< Upper right quadrant.
+inline constexpr const char* BoxBottom = "\u2580";       ///< Upper half block.
+inline constexpr const char* BoxBottomRight = "\u2598";  ///< Upper left quadrant.
 
 }  // namespace Glyphs
 

@@ -150,9 +150,9 @@ TEST_CASE("a triple click takes the whole row") {
 
 TEST_CASE("what the client draws for itself is not copied") {
     Canvas frame{12, 3};
-    frame.put(0, 0, "\u250C\u2500\u2510", Palette::muted());
-    frame.put(1, 0, "\u2502 \u2771 hi", Palette::text());
-    frame.put(2, 0, "\u2514\u2500\u2518", Palette::muted());
+    frame.put(0, 0, "\u2597\u2584\u2596", Palette::muted());
+    frame.put(1, 0, "\u2590 \u2771 hi", Palette::text());
+    frame.put(2, 0, "\u259D\u2580\u2598", Palette::muted());
     frame.put(1, 11, OpenAnimaTui::Screen::Glyphs::ScrollBar, Palette::muted());
 
     Selection all;
