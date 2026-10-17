@@ -393,6 +393,27 @@ struct HintLayout {
     std::size_t columns{0};   ///< Columns the panel takes.
 };
 
+/// Columns the panel of hints takes.
+///
+/// A panel of a share of the width leaves the conversation readable beside it, which is the
+/// point of it floating. The share is only a share while it leaves room for the words: a
+/// narrow window would clip the longer commands, so the panel grows to what the longest one
+/// needs, and the hints are whole on the narrowest screen that can hold them.
+/// @param hints Hints that match, whether the panel shows them or not.
+/// @param width Columns of the screen.
+/// @return The columns of the panel, never wider than the screen.
+[[nodiscard]] std::size_t hintPanelColumns(const std::vector<std::string>& hints,
+                                           std::size_t width) {
+    std::size_t longest = 0;
+    for (const std::string& hint : hints) {
+        longest = std::max(longest, measure(hint));
+    }
+    const std::size_t share = width * HintShare / 100;
+    // The indent in front of the words and the column the bar takes at the end.
+    const std::size_t needed = HintIndent + longest + 1;
+    return std::min(width, std::max(share, needed));
+}
+
 /// Paints the panel of hints: the commands that complete what is being typed, floating over the
 /// last rows of the conversation, anchored to the left edge.
 ///
@@ -579,7 +600,7 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
 
     // The hints float over the last rows of the conversation, anchored to the left edge, on a
     // panel of their own that leaves the rest of the screen to what was said.
-    const std::size_t hintColumns = std::max<std::size_t>(4, width * HintShare / 100);
+    const std::size_t hintColumns = hintPanelColumns(all, width);
     const std::size_t hintRows = hints.size();
     const std::size_t hintTop = viewRows > hintRows ? viewRows - hintRows : 0;
     result.hintRow = hintTop;

@@ -20,7 +20,9 @@ constexpr std::size_t BoxWidth = 1;     ///< Columns the frame around the prompt
 constexpr std::size_t PanelPad = 1;     ///< Columns of panel kept empty inside the frame, a side.
 constexpr std::size_t MaxHints = 6;     ///< Command hints shown at once.
 constexpr std::size_t HintIndent = 2;   ///< Columns a hint is indented by.
-constexpr std::size_t HintShare = 30;   ///< Percent of the width the panel of hints takes.
+/// Percent of the width the panel of hints aims for. It grows past that when the longest hint
+/// needs more, so a narrow window still shows them whole.
+constexpr std::size_t HintShare = 30;
 
 }  // namespace Metrics
 

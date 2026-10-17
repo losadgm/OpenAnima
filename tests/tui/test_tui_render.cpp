@@ -470,19 +470,41 @@ TEST_CASE("the hints float on a panel that takes a share of the width and no row
         model.messages.push_back(
             {OpenAnimaTui::App::Role::User, "row " + std::to_string(index), false});
     }
-    const RenderResult quiet = render(model, 40, 12);
+    const RenderResult quiet = render(model, 100, 12);
     type(model, "/");
-    const RenderResult hinted = render(model, 40, 12);
+    const RenderResult hinted = render(model, 100, 12);
 
     // The conversation keeps the rows the panel floats on: it is anchored to the left edge and
     // leaves the rest of the screen to what was said.
     CHECK(hinted.scrollRows == quiet.scrollRows);
-    CHECK(hinted.hintColumns == 40 * OpenAnimaTui::Screen::Metrics::HintShare / 100);
+    CHECK(hinted.hintColumns == 100 * OpenAnimaTui::Screen::Metrics::HintShare / 100);
     REQUIRE(hinted.hintCount > 0);
     CHECK(hinted.hintRow + hinted.hintCount == hinted.scrollRows);
     CHECK(hinted.frame.at(hinted.hintRow, 0).style.background.equals(Palette::raisedColor()));
     CHECK_FALSE(hinted.frame.at(hinted.hintRow, hinted.hintColumns)
                     .style.background.equals(Palette::raisedColor()));
+}
+
+TEST_CASE("a narrow screen widens the panel so the hints are still whole") {
+    Model model;
+    type(model, "/");
+    std::size_t longest = 0;
+    for (const std::string& hint : OpenAnimaTui::App::hintsFor(model)) {
+        if (OpenAnimaTui::Screen::measure(hint) > longest) {
+            longest = OpenAnimaTui::Screen::measure(hint);
+        }
+    }
+    const std::size_t needed = OpenAnimaTui::Screen::Metrics::HintIndent + longest + 1;
+    const std::size_t share = OpenAnimaTui::Screen::Metrics::HintShare;
+
+    // A share of a wide screen already leaves room for the words, so the share is what it takes.
+    CHECK(render(model, 200, 12).hintColumns == 200 * share / 100);
+    CHECK(render(model, 40, 12).hintColumns == 40 * share / 100);
+    // A share of a narrow one does not, so the panel grows to what the hints need.
+    REQUIRE(needed > 30 * share / 100);
+    CHECK(render(model, 30, 12).hintColumns == needed);
+    // And it is never wider than the screen, however narrow that is.
+    CHECK(render(model, 8, 12).hintColumns == 8);
 }
 
 TEST_CASE("the panel of hints has a bar of its own, which lights up under the pointer") {
