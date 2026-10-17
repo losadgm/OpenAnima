@@ -25,12 +25,20 @@ namespace OpenAnimaTui::App {
 using OpenAnima::Core::Event;
 
 /// Who speaks a line. The colour of a role is the screen's business.
-enum class Role : std::uint8_t { User, Npc, System };
+enum class Role : std::uint8_t {
+    User,     ///< What the player typed.
+    Npc,      ///< What the npc says out loud.
+    Thought,  ///< What the npc thought first: named like the npc, painted quietly.
+    System    ///< A note from the client, belonging to no speaker.
+};
 
 /// One finished turn of the conversation, oldest first.
 struct Message {
     Role role;
     std::string text;
+    /// Part of the message before it: no blank row between them, and no name of its own.
+    /// A reply is one of these blocks, named once on the thought that opens it.
+    bool continues{false};
 };
 
 /// The prompts typed in one scope (one NPC, or the lobby), and where the walk sits.

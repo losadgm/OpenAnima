@@ -91,8 +91,10 @@ The commands are listed while one is being typed, up to six of them, with the se
 the accent colour. When there are more than fit, the panel shows the ones around the
 selection, so a command reached with the arrows is never off the panel.
 
-A blank row separates every message from the one before it, so a conversation reads as turns
-instead of as one block of text.
+A blank row separates every turn from the one before it, so a conversation reads as a question
+and the answer it got. The answer itself is one block: the name of the NPC sits on its first
+line, over the thought that opens it, and the dialogue and the actions follow without
+repeating the name or opening a gap.
 
 - The client owns the screen: it runs in the alternate screen, paints the whole window on a
   change, and hands the terminal back on the way out.
@@ -103,7 +105,8 @@ instead of as one block of text.
 - The commands that complete what is being typed float above the prompt on a lighter panel,
   with the selected one in the accent colour. The arrows walk them, and tab takes the one that
   is selected.
-- Each role has its own colour and its own prefix, so a long session is readable at a glance.
+- Each role has its own colour: the player in muted gray, the NPC in the accent colour, and
+  the thought quietly under the same name, so it reads as the NPC's and not as the client's.
 - The look borrows the OpenCode theme: a purple accent for the prompt marker and the spinner,
   a warm peach for the persona, muted gray for the quiet text, and the same braille spinner.
 - The status line carries the state: which model answered, how long the turn has been running,

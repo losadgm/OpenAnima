@@ -83,6 +83,7 @@ OpenAnima::Core::Event finishedWithReply(const std::string& document) {
     OpenAnima::Core::NpcReply reply;
     reply.reasoning = "It looks harmless.";
     reply.dialogue = "Good evening.";
+    reply.actions.push_back({"emote", nlohmann::ordered_json{{"kind", "nod"}}});
     reply.document = nlohmann::ordered_json::parse(document);
     event.reply = reply;
     return event;
@@ -378,6 +379,31 @@ TEST_CASE("raw mode says so when there is no document to show") {
 
     CHECK_FALSE(model.busy);
     CHECK(model.messages.back().text.find("no document") != std::string::npos);
+}
+
+TEST_CASE("a reply is one block, named on the thought that opens it") {
+    Model model = modelWithNpc();
+    (void)submit(model, "hello");
+    (void)OpenAnimaTui::App::applyEvent(model, delta("Good evening."));
+    (void)OpenAnimaTui::App::applyEvent(
+        model, finishedWithReply(R"({"reasoning":"It looks harmless.","dialogue":"Good evening.",)"
+                                 R"("actions":[{"name":"emote","arguments":{"kind":"nod"}}]})"));
+
+    const std::size_t count = model.messages.size();
+    REQUIRE(count >= 3);
+
+    // The thought opens the block and carries the name; the rest hangs from it.
+    CHECK(model.messages[count - 3].role == OpenAnimaTui::App::Role::Thought);
+    CHECK(model.messages[count - 3].text.find("It looks harmless.") != std::string::npos);
+    CHECK_FALSE(model.messages[count - 3].continues);
+
+    CHECK(model.messages[count - 2].role == OpenAnimaTui::App::Role::Npc);
+    CHECK(model.messages[count - 2].text == "Good evening.");
+    CHECK(model.messages[count - 2].continues);
+
+    CHECK(model.messages[count - 1].role == OpenAnimaTui::App::Role::System);
+    CHECK(model.messages[count - 1].text.rfind("[emote]", 0) == 0);
+    CHECK(model.messages[count - 1].continues);
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

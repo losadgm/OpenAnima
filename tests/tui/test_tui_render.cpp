@@ -207,6 +207,39 @@ TEST_CASE("the speaker of a line is named in the prefix and the text follows it"
     CHECK(rendered.frame.at(4, 8).style.foreground.equals(Palette::text().foreground));
 }
 
+TEST_CASE("a reply is painted as one block, named on its first row") {
+    Model model;
+    submit(model, "/create a smith");
+    submit(model, "hello");
+
+    OpenAnima::Core::Event piece;
+    piece.kind = OpenAnima::Core::EventKind::Delta;
+    piece.text = "Good evening.";
+    (void)OpenAnimaTui::App::applyEvent(model, piece);
+
+    OpenAnima::Core::Event done;
+    done.kind = OpenAnima::Core::EventKind::Finished;
+    done.completion.finishReason = OpenAnima::Core::FinishReason::Stop;
+    OpenAnima::Core::NpcReply reply;
+    reply.reasoning = "It looks harmless.";
+    reply.dialogue = "Good evening.";
+    reply.actions.push_back({"emote", nlohmann::ordered_json{{"kind", "nod"}}});
+    done.reply = reply;
+    (void)OpenAnimaTui::App::applyEvent(model, done);
+
+    const RenderResult rendered = render(model, 60, 12);
+
+    // The note, the question, and then the answer as one block with no gaps in it.
+    CHECK(readRow(rendered.frame, 4).substr(0, 8) == "npc 1   ");
+    CHECK(readRow(rendered.frame, 4).substr(8).find("~ It looks harmless.") == 0);
+    CHECK(rendered.frame.at(4, 8).style.foreground.equals(Palette::muted().foreground));
+    CHECK(readRow(rendered.frame, 5).substr(0, 8) == "        ");
+    CHECK(readRow(rendered.frame, 5).substr(8).find("Good evening.") == 0);
+    CHECK(rendered.frame.at(5, 8).style.foreground.equals(Palette::text().foreground));
+    CHECK(readRow(rendered.frame, 6).substr(0, 8) == "        ");
+    CHECK(readRow(rendered.frame, 6).substr(8).find("[emote]") == 0);
+}
+
 TEST_CASE("a character still arriving leaves the prompt clean") {
     Model model;
     type(model, "a");

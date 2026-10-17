@@ -151,9 +151,9 @@ std::vector<TranscriptRow> transcriptRows(const Model& model, std::size_t width)
 
     std::vector<TranscriptRow> rows;
     for (const Message& message : model.messages) {
-        // Every message is separated from the one before it, so a turn reads as a question and
-        // the answer it got rather than as one block of text.
-        if (!rows.empty()) {
+        // Turns are separated from each other, but the lines of one reply are not: they are a
+        // block, and the name on its first line is the name of all of them.
+        if (!rows.empty() && !message.continues) {
             appendGap(rows);
         }
         if (message.role == Role::System) {
@@ -161,8 +161,13 @@ std::vector<TranscriptRow> transcriptRows(const Model& model, std::size_t width)
             continue;
         }
         const bool fromUser = message.role == Role::User;
-        appendMessage(rows, message, fromUser ? "you" : npc,
-                      fromUser ? Palette::muted() : Palette::primary(), Palette::text(), bodyWidth);
+        std::string speaker;
+        if (!message.continues) {
+            speaker = fromUser ? "you" : npc;
+        }
+        const Style nameStyle = fromUser ? Palette::muted() : Palette::primary();
+        const Style bodyStyle = message.role == Role::Thought ? Palette::muted() : Palette::text();
+        appendMessage(rows, message, speaker, nameStyle, bodyStyle, bodyWidth);
     }
     if (model.busy || !model.answer.empty()) {
         if (!rows.empty()) {
