@@ -47,6 +47,9 @@ struct RenderResult {
     /// Rows hidden above the viewport when it is scrolled all the way up, which is the
     /// largest offset the model can hold.
     std::size_t maxScrollOffset{0};
+    std::size_t promptFirst{0};  ///< Row of the draft the panel of the prompt starts on.
+    std::size_t promptRows{0};   ///< Rows of the draft the panel shows.
+    std::size_t promptTotal{0};  ///< Rows the whole draft takes.
 };
 
 /// @param transcriptRows Rows the whole conversation takes.

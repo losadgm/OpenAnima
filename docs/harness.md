@@ -115,9 +115,11 @@ repeating the name or opening a gap.
   text never sits against the frame. While the line is empty the frame says what can be done
   from there, which is not the same in the lobby as in a conversation, and the words go as soon
   as there is something to say. The box grows with the draft, row by row, until it would be
-  taller than the window: past that the panel keeps a window of its rows that follows the caret,
-  so what is being typed is never off the screen, and the padding column inside the frame
-  carries a bar that says how much of the draft is out of it.
+  taller than the window: past that the panel keeps a window of its rows, and the padding column
+  inside the frame carries a bar that says how much of the draft is out of it. The window
+  follows the caret, so what is being typed is never off the screen, and the wheel over the box
+  or a drag of its bar reads the rest of the draft; the next key that writes brings the window
+  back to the caret.
 - The commands that complete what is being typed float over the last rows of the conversation,
   on a lighter panel of their own. The panel is as wide as the longest command, its indent and
   the margin after it, anchored to the left edge, so the rest of those rows still shows what was
@@ -151,7 +153,7 @@ repeating the name or opening a gap.
 | Ctrl+Backspace, Ctrl+Delete | Deletes a word at a time, and the gap around it |
 | Ctrl+P, Ctrl+N | Walks the prompts of this scope |
 | Page up, Page down | Scrolls the conversation |
-| Wheel | Scrolls whatever the pointer is over: the conversation, or the hints |
+| Wheel | Scrolls whatever the pointer is over: the conversation, the hints, or the draft when it is taller than its box |
 | Drag a scrollbar | Scrolls to where the thumb is put, following the button |
 | Hover a hint or a scrollbar | Lights it up: the hint goes lilac, bold and underlined, the thumb of the bar goes lilac and bold |
 | Click a hint | Writes it into the draft, the same as tab with the selected one |

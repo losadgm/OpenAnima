@@ -435,6 +435,22 @@ TEST_CASE("raw mode says so when there is no document to show") {
     CHECK(model.messages.back().text.find("no document") != std::string::npos);
 }
 
+TEST_CASE("a panel of the prompt scrolled away from the caret stays until a key writes") {
+    Model model;
+    type(model, "hola");
+    model.promptScroll = 2;
+
+    // The wheel and the page keys are about the conversation, so the panel keeps its place.
+    (void)press(model, Key::Kind::WheelUp);
+    (void)press(model, Key::Kind::PageDown);
+    CHECK(model.promptScroll.has_value());
+    CHECK(*model.promptScroll == 2);
+
+    // Anything that writes or moves the caret takes it back to where the caret is.
+    (void)OpenAnimaTui::App::update(model, character('x'), ScrollStep);
+    CHECK_FALSE(model.promptScroll.has_value());
+}
+
 TEST_CASE("a reply is one block, named on the thought that opens it") {
     Model model = modelWithNpc();
     (void)submit(model, "hello");

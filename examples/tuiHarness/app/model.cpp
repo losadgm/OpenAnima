@@ -411,24 +411,52 @@ void submit(Model& model, std::vector<Effect>& effects) {
 
 }  // namespace
 
+/// @param kind Key that arrived.
+/// @return Whether it only moves the conversation, which leaves the panel of the prompt where
+///         the reader put it.
+bool movesOnlyTranscript(Key::Kind kind) {
+    return kind == Key::Kind::WheelUp || kind == Key::Kind::WheelDown ||
+           kind == Key::Kind::PageUp || kind == Key::Kind::PageDown;
+}
+
+/// Handles a key while a turn is in flight: the one that stops it and the one that leaves, and
+/// nothing else changes meaning.
+/// @param model The model, changed in place.
+/// @param key The key.
+/// @param effects Receives the cancel, when the key asks for one.
+/// @return Whether the turn in flight took the key.
+bool whileBusy(Model& model, const Key& key, std::vector<Effect>& effects) {
+    if (!model.busy) {
+        return false;
+    }
+    if (key.kind == Key::Kind::Escape) {
+        if (model.world.active.has_value()) {
+            model.cancelling = true;
+            effects.push_back({EffectKind::Cancel, *model.world.active, {}});
+        }
+        return true;
+    }
+    if (key.kind == Key::Kind::CtrlD) {
+        model.running = false;
+        return true;
+    }
+    return false;
+}
+
 std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep) {
     std::vector<Effect> effects;
     const std::vector<std::string> hints = hintsFor(model);
 
     // A turn in flight takes the key that stops it, and nothing else changes meaning. Ctrl+C is
     // not that key: it copies, and the shell takes it before it ever gets here.
-    if (model.busy) {
-        if (key.kind == Key::Kind::Escape) {
-            if (model.world.active.has_value()) {
-                model.cancelling = true;
-                effects.push_back({EffectKind::Cancel, *model.world.active, {}});
-            }
-            return effects;
-        }
-        if (key.kind == Key::Kind::CtrlD) {
-            model.running = false;
-            return effects;
-        }
+    if (whileBusy(model, key, effects)) {
+        return effects;
+    }
+
+    // Writing or moving the caret brings the panel back to it: a window scrolled away from the
+    // caret is only worth keeping while nothing is being typed.
+    if (!movesOnlyTranscript(key.kind)) {
+        model.promptScroll.reset();
     }
 
     switch (key.kind) {

@@ -71,6 +71,18 @@ Model longConversation() {
     return model;
 }
 
+/// A draft of one line per row given, with the caret on the last one.
+Model longDraft(int lines) {
+    Model model;
+    for (int line = 0; line < lines; ++line) {
+        type(model, "line " + std::to_string(line));
+        if (line + 1 < lines) {
+            (void)press(model, Key::Kind::CtrlEnter);
+        }
+    }
+    return model;
+}
+
 /// The rows of the screen painted over the raised panel.
 std::vector<std::size_t> raisedRows(const RenderResult& rendered) {
     std::vector<std::size_t> rows;
@@ -506,13 +518,7 @@ TEST_CASE("raw mode names the npc in the colour of a speaker, not in the quiet o
 }
 
 TEST_CASE("a draft taller than the screen keeps a window of itself and a bar") {
-    Model model;
-    for (int line = 0; line < 20; ++line) {
-        type(model, "line " + std::to_string(line));
-        if (line + 1 < 20) {
-            (void)press(model, Key::Kind::CtrlEnter);
-        }
-    }
+    const Model model = longDraft(20);
     const RenderResult rendered = render(model, 40, 10);
 
     // The line being typed is the last one, so the window followed the caret to it and the
@@ -542,6 +548,24 @@ TEST_CASE("a draft taller than the screen keeps a window of itself and a bar") {
     type(shortDraft, "hola");
     const RenderResult fits = render(shortDraft, 40, 10);
     CHECK_FALSE(isBarCell(fits.frame.at(7, column)));
+}
+
+TEST_CASE("the panel of the prompt can be scrolled away from the caret") {
+    Model model = longDraft(20);
+    model.promptScroll = 2;
+    const RenderResult rendered = render(model, 40, 10);
+
+    // The window starts on the row it was put on, and what is under it is out of view.
+    const std::string screen = readAll(rendered.frame);
+    CHECK(screen.find("line 2") != std::string::npos);
+    CHECK(screen.find("line 8") != std::string::npos);
+    CHECK(screen.find("line 19") == std::string::npos);
+
+    // The thumb sits at the top of the bar, and there is no caret to place.
+    const std::size_t column = 38;
+    CHECK_FALSE(rendered.frame.at(1, column).style.dim);
+    CHECK(rendered.frame.at(7, column).style.dim);
+    CHECK(rendered.caretRow >= rendered.frame.height());
 }
 
 TEST_CASE("a hint lights up under the pointer, and the rows of the others do not") {

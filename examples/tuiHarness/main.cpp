@@ -132,6 +132,7 @@ struct ScreenState {
     bool pullingBar{false};                     ///< Whether the bar of the conversation is dragged.
     bool pullingHintBar{false};                 ///< Whether the bar of the hints is dragged.
     bool pullingSelection{false};               ///< Whether the drag stretches a selection.
+    bool pullingPromptBar{false};               ///< Whether the bar of the prompt is dragged.
     std::chrono::steady_clock::time_point nextAutoScroll;  ///< When the edge may move it on.
 };
 
@@ -149,6 +150,42 @@ constexpr std::chrono::milliseconds AutoScrollStep{50};
 bool overScrollBar(const ScreenState& state, std::size_t column, std::size_t row) {
     return state.shape.maxScrollOffset > 0 && row < state.shape.scrollRows &&
            column + 1 == state.shape.frame.width();
+}
+
+/// @param state The screen as it is.
+/// @param column Column the pointer is on.
+/// @param row Row the pointer is on.
+/// @return Whether the pointer is over the bar of the prompt, which is only there when the
+///         draft is taller than the panel that shows it.
+bool overPromptBar(const ScreenState& state, std::size_t column, std::size_t row) {
+    const std::size_t width = state.shape.frame.width();
+    if (state.shape.promptTotal <= state.shape.promptRows || state.shape.promptRows == 0 ||
+        width < OpenAnimaTui::Screen::Metrics::BoxWidth + OpenAnimaTui::Screen::Metrics::PanelPad) {
+        return false;
+    }
+    const std::size_t barColumn =
+        width - OpenAnimaTui::Screen::Metrics::BoxWidth - OpenAnimaTui::Screen::Metrics::PanelPad;
+    return column == barColumn && row > state.shape.scrollRows &&
+           row <= state.shape.scrollRows + state.shape.promptRows;
+}
+
+/// @param state The screen as it is.
+/// @param row Row the pointer is on.
+/// @return Whether the pointer is over the box of the prompt, borders included.
+bool overPromptBox(const ScreenState& state, std::size_t row) {
+    return row >= state.shape.scrollRows &&
+           row < state.shape.scrollRows + state.shape.promptRows + 2;
+}
+
+/// Puts the panel of the prompt where the pointer puts its thumb.
+/// @param state The screen as it is.
+/// @param model The model, which holds where the panel starts.
+/// @param row Row the pointer is on.
+void dragPromptBarTo(const ScreenState& state, Model& model, std::size_t row) {
+    const std::size_t top = state.shape.scrollRows + 1;
+    const std::size_t offset = row >= top ? row - top : 0;
+    model.promptScroll = OpenAnimaTui::Screen::firstRowForThumb(state.shape.promptTotal,
+                                                                state.shape.promptRows, offset);
 }
 
 /// @param state The screen as it is.
@@ -355,6 +392,11 @@ void pressAt(const Key& key, ScreenState& state, Model& model, std::size_t scrol
         grabBar(state, model, key.row);
         return;
     }
+    if (overPromptBar(state, key.column, key.row)) {
+        state.pullingPromptBar = true;
+        dragPromptBarTo(state, model, key.row);
+        return;
+    }
     // A second press on the same cell takes the word under it and a third takes the row,
     // which is what picking text out means everywhere else. The rows of the viewport are the
     // conversation's, which scrolls; the rest of the screen stays where it is.
@@ -388,6 +430,10 @@ void dragTo(const Key& key, ScreenState& state, Model& model) {
         dragBarTo(state, model, key.row);
         return;
     }
+    if (state.pullingPromptBar) {
+        dragPromptBarTo(state, model, key.row);
+        return;
+    }
     // A word or a row taken by a double click stays as it is: the pointer is still inside it.
     if (state.clicks.count() < 2) {
         state.selection.extend(key.row, key.column);
@@ -405,11 +451,24 @@ bool scrollWith(const Key& key, const ScreenState& state, Model& model) {
     const bool fromWheel = key.kind == Key::Kind::WheelUp || key.kind == Key::Kind::WheelDown;
     const std::size_t row = fromWheel ? key.row : state.pointer.row;
     const std::size_t column = fromWheel ? key.column : state.pointer.column;
-    if (!hintAt(state, column, row).has_value()) {
-        return false;
+    if (hintAt(state, column, row).has_value()) {
+        stepHint(model, key.kind == Key::Kind::WheelDown || key.kind == Key::Kind::PageDown);
+        return true;
     }
-    stepHint(model, key.kind == Key::Kind::WheelDown || key.kind == Key::Kind::PageDown);
-    return true;
+    // The wheel over the prompt moves the draft when the panel is too short for it; the page
+    // keys stay with the conversation, which is what they are for.
+    if (fromWheel && state.shape.promptTotal > state.shape.promptRows &&
+        overPromptBox(state, row)) {
+        const std::size_t last = state.shape.promptTotal - state.shape.promptRows;
+        const std::size_t here = model.promptScroll.value_or(state.shape.promptFirst);
+        if (key.kind == Key::Kind::WheelUp) {
+            model.promptScroll = here > 0 ? here - 1 : 0;
+        } else {
+            model.promptScroll = std::min(here + 1, last);
+        }
+        return true;
+    }
+    return false;
 }
 
 /// Handles the keys that are about the screen rather than about the conversation: what the
@@ -444,6 +503,7 @@ bool handleScreenKey(const Key& key, ScreenState& state, std::string& clipboard,
         return true;
     case Key::Kind::MouseRelease:
         state.pullingSelection = false;
+        state.pullingPromptBar = false;
         if (state.pullingHintBar) {
             state.pullingHintBar = false;
             return true;

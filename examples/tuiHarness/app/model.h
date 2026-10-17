@@ -70,6 +70,10 @@ struct Model {
     std::vector<Message> messages;  ///< The transcript on screen: the active one.
     std::string draft;
     std::size_t cursor{0};
+    /// First row of the draft the panel of the prompt shows, when it has been scrolled away
+    /// from the caret. Nothing means the panel follows the caret, which is where a key that
+    /// writes puts it back.
+    std::optional<std::size_t> promptScroll;
     std::size_t scrollOffset{0};  ///< Transcript rows hidden above the viewport.
     std::size_t hintIndex{0};     ///< Which of the command hints is selected.
     std::string answer;           ///< Text of the turn in flight.
