@@ -166,16 +166,21 @@ void editComplete(Model& model, const std::string& chosen) {
 }
 
 /// Moves the command hint selection, stopping at the ends of the list.
-void moveHint(Model& model, std::size_t count, int direction) {
-    if (count == 0) {
+/// @param model The model, which holds the selection.
+/// @param hints The hints that are showing.
+/// @param direction Which way it goes: back to the one before when it is negative, on to the
+///        one after otherwise.
+void moveHint(Model& model, const std::vector<std::string>& hints, int direction) {
+    if (hints.empty()) {
         return;
     }
-    const std::size_t index = std::min(model.hintIndex, count - 1);
+    const std::size_t last = hints.size() - 1;
+    const std::size_t index = std::min(model.hintIndex, last);
     if (direction < 0) {
         model.hintIndex = index > 0 ? index - 1 : 0;
         return;
     }
-    model.hintIndex = std::min(index + 1, count - 1);
+    model.hintIndex = std::min(index + 1, last);
 }
 
 /// Walks the history of the scope being typed at, putting the draft aside on the way.
@@ -467,7 +472,7 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
 
     case Key::Kind::ArrowUp:
         if (!hints.empty()) {
-            moveHint(model, hints.size(), -1);
+            moveHint(model, hints, -1);
         } else {
             historyWalk(model, -1);
         }
@@ -475,7 +480,7 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
 
     case Key::Kind::ArrowDown:
         if (!hints.empty()) {
-            moveHint(model, hints.size(), 1);
+            moveHint(model, hints, 1);
         } else {
             historyWalk(model, 1);
         }

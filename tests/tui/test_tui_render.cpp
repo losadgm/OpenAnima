@@ -1,6 +1,7 @@
 /// @file
 /// @brief What the client shows: the conversation, the hints, the status and the prompt.
 
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <cstddef>
 #include <string>
@@ -171,17 +172,38 @@ TEST_CASE("the status line sits under the frame, with no indent and no panel") {
 
 TEST_CASE("the empty prompt says what can be done, and stops saying it when typed in") {
     Model model;
-    CHECK(readAll(render(model, 40, 10).frame).find("/create <description> to make an npc") !=
+    CHECK(readAll(render(model, 60, 10).frame).find("/create <description> to make an npc") !=
           std::string::npos);
 
     submit(model, "/create a smith");
-    CHECK(readAll(render(model, 40, 10).frame).find("say something, or /help") !=
+    CHECK(readAll(render(model, 60, 10).frame).find("say something, or /help") !=
           std::string::npos);
 
     type(model, "hola");
-    const std::string typed = readAll(render(model, 40, 10).frame);
+    const std::string typed = readAll(render(model, 60, 10).frame);
     CHECK(typed.find("say something") == std::string::npos);
     CHECK(typed.find("hola") != std::string::npos);
+}
+
+TEST_CASE("what the empty prompt says is cut with an ellipsis when it does not fit") {
+    Model model;
+    const RenderResult rendered = render(model, 30, 12);
+    const std::string row = readRow(rendered.frame, rendered.caretRow);
+
+    CHECK(row.find("/create <description>...") != std::string::npos);
+    // The cut text stops at the padding and the frame is still the last thing on the row.
+    CHECK(row.size() > 3);
+    CHECK(row.substr(row.size() - 3) == "\u2595");
+}
+
+TEST_CASE("the status line is cut with an ellipsis when it does not fit") {
+    Model model;
+    model.modelName = "a-model-with-a-long-name";
+    const RenderResult rendered = render(model, 30, 12);
+    const std::string row = readRow(rendered.frame, rendered.caretRow + 2);
+
+    CHECK(row.rfind("...", row.size() - 3) != std::string::npos);
+    CHECK(OpenAnimaTui::Screen::measure(row) == 30);
 }
 
 TEST_CASE("a long prompt wraps and the caret follows it down") {
@@ -490,9 +512,7 @@ TEST_CASE("a narrow screen widens the panel so the hints are still whole") {
     type(model, "/");
     std::size_t longest = 0;
     for (const std::string& hint : OpenAnimaTui::App::hintsFor(model)) {
-        if (OpenAnimaTui::Screen::measure(hint) > longest) {
-            longest = OpenAnimaTui::Screen::measure(hint);
-        }
+        longest = std::max(longest, OpenAnimaTui::Screen::measure(hint));
     }
     const std::size_t needed = OpenAnimaTui::Screen::Metrics::HintIndent + longest + 1;
     const std::size_t share = OpenAnimaTui::Screen::Metrics::HintShare;

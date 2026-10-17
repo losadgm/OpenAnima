@@ -343,6 +343,9 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
     const std::size_t textColumn = markerColumn + PromptWidth;
     const std::size_t commandLength = commandTokenLength(model.draft);
     const Style border = Palette::muted().withBackground(Palette::panelColor());
+    // The columns the line has once the frame and the padding on both sides are taken out.
+    const std::size_t textColumns =
+        width > textColumn + BoxWidth + PanelPad ? width - textColumn - BoxWidth - PanelPad : 0;
 
     // The panel is the box and the frame runs along its inside edge: the strokes are the first
     // pixel of colour on every side, so the colour does not show outside them and the text sits
@@ -377,7 +380,9 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
         frame.put(row, textColumn + token, std::string_view{text}.substr(token),
                   Palette::text().withBackground(Palette::panelColor()));
         if (index == 0 && model.draft.empty()) {
-            frame.put(row, textColumn, placeholderOf(model),
+            // What the empty prompt says is a line of its own: it is cut with an ellipsis rather
+            // than allowed to run over the frame when the window is narrow.
+            frame.put(row, textColumn, clip(placeholderOf(model), textColumns),
                       Palette::muted().withBackground(Palette::panelColor()));
         }
     }
@@ -448,7 +453,7 @@ void paintHints(Canvas& frame, const std::vector<std::string>& hints, const Hint
                 Palette::accent().withBackground(Palette::raisedColor()).withBold().withUnderline();
         }
         frame.fill(row, 0, layout.columns, Palette::raised());
-        frame.put(row, HintIndent, std::string_view{hints[index]}.substr(0, textColumns), style);
+        frame.put(row, HintIndent, clip(hints[index], textColumns), style);
     }
 
     if (scrolls) {
@@ -617,7 +622,9 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     row += prompt.rows.size() + 2;
 
     if (withStatus) {
-        frame.put(row, 0, statusRow(model), Palette::muted());
+        // The status is the last row, but it is cut all the same: it ends in an ellipsis rather
+        // than in half a sentence running off the screen.
+        frame.put(row, 0, clip(statusRow(model), width), Palette::muted());
     }
 
     const auto position = prompt.positions.at(std::min(model.cursor, model.draft.size()));

@@ -35,6 +35,16 @@ namespace OpenAnimaTui::Screen {
 /// @return Columns, never negative.
 [[nodiscard]] std::size_t measure(std::string_view text);
 
+/// Cuts a text to the columns it has, marking the cut with an ellipsis.
+///
+/// A text that fits is returned as it is. One that does not ends in `...`, which takes the last
+/// three of the columns: a line that is too long for the room it sits in is cut there instead of
+/// running over the layout behind it. A wide character is never half printed.
+/// @param text Text to cut.
+/// @param columns Columns available.
+/// @return The text, cut with an ellipsis when it did not fit.
+[[nodiscard]] std::string clip(std::string_view text, std::size_t columns);
+
 /// Breaks a text into rows that fit a width, at spaces when there is one.
 ///
 /// A row never splits a code point and never counts a wide character as one column. A newline
