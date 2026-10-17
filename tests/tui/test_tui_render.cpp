@@ -25,6 +25,7 @@ using OpenAnimaTui::App::Model;
 using OpenAnimaTui::Screen::render;
 using OpenAnimaTui::Screen::RenderResult;
 using OpenAnimaTui::Screen::Selection;
+using OpenAnimaTui::Screen::Metrics::BoxWidth;
 using OpenAnimaTui::Screen::Metrics::MaxHints;
 using namespace OpenAnimaTui::Tests;
 
@@ -87,10 +88,10 @@ bool isBarCell(const Cell& cell) {
 }
 
 /// @return How many rows the conversation occupies: everything above the frame of the prompt,
-///         which is drawn with the same stroke as the scrollbar.
+///         whose top border is a hairline that starts where the vertical one is drawn.
 std::size_t viewportRows(const RenderResult& rendered) {
     for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
-        if (readRow(rendered.frame, row).rfind("\u2597", 0) == 0) {
+        if (readRow(rendered.frame, row).find("\u2581") == BoxWidth) {
             return row;
         }
     }
@@ -144,8 +145,8 @@ TEST_CASE("the prompt sits inside a frame, with the caret in it") {
 
     // Ten rows: four of conversation, the top border, a row of panel, the prompt, another row
     // of panel, the bottom border and the status.
-    CHECK(readRow(rendered.frame, 4).rfind("\u2597", 0) == 0);
-    CHECK(readRow(rendered.frame, 8).rfind("\u259D", 0) == 0);
+    CHECK(readRow(rendered.frame, 4).rfind(" \u2581", 0) == 0);
+    CHECK(readRow(rendered.frame, 8).rfind(" \u2594", 0) == 0);
 
     // The panel is the inside of the frame: the stroke is exactly where the colour changes.
     CHECK(rendered.frame.at(4, 1).style.background.kind == Color::Kind::Default);
@@ -167,7 +168,7 @@ TEST_CASE("the status line sits under the frame, with no indent and no panel") {
 
     CHECK(readRow(rendered.frame, 9).rfind("no npc", 0) == 0);
     CHECK(rendered.frame.at(9, 0).style.background.kind == Color::Kind::Default);
-    CHECK(readRow(rendered.frame, 8).rfind("\u259D", 0) == 0);
+    CHECK(readRow(rendered.frame, 8).rfind(" \u2594", 0) == 0);
 }
 
 TEST_CASE("the empty prompt says what can be done, and stops saying it when typed in") {

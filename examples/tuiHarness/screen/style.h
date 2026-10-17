@@ -100,17 +100,13 @@ inline constexpr const char* ScrollBar = "\u2502";
 /// They are eighths, not lines: a line drawn by the font sits in the middle of the cell, so it
 /// would leave half a cell between itself and the colour it is meant to be the edge of. A one
 /// eighth block paints one eighth of the cell, on the side that touches the panel, so the stroke
-/// is thin and lands on the border of the rectangle exactly. The corners are quadrants because
-/// there is no such thing as a one-eighth corner: the block is thin on both sides, which is what
-/// a joint needs.
-inline constexpr const char* BoxTopLeft = "\u2597";      ///< Lower right quadrant.
-inline constexpr const char* BoxTop = "\u2581";          ///< Lower one eighth block.
-inline constexpr const char* BoxTopRight = "\u2596";     ///< Lower left quadrant.
-inline constexpr const char* BoxLeft = "\u2595";         ///< Right one eighth block.
-inline constexpr const char* BoxRight = "\u258F";        ///< Left one eighth block.
-inline constexpr const char* BoxBottomLeft = "\u259D";   ///< Upper right quadrant.
-inline constexpr const char* BoxBottom = "\u2594";       ///< Upper one eighth block.
-inline constexpr const char* BoxBottomRight = "\u2598";  ///< Upper left quadrant.
+/// is thin and lands on the border of the rectangle exactly. There is no corner glyph: the
+/// horizontal stroke starts in the column the vertical one is drawn in, and the two meet where
+/// the corner of the panel is, which is the only place a corner belongs.
+inline constexpr const char* BoxTop = "\u2581";     ///< Lower one eighth block.
+inline constexpr const char* BoxLeft = "\u2595";    ///< Right one eighth block.
+inline constexpr const char* BoxRight = "\u258F";   ///< Left one eighth block.
+inline constexpr const char* BoxBottom = "\u2594";  ///< Upper one eighth block.
 
 }  // namespace Glyphs
 

@@ -278,18 +278,21 @@ void paintScrollBar(Canvas& frame, std::size_t viewRows, std::size_t width, std:
 /// Paints one horizontal border of the frame around the prompt.
 ///
 /// The border sits on the plain background, so the change of colour is exactly where the frame
-/// is: everything inside it is the panel, everything outside is not.
+/// is: everything inside it is the panel, everything outside is not. The stroke spans the panel
+/// and not a cell more: it starts in the column the vertical stroke is drawn in, so the two meet
+/// at the corner of the panel. No corner glyph is drawn, because a corner glyph would be a cell
+/// of its own, outside the panel it is supposed to be the corner of.
 /// @param frame Canvas to paint on.
 /// @param row Row to paint.
 /// @param width Columns available.
 /// @param top Whether it is the upper border.
+// A row and a width are both counts, and both are named where they are used.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void paintBoxBorder(Canvas& frame, std::size_t row, std::size_t width, bool top) {
     const Style border = Palette::muted();
-    frame.put(row, 0, top ? Glyphs::BoxTopLeft : Glyphs::BoxBottomLeft, border);
-    for (std::size_t column = 1; column + 1 < width; ++column) {
+    for (std::size_t column = BoxWidth; column + BoxWidth < width; ++column) {
         frame.put(row, column, top ? Glyphs::BoxTop : Glyphs::BoxBottom, border);
     }
-    frame.put(row, width - 1, top ? Glyphs::BoxTopRight : Glyphs::BoxBottomRight, border);
 }
 
 /// What the empty prompt says: what can be done from here, which is not the same in the lobby

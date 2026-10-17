@@ -47,10 +47,8 @@ bool isWordCell(const Cell& cell) {
 /// @param glyph Glyph to look at.
 /// @return Whether it is a stroke of the frame the client draws around the prompt.
 bool isBoxGlyph(std::string_view glyph) {
-    return glyph == Glyphs::BoxTopLeft || glyph == Glyphs::BoxTop || glyph == Glyphs::BoxTopRight ||
-           glyph == Glyphs::BoxLeft || glyph == Glyphs::BoxRight ||
-           glyph == Glyphs::BoxBottomLeft || glyph == Glyphs::BoxBottom ||
-           glyph == Glyphs::BoxBottomRight;
+    return glyph == Glyphs::BoxTop || glyph == Glyphs::BoxLeft || glyph == Glyphs::BoxRight ||
+           glyph == Glyphs::BoxBottom;
 }
 
 /// @param frame Frame that was painted, for the width of its last column.
