@@ -260,6 +260,28 @@ TEST_CASE("a drag that waits at an edge of the prompt keeps the draft moving") {
     CHECK(model.promptScroll.value_or(0) == 6);
 }
 
+TEST_CASE("the wheel and the page keys over the conversation are the model's") {
+    Model model = withRows(30);
+    Interaction interaction;
+    ClipboardTerminal terminal;
+    std::string clipboard;
+    layOut(model, interaction);
+    REQUIRE(interaction.shape.maxScrollOffset > 0);
+    const std::size_t row = 2;  // The conversation, above the prompt and off the hints.
+
+    const Key wheel{Key::Kind::WheelUp, 0, 0, row};
+    const KeyResult rolled = send(interaction, model, wheel, clipboard, terminal);
+    CHECK_FALSE(rolled.used);  // Nothing under the pointer scrolled it, so the model gets it.
+
+    (void)applyKey(interaction, model, wheel, ScrollStep);
+    CHECK(model.scrollOffset > 0);
+
+    const Key page{Key::Kind::PageDown, 0, 0, row};
+    CHECK_FALSE(send(interaction, model, page, clipboard, terminal).used);
+    (void)applyKey(interaction, model, page, ScrollStep);
+    CHECK(model.scrollOffset == 0);
+}
+
 TEST_CASE("a key that is not the screen's goes to the model, and drops what was picked out") {
     Model model = withRows(3);
     Interaction interaction;

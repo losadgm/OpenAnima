@@ -480,8 +480,12 @@ KeyResult handleKey(Interaction& interaction, Model& model, const Key& key, std:
     case Key::Kind::WheelUp:
     case Key::Kind::WheelDown:
     case Key::Kind::PageUp:
-    case Key::Kind::PageDown:
-        return {true, scrollWith(key, interaction, model)};
+    case Key::Kind::PageDown: {
+        // With nothing under the pointer that scrolls, the key is the conversation's: it goes
+        // to the model, which is what moves the transcript and takes the picking with it.
+        const bool handled = scrollWith(key, interaction, model);
+        return {handled, handled};
+    }
     case Key::Kind::CtrlC:
         // The copy key, and nothing else. A client that leaves on it is a client someone leaves
         // by accident while reaching for a selection.
