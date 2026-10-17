@@ -5,26 +5,42 @@ both are meant to be read as much as run.
 
 | Client | What it is | Where it stands |
 | --- | --- | --- |
-| `cliHarness` | The command line: one prompt at a time, or a session over stdin | in place |
+| `cliHarness` | The command line: options in, one prompt or a session out | in place |
 | `tuiHarness` | The terminal UI: the conversation on screen, the answer arriving as it is written | built |
 
 ## cliHarness
 
-It reads the configuration from the environment, keeps one conversation across turns and
-prints the answer as it arrives, piece by piece.
+The command-line client. Every setting is an option, the npcs are created from the command
+line or from a command, and the answer is printed while the model writes it.
 
 ```bash
-./build/examples/open_anima_cli "who are you?"   # one prompt, one answer, exit
-./build/examples/open_anima_cli                  # a session, one turn per line
+./build/examples/open_anima_cli --help                    # the manual
+./build/examples/open_anima_cli --persona "a blacksmith" "who are you?"
+./build/examples/open_anima_cli --persona "a blacksmith"  # a session over stdin
 ```
 
-`quit` or `exit` ends a session, and so does the end of the input. The environment is the one
-in [the configuration table](index.html#a-request-end-to-end), and `.env` is loaded on its own
-from the working directory or from up to three of its parents, which is what makes the editor
-buttons work with no wiring. The loader is `examples/common/dotenv`, shared with the terminal
-client. The client is the reference for the streamed reply: `askTurn()` with a sink, the
-dialogue arriving as it is written, the reasoning printed muted above it and the actions
-listed after it.
+- An option wins over the variable it reads, `OPENANIMA_CLI_<NAME>`, and the variable wins
+  over `.env`, which is only a way of setting variables. `--base-url` and `--model` are the
+  two that have to come from somewhere; with both, the client runs with no `.env` at all.
+- There is no npc until one is asked for: `--persona` creates it at startup, `/create` in a
+  session. A prompt with nobody to answer it says how to make one instead of asking a model
+  without a role.
+- `--provider` picks the provider, and `rest` is the only one that exists today.
+- `--raw`, or `/raw` in a session, prints the reply document as JSON after the dialogue: the
+  three variables as the model wrote them, which is what to look at when a turn comes back
+  wrong.
+- The session speaks the vocabulary of the console client: `/create`, `/enter`, `/npcs`,
+  `/leave`, `/clear`, `/raw`, `/help` and `/quit`. Given an argument it does not take, each
+  answers with its usage.
+- `ctrl-c` stops the turn in flight and keeps what it had said; twice, and it leaves. `ctrl-d`
+  leaves too.
+- When stdin is not a terminal there is no banner and no prompt, so a session can be piped.
+
+The settings are read by `examples/common/apiSettings`, shared with the terminal client under
+its own prefix, and the loader for `.env` is `examples/common/dotenv`. The client is the
+reference for the asynchronous turn: `askTurnAsync()` with `poll()`, the dialogue arriving as
+it is written, `cancel()` wired to ctrl-c, and the whole document available when the turn is
+over.
 
 ## tuiHarness
 
@@ -185,8 +201,9 @@ for the answer, and says so.
   transcript; the model holds the ids, the transcripts and which one is being talked to. The
   library does not need to know that several NPCs exist until they have to speak to each
   other.
-- **Two clients, one configuration**: the same environment, the same `.env` loader and the
-  same provider as the command line.
+- **Two clients, one configuration**: the same settings reader, the same `.env` loader and the
+  same provider as the command line, read from its own prefix, `OPENANIMA_TUI_`. The two can
+  point at different models from the same shell.
 
 ### Packets
 

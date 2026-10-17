@@ -6,8 +6,15 @@
 # -----------------------------------------------------------------------------
 add_executable(open_anima_cli
     cliHarness/main.cpp
+    cliHarness/options.cpp
+    cliHarness/session.cpp
     common/apiSettings.cpp
     common/dotenv.cpp)
+
+# The version printed by --version is the one the project declares, so it cannot drift.
+target_compile_definitions(open_anima_cli
+    PRIVATE
+        OPENANIMA_CLI_VERSION="${PROJECT_VERSION}")
 
 target_include_directories(open_anima_cli
     PRIVATE
