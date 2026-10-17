@@ -104,13 +104,14 @@ repeating the name or opening a gap.
   A one-column bar on the right shows how much of the conversation is on screen and where in
   it the viewport sits; it is a picture, and it takes no clicks and no keys.
 - The prompt is the fixed part: the draft is drawn inside a frame of its own, with the command
-  in its own colour while one is being typed, and the caret never leaves it. The stroke is laid
-  on the edge of the panel, a quarter of the cell on the sides and an eighth on the top and the
-  bottom, which is the same weight all round, and the band of colour inside it keeps a row
-  empty above the line and another one below, and a column on each side, so the text never sits
-  against it. While the line is empty the frame says what can be done from there, which is not
-  the same in the lobby as in a conversation, and the words go as soon as there is something
-  to say.
+  in its own colour while one is being typed, and the caret never leaves it. The frame runs
+  along the inside edge of the panel, out of the one-eighth blocks and the legacy computing
+  corners that join two of them, so the colour reaches the edge of the box and none of it shows
+  outside the strokes; those four corners need a font that covers U+1FB00 to U+1FBFF, which
+  DejaVu Sans Mono does not. The band inside keeps a row empty above the line and another one
+  below, and a column on each side, so the text never sits against it. While the line is empty
+  the frame says what can be done from there, which is not the same in the lobby as in a
+  conversation, and the words go as soon as there is something to say.
 - The commands that complete what is being typed float above the frame on a lighter panel,
   with the selected one in the accent colour. The arrows walk them, and tab takes the one that
   is selected.

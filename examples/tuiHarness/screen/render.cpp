@@ -277,11 +277,8 @@ void paintScrollBar(Canvas& frame, std::size_t viewRows, std::size_t width, std:
 
 /// Paints one horizontal border of the frame around the prompt.
 ///
-/// The border sits on the plain background, so the change of colour is exactly where the frame
-/// is: everything inside it is the panel, everything outside is not. The stroke spans the width
-/// of the panel and not a cell more, so it ends where the side strokes are drawn and the two meet
-/// at the corners of the panel. No corner glyph is drawn, because a corner glyph would be a cell
-/// of its own, outside the panel it is supposed to be the corner of.
+/// The stroke runs along the inside edge of the panel and the corners join it to the side ones, so
+/// the border is the first pixel of the colour and there is nothing of the panel outside it.
 /// @param frame Canvas to paint on.
 /// @param row Row to paint.
 /// @param width Columns available.
@@ -289,10 +286,15 @@ void paintScrollBar(Canvas& frame, std::size_t viewRows, std::size_t width, std:
 // A row and a width are both counts, and both are named where they are used.
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void paintBoxBorder(Canvas& frame, std::size_t row, std::size_t width, bool top) {
-    const Style border = Palette::muted();
-    for (std::size_t column = 0; column + BoxWidth < width; ++column) {
+    if (width == 0) {
+        return;
+    }
+    const Style border = Palette::muted().withBackground(Palette::panelColor());
+    frame.put(row, 0, top ? Glyphs::BoxTopLeft : Glyphs::BoxBottomLeft, border);
+    for (std::size_t column = 1; column + 1 < width; ++column) {
         frame.put(row, column, top ? Glyphs::BoxTop : Glyphs::BoxBottom, border);
     }
+    frame.put(row, width - 1, top ? Glyphs::BoxTopRight : Glyphs::BoxBottomRight, border);
 }
 
 /// What the empty prompt says: what can be done from here, which is not the same in the lobby
@@ -312,25 +314,28 @@ std::string placeholderOf(const Model& model) {
 /// @param width Columns available.
 void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, std::size_t firstRow,
                  std::size_t width) {
-    const std::size_t markerColumn = PanelPad;
+    const std::size_t markerColumn = BoxWidth + PanelPad;
     const std::size_t textColumn = markerColumn + PromptWidth;
     const std::size_t commandLength = commandTokenLength(model.draft);
-    const Style border = Palette::muted();
-    const Style onPanel = border.withBackground(Palette::panelColor());
+    const Style border = Palette::muted().withBackground(Palette::panelColor());
 
-    // The panel is the box, and the strokes are its edges: the left one is drawn on the panel
-    // itself, in the column it takes, and the right one in the column after it. It keeps a row
-    // empty above the line being typed and another one below, so the text sits in the middle of
-    // a band of colour instead of against the stroke.
-    paintBoxBorder(frame, firstRow, width, true);
+    // The panel is the box and the frame runs along its inside edge: the strokes are the first
+    // pixel of colour on every side, so the colour does not show outside them and the text sits
+    // in a band of it. The panel keeps a row empty above the line being typed and another one
+    // below.
     const std::size_t panelRows = prompt.rows.size() + 2;
+    const std::size_t boxRows = panelRows + 2;
+    if (width > 0) {
+        for (std::size_t row = firstRow; row < firstRow + boxRows; ++row) {
+            frame.fill(row, 0, width, Palette::panel());
+        }
+    }
+
+    paintBoxBorder(frame, firstRow, width, true);
     for (std::size_t index = 0; index < panelRows; ++index) {
         const std::size_t row = firstRow + 1 + index;
-        if (width > BoxWidth) {
-            frame.fill(row, 0, width - BoxWidth, Palette::panel());
-        }
-        frame.put(row, 0, Glyphs::BoxSide, onPanel);
-        frame.put(row, width - 1, Glyphs::BoxSide, border);
+        frame.put(row, 0, Glyphs::BoxLeft, border);
+        frame.put(row, width - 1, Glyphs::BoxRight, border);
         if (index == 0 || index + 1 == panelRows) {
             continue;  // A row of panel and nothing else.
         }
@@ -370,9 +375,9 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     }
 
     // The prompt has a frame of its own, so the line being typed is not read as one more row of
-    // the conversation, and the line inside it is laid out to the width the column of the marker
-    // and the panel and the stroke on the right leave.
-    const std::size_t textColumn = PanelPad + PromptWidth;
+    // the conversation, and the line inside it is laid out to the width the frame and the panel
+    // around it leave.
+    const std::size_t textColumn = BoxWidth + PanelPad + PromptWidth;
     const std::size_t lastColumn =
         width > (BoxWidth + PanelPad) ? width - BoxWidth - PanelPad - 1 : 0;
     const std::size_t textColumns = lastColumn >= textColumn ? lastColumn - textColumn + 1 : 1;
@@ -435,7 +440,7 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
 
     const auto position = prompt.positions.at(std::min(model.cursor, model.draft.size()));
     result.caretRow = viewRows + hints.size() + 2 + position.first;
-    result.caretColumn = PanelPad + PromptWidth + position.second;
+    result.caretColumn = BoxWidth + PanelPad + PromptWidth + position.second;
 
     pickOutSelection(frame, selection);
     return result;

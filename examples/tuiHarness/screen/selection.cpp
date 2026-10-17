@@ -44,10 +44,19 @@ bool isWordCell(const Cell& cell) {
     return std::isalnum(first) != 0 || first == '_';
 }
 
-/// @param glyph Glyph to look at.
-/// @return Whether it is a stroke of the frame the client draws around the prompt.
-bool isBoxGlyph(std::string_view glyph) {
-    return glyph == Glyphs::BoxSide || glyph == Glyphs::BoxTop || glyph == Glyphs::BoxBottom;
+/// @param cell Cell to look at.
+/// @return Whether it is a stroke of the frame the client draws around the prompt, which is a
+///         stroke painted on the panel and nowhere else: the same character in what was said is
+///         part of what was said.
+bool isBoxGlyph(const Cell& cell) {
+    if (cell.kind != Cell::Kind::Glyph || !cell.style.background.equals(Palette::panelColor())) {
+        return false;
+    }
+    const std::string_view glyph{cell.glyph.data(), cell.length};
+    return glyph == Glyphs::BoxTopLeft || glyph == Glyphs::BoxTop || glyph == Glyphs::BoxTopRight ||
+           glyph == Glyphs::BoxLeft || glyph == Glyphs::BoxRight ||
+           glyph == Glyphs::BoxBottomLeft || glyph == Glyphs::BoxBottom ||
+           glyph == Glyphs::BoxBottomRight;
 }
 
 /// @param frame Frame that was painted, for the width of its last column.
@@ -59,7 +68,7 @@ bool isFurniture(const Canvas& frame, const Cell& cell, std::size_t column) {
         return false;
     }
     const std::string_view glyph{cell.glyph.data(), cell.length};
-    if (glyph == Glyphs::PromptMarker || isBoxGlyph(glyph)) {
+    if (glyph == Glyphs::PromptMarker || isBoxGlyph(cell)) {
         return true;
     }
     return column + 1 == frame.width() && glyph == Glyphs::ScrollBar;

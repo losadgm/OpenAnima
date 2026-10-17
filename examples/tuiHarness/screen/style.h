@@ -97,16 +97,19 @@ inline constexpr const char* ScrollBar = "\u2502";
 
 /// The strokes of the frame around the prompt.
 ///
-/// They are block elements, not lines: a line drawn by the font sits in the middle of the cell,
-/// so it would leave half a cell between itself and the colour it is meant to be the edge of. A
-/// block paints the part of the cell that touches the panel, so the stroke lands on the border of
-/// the rectangle exactly. The sides take a quarter of the cell width and the top and the bottom
-/// an eighth of its height, which on a cell twice as tall as it is wide is the same two pixels:
-/// the frame has one weight all round. There is no corner glyph: the horizontal stroke spans
-/// exactly the width of the panel, so it ends where the side strokes are drawn.
-inline constexpr const char* BoxSide = "\u258E";    ///< Left one quarter block.
-inline constexpr const char* BoxTop = "\u2581";     ///< Lower one eighth block.
-inline constexpr const char* BoxBottom = "\u2594";  ///< Upper one eighth block.
+/// They are one-eighth blocks, which paint the eighth of the cell that hugs one edge, so the
+/// frame runs along the inside edge of the panel and nothing of the colour shows outside it. The
+/// corners come from the symbols for legacy computing, where the strips of two edges are joined
+/// in one glyph: left and upper, right and upper, and so on. Every stroke is the same eighth, so
+/// the frame has one weight on all four sides.
+inline constexpr const char* BoxTopLeft = "\U0001FB7D";      ///< Left and upper eighth.
+inline constexpr const char* BoxTop = "\u2594";              ///< Upper one eighth block.
+inline constexpr const char* BoxTopRight = "\U0001FB7E";     ///< Right and upper eighth.
+inline constexpr const char* BoxLeft = "\u258F";             ///< Left one eighth block.
+inline constexpr const char* BoxRight = "\u2595";            ///< Right one eighth block.
+inline constexpr const char* BoxBottomLeft = "\U0001FB7C";   ///< Left and lower eighth.
+inline constexpr const char* BoxBottom = "\u2581";           ///< Lower one eighth block.
+inline constexpr const char* BoxBottomRight = "\U0001FB7F";  ///< Right and lower eighth.
 
 }  // namespace Glyphs
 
