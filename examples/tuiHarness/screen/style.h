@@ -97,17 +97,17 @@ inline constexpr const char* ScrollBar = "\u2502";
 
 /// The strokes of the frame around the prompt.
 ///
-/// They are block elements, which paint the part of the cell that hugs one edge, so the frame
-/// runs along the inside edge of the panel and nothing of the colour shows outside it. The sides
-/// take a quarter of the cell width and the top and the bottom an eighth of its height, which on
-/// a cell twice as tall as it is wide is the same two pixels: one weight on all four sides. The
+/// They are one-eighth blocks, which paint the eighth of the cell that hugs one edge, so the
+/// frame runs along the inside edge of the panel and nothing of the colour shows outside it. The
 /// corners come from the symbols for legacy computing, where the strips of two edges are joined
-/// in one glyph, a eighth each because there is no thicker corner.
+/// in one glyph. Everything is one eighth, which is one pixel across and two down on a cell twice
+/// as tall as it is wide: the sides and the corners match each other, and the top and the bottom
+/// are the thicker pair because a horizontal stroke cannot be thinner than that eighth.
 inline constexpr const char* BoxTopLeft = "\U0001FB7D";      ///< Left and upper eighth.
 inline constexpr const char* BoxTop = "\u2594";              ///< Upper one eighth block.
 inline constexpr const char* BoxTopRight = "\U0001FB7E";     ///< Right and upper eighth.
-inline constexpr const char* BoxLeft = "\u258E";             ///< Left one quarter block.
-inline constexpr const char* BoxRight = "\U0001FB87";        ///< Right one quarter block.
+inline constexpr const char* BoxLeft = "\u258F";             ///< Left one eighth block.
+inline constexpr const char* BoxRight = "\u2595";            ///< Right one eighth block.
 inline constexpr const char* BoxBottomLeft = "\U0001FB7C";   ///< Left and lower eighth.
 inline constexpr const char* BoxBottom = "\u2581";           ///< Lower one eighth block.
 inline constexpr const char* BoxBottomRight = "\U0001FB7F";  ///< Right and lower eighth.

@@ -350,7 +350,7 @@ TEST_CASE("a character still arriving leaves the prompt clean") {
     type(model, "a");
     type(model, "\xc3");  // The first byte of an enye, with the one after it still on its way.
     RenderResult rendered = render(model, 40, 10);
-    CHECK(readRow(rendered.frame, 7).rfind("\u258E \u2771 a", 0) == 0);
+    CHECK(readRow(rendered.frame, 7).rfind("\u258F \u2771 a", 0) == 0);
     CHECK(rendered.frame.at(7, 5).isBlank());
 
     type(model, "\xb1");
