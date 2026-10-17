@@ -101,12 +101,12 @@ TEST_CASE("the text of a selection is what the frame shows there") {
     CHECK(selectedText(frame, oneCell) == "l");
 }
 
-TEST_CASE("a trailing blank is not part of what was selected") {
+TEST_CASE("blank layout around the text is not part of what was selected") {
     const Canvas frame = painted();
     Selection selection;
     selection.begin(0, 13);
     selection.extend(1, 19);
-    CHECK(selectedText(frame, selection) == "\nnpc 1   well met");
+    CHECK(selectedText(frame, selection) == "npc 1   well met");
 }
 
 TEST_CASE("clearing a selection leaves nothing picked out") {
@@ -151,8 +151,11 @@ TEST_CASE("a triple click takes the whole row") {
 TEST_CASE("what the client draws for itself is not copied") {
     Canvas frame{12, 3};
     const Style frameStyle = Palette::muted().withBackground(Palette::panelColor());
+    const Style textStyle = Palette::text().withBackground(Palette::panelColor());
     frame.put(0, 0, "\U0001FB7D\u2594\u2594", frameStyle);
-    frame.put(1, 0, "\u258F \u2771 hi", Palette::text().withBackground(Palette::panelColor()));
+    frame.put(1, 0, "\u258F", frameStyle);
+    frame.put(1, 2, "\u2771", textStyle);
+    frame.put(1, 4, "hi", textStyle);
     frame.put(2, 0, "\U0001FB7C\u2581\u2581", frameStyle);
     frame.put(1, 11, OpenAnimaTui::Screen::Glyphs::ScrollBar, Palette::muted());
 
@@ -160,9 +163,9 @@ TEST_CASE("what the client draws for itself is not copied") {
     all.begin(0, 0);
     all.extend(2, 11);
 
-    // The frame, the prompt marker and the scrollbar stay out of it: a selection across them
-    // comes out with the words and nothing else.
-    CHECK(selectedText(frame, all) == "\n  hi\n");
+    // The frame, the prompt marker, the scrollbar and the blank layout stay out of it: a
+    // selection across them comes out with the words and nothing else.
+    CHECK(selectedText(frame, all) == "hi");
 }
 
 TEST_CASE("presses in the same cell in a row are counted as clicks") {

@@ -63,10 +63,11 @@ private:
 
 /// Reads what a selection covers off the frame that was painted.
 ///
-/// Rows are joined by line breaks, trailing blanks of each row are dropped, and the right half of
-/// a wide character contributes nothing because the character itself already covers the columns.
-/// What the client draws for itself, the prompt marker and the scrollbar, is not part of what is
-/// copied: a reader copies what is said, not the frame it is said on.
+/// Only what was said is copied: the layout the client draws to place it is left out, which
+/// means the frame, the prompt marker, the indentation before a name, the blank rows between
+/// turns and the empty columns of a panel. The right half of a wide character contributes
+/// nothing either, because the character itself already covers the columns. Rows are joined by
+/// line breaks and trailing blanks are dropped.
 /// @param frame Frame the selection was made on.
 /// @param selection Region to read.
 /// @return The text, empty when nothing is covered.
@@ -89,6 +90,17 @@ private:
 /// @param row Row the pointer is on.
 /// @return The selection that covers the row, empty when the position is off the frame.
 [[nodiscard]] Selection lineAt(const Canvas& frame, std::size_t row);
+
+/// Whether a cell is layout rather than something that was said.
+///
+/// Layout is what the client draws to place the words: the panel the prompt sits on, the strokes
+/// of its frame, the marker in front of it and the scrollbar on the right. A selection neither
+/// paints it nor copies it, so the screen looks picked out only where there is something to read.
+/// @param frame Frame that was painted, for the width of its last column.
+/// @param cell Cell to look at.
+/// @param column Column the cell is in.
+/// @return True for a cell that holds no words.
+[[nodiscard]] bool isLayout(const Canvas& frame, const Cell& cell, std::size_t column);
 
 /// Counts presses that come fast and in the same cell, which is what a double click is.
 class Clicks {

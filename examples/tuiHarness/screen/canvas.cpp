@@ -19,6 +19,7 @@ void setGlyph(Cell& cell, std::string_view bytes, bool wide) {
     cell.kind = Cell::Kind::Glyph;
     cell.length = static_cast<std::uint8_t>(bytes.size());
     cell.wide = wide;
+    cell.furniture = false;
     std::copy(bytes.begin(), bytes.end(), cell.glyph.begin());
 }
 
@@ -27,6 +28,7 @@ void setBlank(Cell& cell) {
     cell.kind = Cell::Kind::Blank;
     cell.length = 0;
     cell.wide = false;
+    cell.furniture = true;
 }
 
 /// Whether what starts at a position is a character whose remaining bytes have not arrived.
@@ -160,10 +162,13 @@ void Canvas::put(std::size_t row, std::size_t column, std::string_view text, con
         } else {
             setGlyph(m_cells[index(row, current)], bytes, columns == 2);
         }
+        // What was painted is what was said, so a space inside a line is text and not layout.
+        m_cells[index(row, current)].furniture = false;
         m_cells[index(row, current)].style = style;
         if (columns == 2) {
             Cell& next = m_cells[index(row, current + 1)];
             next.kind = Cell::Kind::Continuation;
+            next.furniture = false;
             next.style = style;
         }
         current += columns;
@@ -180,6 +185,7 @@ void Canvas::fill(std::size_t row, std::size_t column, std::size_t columns, cons
         detach(row, current);
         Cell& cell = m_cells[index(row, current)];
         cell.style = style;
+        cell.furniture = true;
     }
 }
 

@@ -13,6 +13,7 @@ add_executable(open_anima_tests
     tui/test_tui_canvas.cpp
     tui/test_tui_commands.cpp
     tui/test_tui_diff.cpp
+    tui/test_tui_menu.cpp
     tui/test_tui_model.cpp
     tui/test_tui_render.cpp
     tui/test_tui_selection.cpp
@@ -24,6 +25,7 @@ add_executable(open_anima_tests
     ../examples/tuiHarness/screen/canvas.cpp
     ../examples/tuiHarness/screen/cell.cpp
     ../examples/tuiHarness/screen/diff.cpp
+    ../examples/tuiHarness/screen/menu.cpp
     ../examples/tuiHarness/screen/render.cpp
     ../examples/tuiHarness/screen/selection.cpp
     ../examples/tuiHarness/screen/style.cpp

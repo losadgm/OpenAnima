@@ -11,6 +11,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,6 +22,7 @@
 #include "common/apiSettings.h"
 #include "common/dotenv.h"
 #include "screen/diff.h"
+#include "screen/menu.h"
 #include "screen/render.h"
 #include "screen/selection.h"
 #include "terminal/terminal.h"
@@ -120,12 +122,64 @@ void insertText(Model& model, const std::string& text, std::size_t scrollStep) {
 /// @param clipboard What was copied last.
 /// @param model The model, for the paste and for the step a scroll takes.
 /// @param terminal Terminal the clipboard sequence goes to.
+/// @param menu The menu the right button opened.
 /// @return Whether the key was used here, so the model does not see it as well.
 bool handleScreenKey(const Key& key, OpenAnimaTui::Screen::Selection& selection,
                      OpenAnimaTui::Screen::Clicks& clicks,
                      const OpenAnimaTui::Screen::Canvas& painted, std::string& clipboard,
-                     Model& model, OpenAnimaTui::Terminal& terminal) {
+                     Model& model, OpenAnimaTui::Terminal& terminal,
+                     OpenAnimaTui::Screen::Menu& menu) {
     const std::size_t scrollStep = terminal.height() / 2;
+    const std::size_t entries = OpenAnimaTui::Screen::MenuEntries.size();
+
+    // While the menu is up it takes the keys: the arrows walk it, Return or a click on an entry
+    // picks it, and anything else puts it away and then does its usual job.
+    if (menu.open) {
+        switch (key.kind) {
+        case Key::Kind::ArrowUp:
+            menu.selected = menu.selected == 0 ? entries - 1 : menu.selected - 1;
+            return true;
+        case Key::Kind::ArrowDown:
+            menu.selected = (menu.selected + 1) % entries;
+            return true;
+        case Key::Kind::Escape:
+            menu.open = false;
+            return true;
+        case Key::Kind::MouseRightPress:
+            menu.placement = OpenAnimaTui::Screen::placeMenu(key.row, key.column, painted.width(),
+                                                             painted.height());
+            menu.selected = 0;
+            return true;
+        case Key::Kind::MouseRightRelease:
+            return true;  // The button coming back up leaves the menu where it is.        case
+                          // Key::Kind::Enter:
+        case Key::Kind::CtrlC:
+            menu.open = false;
+            if (menu.selected == 0) {
+                copySelection(selection, painted, clipboard, terminal);
+                selection.clear();
+            } else {
+                insertText(model, clipboard, scrollStep);
+            }
+            return true;
+        case Key::Kind::MousePress: {
+            const std::optional<std::size_t> entry =
+                OpenAnimaTui::Screen::menuEntryAt(menu.placement, key.row, key.column);
+            menu.open = false;
+            if (entry == 0) {
+                copySelection(selection, painted, clipboard, terminal);
+                selection.clear();
+            } else if (entry == 1) {
+                insertText(model, clipboard, scrollStep);
+            }
+            return true;
+        }
+        default:
+            menu.open = false;  // The key is not about the menu, so the menu gets out of the way.
+            break;
+        }
+    }
+
     switch (key.kind) {
     case Key::Kind::MousePress: {
         // A second press on the same cell takes the word under it and a third takes the row,
@@ -140,6 +194,16 @@ bool handleScreenKey(const Key& key, OpenAnimaTui::Screen::Selection& selection,
         }
         return true;
     }
+    case Key::Kind::MouseRightPress:
+        // The terminal's own menu is out of action while the client reports the mouse, so the
+        // right button opens one of its own, where the pointer is.
+        menu.open = true;
+        menu.placement =
+            OpenAnimaTui::Screen::placeMenu(key.row, key.column, painted.width(), painted.height());
+        menu.selected = 0;
+        return true;
+    case Key::Kind::MouseRightRelease:
+        return true;  // The menu is already up, or already gone; the release says nothing.
     case Key::Kind::MouseDrag:
     case Key::Kind::MouseRelease:
         // The drag moves the far end of the selection, and the release leaves it where the
@@ -201,6 +265,7 @@ int main() {
     // which is the shell's business: the model never hears about a position.
     OpenAnimaTui::Screen::Selection selection;
     OpenAnimaTui::Screen::Clicks clicks;
+    OpenAnimaTui::Screen::Menu menu;
     OpenAnimaTui::Screen::Canvas painted{terminal->width(), terminal->height()};
     std::string clipboard;
 
@@ -211,7 +276,8 @@ int main() {
         const bool drained = terminal->flush();
 
         if (const auto key = terminal->readKey(std::chrono::milliseconds{20})) {
-            if (handleScreenKey(*key, selection, clicks, painted, clipboard, model, *terminal)) {
+            if (handleScreenKey(*key, selection, clicks, painted, clipboard, model, *terminal,
+                                menu)) {
                 dirty = true;
                 continue;
             }
@@ -234,7 +300,7 @@ int main() {
 
         if (dirty && drained) {
             const OpenAnimaTui::Screen::RenderResult rendered = OpenAnimaTui::Screen::render(
-                model, terminal->width(), terminal->height(), selection);
+                model, terminal->width(), terminal->height(), selection, menu);
             // The viewport cannot hide more rows than there are. Holding the model to the
             // real range is what makes the wheel answer at once on the way back down.
             model.scrollOffset = std::min(model.scrollOffset, rendered.maxScrollOffset);

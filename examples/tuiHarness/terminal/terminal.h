@@ -19,36 +19,38 @@ namespace OpenAnimaTui {
 /// What the keyboard produced.
 struct Key {
     enum class Kind : std::uint8_t {
-        None,          ///< Nothing was pressed before the timeout.
-        Character,     ///< A printable character, in `character`.
-        Enter,         ///< Return.
-        CtrlEnter,     ///< Control and Return together: a new line, never a send.
-        Backspace,     ///< Delete the character before the cursor.
-        Delete,        ///< Delete the character after the cursor.
-        Tab,           ///< The tab key.
-        Escape,        ///< Escape.
-        ArrowUp,       ///< Cursor up.
-        ArrowDown,     ///< Cursor down.
-        ArrowLeft,     ///< Cursor left.
-        ArrowRight,    ///< Cursor right.
-        PageUp,        ///< One page of transcript up.
-        PageDown,      ///< One page of transcript down.
-        WheelUp,       ///< The wheel, one notch towards the beginning of the conversation.
-        WheelDown,     ///< The wheel, one notch towards the end.
-        MousePress,    ///< A button went down, at `column` and `row`.
-        MouseDrag,     ///< The mouse moved with a button held.
-        MouseRelease,  ///< The button came back up.
-        CtrlC,         ///< Interrupt, or copy what is selected.
-        CtrlD,         ///< End of input.
-        CtrlJ,         ///< Newline without sending.
-        CtrlA,         ///< Start of line.
-        CtrlB,         ///< One character left.
-        CtrlE,         ///< End of line.
-        CtrlF,         ///< One character right.
-        CtrlN,         ///< Next history item.
-        CtrlP,         ///< Previous history item.
-        CtrlV,         ///< Paste what the client copied last.
-        Unknown        ///< A key this client does not use.
+        None,               ///< Nothing was pressed before the timeout.
+        Character,          ///< A printable character, in `character`.
+        Enter,              ///< Return.
+        CtrlEnter,          ///< Control and Return together: a new line, never a send.
+        Backspace,          ///< Delete the character before the cursor.
+        Delete,             ///< Delete the character after the cursor.
+        Tab,                ///< The tab key.
+        Escape,             ///< Escape.
+        ArrowUp,            ///< Cursor up.
+        ArrowDown,          ///< Cursor down.
+        ArrowLeft,          ///< Cursor left.
+        ArrowRight,         ///< Cursor right.
+        PageUp,             ///< One page of transcript up.
+        PageDown,           ///< One page of transcript down.
+        WheelUp,            ///< The wheel, one notch towards the beginning of the conversation.
+        WheelDown,          ///< The wheel, one notch towards the end.
+        MousePress,         ///< A button went down, at `column` and `row`.
+        MouseDrag,          ///< The mouse moved with a button held.
+        MouseRelease,       ///< The button came back up.
+        MouseRightPress,    ///< The right button went down: what opens the menu.
+        MouseRightRelease,  ///< The right button came back up, which does nothing on its own.
+        CtrlC,              ///< Interrupt, or copy what is selected.
+        CtrlD,              ///< End of input.
+        CtrlJ,              ///< Newline without sending.
+        CtrlA,              ///< Start of line.
+        CtrlB,              ///< One character left.
+        CtrlE,              ///< End of line.
+        CtrlF,              ///< One character right.
+        CtrlN,              ///< Next history item.
+        CtrlP,              ///< Previous history item.
+        CtrlV,              ///< Paste what the client copied last.
+        Unknown             ///< A key this client does not use.
     };
 
     Kind kind{Kind::None};  ///< What happened.

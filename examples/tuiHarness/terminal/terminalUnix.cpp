@@ -186,6 +186,11 @@ private:
         }
 
         const char introducer = m_pending.front();
+        // Alt and backspace together is the word before the caret, the way readline spells it.
+        if (introducer == '\x7f' || introducer == '\b') {
+            m_pending.erase(0, 1);
+            return controlled(Key::Kind::Backspace);
+        }
         if (introducer == '[' || introducer == 'O') {
             m_pending.erase(0, 1);
             if (introducer == '[' && !m_pending.empty() && m_pending.front() == 'M') {
@@ -295,7 +300,9 @@ private:
         if (sequence == "1;5D") {
             return controlled(Key::Kind::ArrowLeft);
         }
-        if (sequence == "3;5~") {
+        // Control and Delete as the modifyOtherKeys encoding spells it, and as xterm spells the
+        // key when it reports it itself: `27;5;3~` is a Delete with control held.
+        if (sequence == "3;5~" || sequence == "27;5;3~") {
             return controlled(Key::Kind::Delete);
         }
         // Control and backspace as xterm spells it when it reports the key itself: 8 is the
@@ -351,6 +358,11 @@ private:
             // Bit five says the mouse is moving with a button held, which is a drag.
             if (final == 'M' && (button & 32) != 0) {
                 key.kind = Key::Kind::MouseDrag;
+            }
+            // The right button opens the menu rather than picking text out, and its release says
+            // nothing: the menu is already up. Bit six is the wheel, which is not a button.
+            if ((button & 64) == 0 && (button & 3) == 2) {
+                key.kind = final == 'm' ? Key::Kind::MouseRightRelease : Key::Kind::MouseRightPress;
             }
             key.column = column > 0 ? column - 1 : 0;
             key.row = row > 0 ? row - 1 : 0;
@@ -445,6 +457,11 @@ private:
         if (codepoint == 127) {
             return control ? controlled(Key::Kind::Backspace)
                            : Key{Key::Kind::Backspace, static_cast<char>(0)};
+        }
+        // The key of the enhanced protocol that stands for Delete. With control it takes the word
+        // after the caret; without it, the character, which is what the key does everywhere.
+        if (codepoint == 3) {
+            return control ? controlled(Key::Kind::Delete) : Key{Key::Kind::Delete, '\0'};
         }
         if (codepoint < 0x20 || codepoint > 0x10FFFF) {
             return Key{Key::Kind::Unknown, static_cast<char>(0)};
@@ -562,6 +579,10 @@ private:
         // backspace are pressed together: the two chords are the same byte, and in a line being
         // typed the useful reading of it is the one that takes a word.
         case 0x08:
+            return controlled(Key::Kind::Backspace);
+        // 0x17 is Ctrl+W, which is what a terminal sends for control and backspace when it has
+        // no other way to say it, and the word before the caret is what it means in readline.
+        case 0x17:
             return controlled(Key::Kind::Backspace);
         case 0x03:
             return Key{Key::Kind::CtrlC, static_cast<char>(0)};

@@ -76,6 +76,10 @@ bool isFurniture(const Canvas& frame, const Cell& cell, std::size_t column) {
 
 }  // namespace
 
+bool isLayout(const Canvas& frame, const Cell& cell, std::size_t column) {
+    return cell.furniture || isFurniture(frame, cell, column);
+}
+
 // NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
 void Selection::begin(std::size_t row, std::size_t column) {
     m_active = true;
@@ -138,11 +142,13 @@ std::string selectedText(const Canvas& frame, const Selection& selection) {
                 continue;
             }
             const Cell& cell = frame.at(row, column);
-            if (cell.kind == Cell::Kind::Continuation || isFurniture(frame, cell, column)) {
+            // Layout is what the client drew to place the words: it is skipped here, so a copy
+            // reads as what was said and not as the screen it was said on.
+            if (cell.kind == Cell::Kind::Continuation || isLayout(frame, cell, column)) {
                 continue;
             }
             if (cell.kind == Cell::Kind::Blank) {
-                line += ' ';
+                line += ' ';  // A space that was painted is part of the text.
                 continue;
             }
             line.append(cell.glyph.data(), cell.length);
@@ -150,7 +156,10 @@ std::string selectedText(const Canvas& frame, const Selection& selection) {
         while (!line.empty() && line.back() == ' ') {
             line.pop_back();
         }
-        if (row > selection.firstRow()) {
+        if (line.empty()) {
+            continue;  // A row of layout, which is not a line of anything.
+        }
+        if (!text.empty()) {
             text += '\n';
         }
         text += line;

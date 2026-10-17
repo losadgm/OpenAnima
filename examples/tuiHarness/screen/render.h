@@ -7,6 +7,7 @@
 
 #include "app/model.h"
 #include "canvas.h"
+#include "menu.h"
 #include "selection.h"
 
 namespace OpenAnimaTui::Screen {
@@ -42,8 +43,10 @@ struct RenderResult {
 /// @param width Columns available.
 /// @param height Rows available.
 /// @param selection What the mouse picked out, painted over everything else.
+/// @param menu The menu the right button opened, painted over the selection.
 /// @return The frame and where the caret goes.
 [[nodiscard]] RenderResult render(const App::Model& model, std::size_t width, std::size_t height,
-                                  const Selection& selection = Selection{});
+                                  const Selection& selection = Selection{},
+                                  const Menu& menu = Menu{});
 
 }  // namespace OpenAnimaTui::Screen

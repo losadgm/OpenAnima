@@ -146,6 +146,7 @@ repeating the name or opening a gap.
 | Press and release on one cell | Picks out that one character |
 | Double click | Picks out the word under the pointer |
 | Triple click | Picks out the whole row |
+| Right click | Opens a small menu with copy and paste, where the button was |
 | Ctrl+C | Copies what is picked out and drops the picking. It never leaves the client, which is what keeps a reach for the copy key from ending the session |
 | Ctrl+V | Types what was copied last |
 | Ctrl+D | Leaves |
@@ -153,7 +154,10 @@ repeating the name or opening a gap.
 Control and backspace travel as the same byte as Ctrl+H on the terminals that do not report the
 chord itself, which is nearly all of them, so the client reads that byte as the word delete: it
 is what pressing the two keys produces there, and Ctrl+H has nothing else to do in a line being
-typed.
+typed. The same goes for the other spellings the chords turn into: Ctrl+W, alt and backspace,
+and the modifier forms `27;5;3~` and `27;5;127~`. An editor that sends the key through the kitty
+keyboard protocol reports the code point instead, so code point 3 reaches the word delete too and
+code point 127 the word backspace.
 
 A tab is never written into the draft. It counts as one column to the client and as up to
 eight to the terminal, and the two disagreeing is what tore the row apart.
@@ -162,12 +166,17 @@ The picking out follows the button for as long as it is held: the cells are pain
 pointer passes over them, the paint grows and shrinks with it, and the last one stays painted
 when the button comes back up. A double click takes the word under the pointer and a triple
 click takes the whole row, the way a terminal does it; a cell that is not part of a word is a
-word of its own. What is copied is what was painted, except the two things the client draws
-for itself: the prompt marker and the scrollbar stay out of the text, so a selection across
-them comes out clean. Any other key drops the picking, so a selection never sits over text
-that has moved under it. While the client runs the mouse is the client's, which is the price
-of the wheel scrolling the conversation; holding shift asks the terminal for its own selection
-back in most of them.
+word of its own. Picking is only over what was said: the box of the prompt, its padding, the
+marker beside it and the scrollbar on the right are the client's own drawing, so a drag across
+them paints the text and leaves them as they were, and a copy of that same selection holds the
+words without the box and comes out flush with the left edge.
+Any other key drops the picking, so a selection never sits over text that has moved under it.
+While the client runs the mouse is the client's, which is the price of the wheel scrolling the
+conversation; holding shift asks the terminal for its own selection back in most of them.
+
+The menu the right button opens takes the arrows and Return, and Escape drops it without doing
+anything; a click on an entry picks it just the same. It is drawn over the conversation and the
+selection stays where it was, so picking copy copies the same thing Ctrl+C would.
 
 Anything a keyboard can send reaches the draft as bytes, so an enye, an accented vowel or a
 combining mark typed after a letter lands in the same cell as the letter it belongs to. Copying goes out as the terminal's own clipboard sequence and lives in

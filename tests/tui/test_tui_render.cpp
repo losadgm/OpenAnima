@@ -393,4 +393,39 @@ TEST_CASE("what the mouse is holding is painted, down to the cell it went down o
     CHECK_FALSE(rendered.frame.at(9, 3).style.reverse);
 }
 
+TEST_CASE("picking out marks the words and leaves the frame of the prompt alone") {
+    Model model;
+    type(model, "hola");
+
+    // The whole box, borders and padding included.
+    Selection selection;
+    selection.begin(6, 0);
+    selection.extend(8, 39);
+    const RenderResult rendered = render(model, 40, 10, selection);
+
+    CHECK(rendered.frame.at(7, 4).style.reverse);        // The first letter of the draft.
+    CHECK(rendered.frame.at(7, 7).style.reverse);        // The last one.
+    CHECK_FALSE(rendered.frame.at(6, 0).style.reverse);  // The top border.
+    CHECK_FALSE(rendered.frame.at(7, 0).style.reverse);  // Its left stroke.
+    CHECK_FALSE(rendered.frame.at(7, 2).style.reverse);  // The marker in front of the draft.
+    CHECK_FALSE(rendered.frame.at(7, 3).style.reverse);  // The panel between the two.
+}
+
+TEST_CASE("the menu is painted over the screen, with its first entry picked out") {
+    Model model;
+    OpenAnimaTui::Screen::Menu menu;
+    menu.open = true;
+    menu.placement = OpenAnimaTui::Screen::placeMenu(1, 2, 40, 10);
+
+    const RenderResult rendered = render(model, 40, 10, Selection{}, menu);
+    const std::string screen = readAll(rendered.frame);
+    CHECK(screen.find("copy") != std::string::npos);
+    CHECK(screen.find("paste") != std::string::npos);
+
+    const std::size_t row = menu.placement.row + 1;
+    const std::size_t column = menu.placement.column + 2;
+    CHECK(rendered.frame.at(row, column).style.foreground.equals(Palette::accent().foreground));
+    CHECK(rendered.frame.at(row + 1, column).style.foreground.equals(Palette::text().foreground));
+}
+
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

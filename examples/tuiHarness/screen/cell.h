@@ -31,6 +31,9 @@ struct Cell {
     std::array<char, MaxGlyphBytes> glyph{};  ///< UTF-8 bytes of the character.
     std::uint8_t length{0};                   ///< Bytes used in `glyph`.
     bool wide{false};                         ///< Whether the character covers the next cell too.
+    bool furniture{true};                     ///< Whether the client drew it for itself instead of
+                                              ///< showing what was said: a fill, a gap, a frame.
+                                              ///< It is what a copy of a selection leaves out.
     Style style{};                            ///< How the cell is painted.
 
     /// @return Whether the cell holds nothing to show.

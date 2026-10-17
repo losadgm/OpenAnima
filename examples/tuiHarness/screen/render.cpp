@@ -223,8 +223,10 @@ std::string statusRow(const Model& model) {
 }
 
 /// Paint what the mouse picked out, over whatever the frame holds there: a selection is about the
-/// screen, not about the conversation behind it. A drag that is down to one cell still shows,
-/// which is why this asks whether the mouse is holding something and not whether there is
+/// screen, not about the conversation behind it. Only what was said is painted: the panel, the
+/// strokes of the prompt frame, the marker and the scrollbar keep the way they look, so a pick
+/// that crosses them marks the words and nothing else. A drag that is down to one cell still
+/// shows, which is why this asks whether the mouse is holding something and not whether there is
 /// something worth copying.
 /// @param frame Frame to paint on.
 /// @param selection Cells the mouse picked out.
@@ -239,6 +241,9 @@ void pickOutSelection(Canvas& frame, const Selection& selection) {
                 continue;
             }
             Cell& cell = frame.at(picked, column);
+            if (isLayout(frame, cell, column)) {
+                continue;
+            }
             cell.style = cell.style.withReverse();
         }
     }
@@ -377,10 +382,56 @@ void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, s
     paintBoxBorder(frame, firstRow + panelRows + 1, width, false);
 }
 
+/// Paints the menu over everything else: a panel of its own, framed with the same strokes as the
+/// prompt, with the entry under the pointer in the accent colour.
+/// @param frame Canvas to paint on.
+/// @param menu Menu to paint.
+void paintMenu(Canvas& frame, const Menu& menu) {
+    const MenuPlacement& box = menu.placement;
+    if (!menu.open || box.rows < 3 || box.columns < 3) {
+        return;
+    }
+    const std::size_t bottom = std::min(box.row + box.rows, frame.height()) - 1;
+    const std::size_t right = std::min(box.column + box.columns, frame.width()) - 1;
+    const Style border = Palette::muted().withBackground(Palette::raisedColor());
+
+    for (std::size_t row = box.row; row <= bottom; ++row) {
+        frame.fill(row, box.column, right - box.column + 1, Palette::raised());
+    }
+    frame.put(box.row, box.column, Glyphs::BoxTopLeft, border);
+    for (std::size_t column = box.column + 1; column < right; ++column) {
+        frame.put(box.row, column, Glyphs::BoxTop, border);
+    }
+    frame.put(box.row, right, Glyphs::BoxTopRight, border);
+    for (std::size_t row = box.row + 1; row < bottom; ++row) {
+        frame.put(row, box.column, Glyphs::BoxLeft, border);
+        frame.put(row, right, Glyphs::BoxRight, border);
+    }
+    frame.put(bottom, box.column, Glyphs::BoxBottomLeft, border);
+    for (std::size_t column = box.column + 1; column < right; ++column) {
+        frame.put(bottom, column, Glyphs::BoxBottom, border);
+    }
+    frame.put(bottom, right, Glyphs::BoxBottomRight, border);
+
+    for (std::size_t index = 0; index < MenuEntries.size() && box.row + 1 + index < bottom;
+         ++index) {
+        const Style style = (index == menu.selected ? Palette::accent() : Palette::text())
+                                .withBackground(Palette::raisedColor());
+        frame.put(box.row + 1 + index, box.column + 2, MenuEntries.at(index), style);
+    }
+
+    // The menu is the client's own drawing, so a copy never takes it for something that was said.
+    for (std::size_t row = box.row; row <= bottom; ++row) {
+        for (std::size_t column = box.column; column <= right; ++column) {
+            frame.at(row, column).furniture = true;
+        }
+    }
+}
+
 }  // namespace
 
 RenderResult render(const Model& model, std::size_t width, std::size_t height,
-                    const Selection& selection) {
+                    const Selection& selection, const Menu& menu) {
     RenderResult result{Canvas{width, height}, 0, 0};
     Canvas& frame = result.frame;
     if (width == 0 || height == 0) {
@@ -426,9 +477,16 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     for (std::size_t row = 0; row < viewRows; ++row) {
         if (row < total) {
             const TranscriptRow& line = transcript[start + row];
-            // A note has no prefix, so it starts at the left edge; a speaker's name pushes the
-            // body to the column the name leaves.
-            frame.put(row, 0, line.prefix, line.prefixStyle);
+            // The name is what was said; the padding that lines the body up under it is layout,
+            // so it is left blank and a copy does not carry it.
+            std::string_view name = line.prefix;
+            while (!name.empty() && name.back() == ' ') {
+                name.remove_suffix(1);
+            }
+            frame.put(row, 0, name, line.prefixStyle);
+            if (!name.empty()) {
+                frame.put(row, name.size(), " ", line.prefixStyle);
+            }
             frame.put(row, measure(line.prefix), line.body, line.bodyStyle);
         }
     }
@@ -458,6 +516,7 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
     result.caretColumn = BoxWidth + PanelPad + PromptWidth + position.second;
 
     pickOutSelection(frame, selection);
+    paintMenu(frame, menu);
     return result;
 }
 
