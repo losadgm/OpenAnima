@@ -4,9 +4,11 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 #include "OpenAnima/Core/Completion.h"
+#include "OpenAnima/Core/NpcReply.h"
 
 namespace OpenAnima::Core {
 
@@ -23,14 +25,16 @@ enum class EventKind : std::uint8_t {
 
 /// One thing that happened to one turn.
 ///
-/// Only the fields of its kind carry something: `text` for a Delta, `completion`
-/// for a Finished and `error` for a Failed.
+/// Only the fields of its kind carry something: `text` for a Delta, `completion` and
+/// `reply` for a Finished and `error` for a Failed. A Delta of a turn that asked for a
+/// reply carries the dialogue, not the JSON that is being written.
 struct Event {
-    RequestId id{};         ///< Turn the event belongs to.
-    EventKind kind{};       ///< What happened.
-    std::string text;       ///< Piece of the answer, for a Delta.
-    Completion completion;  ///< Answer and why it ended, for a Finished.
-    std::string error;      ///< What went wrong, for a Failed.
+    RequestId id{};                 ///< Turn the event belongs to.
+    EventKind kind{};               ///< What happened.
+    std::string text;               ///< Piece of the answer, for a Delta.
+    Completion completion;          ///< Answer and why it ended, for a Finished.
+    std::optional<NpcReply> reply;  ///< Reply, for a Finished turn that asked for one.
+    std::string error;              ///< What went wrong, for a Failed.
 };
 
 }  // namespace OpenAnima::Core

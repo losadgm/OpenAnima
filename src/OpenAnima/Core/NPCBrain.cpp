@@ -15,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "OpenAnima/Core/ReplyStream.h"
 #include "OpenAnima/Errors.h"
 #include "OpenAnima/Provider/IProvider.h"
 
@@ -32,6 +33,9 @@ struct Job {
     RequestId id{};                                            ///< Turn this job runs.
     std::shared_ptr<OpenAnima::Provider::IProvider> provider;  ///< Backend that answers it.
     std::vector<ChatMessage> messages;                         ///< Conversation to send.
+    ResponseFormat format;  ///< Shape the answer is asked for in.
+    bool streamsDialogue{
+        false};  ///< Whether the answer is a reply, so only the dialogue is reported.
 };
 
 /// Builds an event with only what every kind of event carries.
@@ -68,10 +72,14 @@ public:
     /// Hands a turn to the thread.
     /// @param messages Conversation to send, system prompt included.
     /// @param provider Backend that answers it.
+    /// @param format Shape the answer is asked for in.
+    /// @param streamsDialogue Whether the answer is a reply, so only the dialogue is
+    ///        reported as it arrives and the turn ends with the reply read out of it.
     /// @return The id of the turn.
     /// @throws OpenAnimaError when a turn is already in flight.
     RequestId start(std::vector<ChatMessage> messages,
-                    std::shared_ptr<OpenAnima::Provider::IProvider> provider) {
+                    std::shared_ptr<OpenAnima::Provider::IProvider> provider,
+                    ResponseFormat format = ResponseFormat::text(), bool streamsDialogue = false) {
         if (m_busy) {
             throw OpenAnimaError("a turn is already in flight: collect its events, or cancel it");
         }
@@ -83,7 +91,8 @@ public:
 
         {
             std::lock_guard<std::mutex> lock{m_mutex};
-            m_job = Job{turnId, std::move(provider), std::move(messages)};
+            m_job = Job{turnId, std::move(provider), std::move(messages), std::move(format),
+                        streamsDialogue};
         }
         if (!m_thread.joinable()) {
             m_thread = std::thread{&NPCBrain::TurnWorker::run, this};
@@ -152,19 +161,32 @@ private:
     void runTurn(const Job& job) {
         push(makeEvent(job.id, EventKind::Started));
 
+        ReplyStream stream{"dialogue"};
+        const bool reply = job.streamsDialogue;
         OpenAnima::Provider::Call call;
-        call.onDelta = [this, turnId = job.id](std::string_view piece) {
+        call.onDelta = [this, turnId = job.id, &stream, reply](std::string_view piece) {
             Event event = makeEvent(turnId, EventKind::Delta);
-            event.text = std::string{piece};
+            if (reply) {
+                event.text = stream.feed(piece);
+                if (event.text.empty()) {
+                    return;
+                }
+            } else {
+                event.text = std::string{piece};
+            }
             push(std::move(event));
         };
         call.keepGoing = [this, turnId = job.id] {
             return !m_stopping.load() && m_abandoned.load() != turnId;
         };
+        call.format = job.format;
 
         try {
             Event event = makeEvent(job.id, EventKind::Finished);
             event.completion = job.provider->complete(job.messages, call);
+            if (reply) {
+                event.reply = readReply(event.completion, stream.text());
+            }
             push(std::move(event));
         } catch (const std::exception& failure) {
             Event event = makeEvent(job.id, EventKind::Failed);
@@ -230,6 +252,30 @@ void NPCBrain::setSystemPrompt(std::string prompt) {
     m_systemPrompt = std::move(prompt);
 }
 
+void NPCBrain::setReplyCatalogue(ActionCatalogue catalogue) {
+    m_catalogue = std::move(catalogue);
+}
+
+std::vector<ChatMessage> NPCBrain::buildRequest(const std::string& prompt,
+                                                std::string_view instruction) const {
+    std::vector<ChatMessage> request;
+    request.reserve(m_history.size() + 2);
+    if (!m_systemPrompt.empty()) {
+        request.push_back(ChatMessage{Role::System, m_systemPrompt});
+    }
+    request.insert(request.end(), m_history.begin(), m_history.end());
+
+    std::string content = prompt;
+    if (!instruction.empty()) {
+        // The contract goes with the turn but not into the history: what the player said
+        // is what the NPC should read back later, not the instruction that shaped it.
+        content.append("\n\n");
+        content.append(instruction);
+    }
+    request.push_back(ChatMessage{Role::User, std::move(content)});
+    return request;
+}
+
 Completion NPCBrain::ask(const std::string& prompt) {
     return ask(prompt, Provider::Call{});
 }
@@ -241,21 +287,43 @@ Completion NPCBrain::ask(const std::string& prompt, const Provider::Call& call) 
         throw OpenAnimaError("no backend is attached to this brain: call setProvider() first");
     }
 
-    std::vector<ChatMessage> request;
-    request.reserve(m_history.size() + 2);
-    if (!m_systemPrompt.empty()) {
-        request.push_back(ChatMessage{Role::System, m_systemPrompt});
-    }
-    request.insert(request.end(), m_history.begin(), m_history.end());
-    request.push_back(ChatMessage{Role::User, prompt});
-
     // The answer is fetched before the history is modified, so a failed call leaves the
     // conversation exactly as it was and the client can retry the same turn.
-    const Completion answer = m_provider->complete(request, call);
+    const Completion answer = m_provider->complete(buildRequest(prompt, {}), call);
 
     m_history.push_back(ChatMessage{Role::User, prompt});
     m_history.push_back(ChatMessage{Role::Assistant, answer.text});
     return answer;
+}
+
+NpcReply NPCBrain::askTurn(const std::string& prompt) {
+    return askTurn(prompt, {});
+}
+
+NpcReply NPCBrain::askTurn(const std::string& prompt, const Provider::DeltaSink& onDialogue) {
+    assert(!prompt.empty() && "askTurn() requires a non-empty prompt");
+
+    if (m_provider == nullptr) {
+        throw OpenAnimaError("no backend is attached to this brain: call setProvider() first");
+    }
+
+    ReplyStream stream{"dialogue"};
+    Provider::Call call;
+    call.onDelta = [&stream, &onDialogue](std::string_view piece) {
+        const std::string text = stream.feed(piece);
+        if (!text.empty() && onDialogue) {
+            onDialogue(text);
+        }
+    };
+    call.format = ResponseFormat::jsonSchema(m_catalogue.replySchema());
+
+    const Completion answer =
+        m_provider->complete(buildRequest(prompt, m_catalogue.replyInstruction()), call);
+    const NpcReply reply = readReply(answer, stream.text());
+
+    m_history.push_back(ChatMessage{Role::User, prompt});
+    m_history.push_back(ChatMessage{Role::Assistant, answer.text});
+    return reply;
 }
 
 RequestId NPCBrain::askAsync(std::string prompt) {
@@ -265,22 +333,34 @@ RequestId NPCBrain::askAsync(std::string prompt) {
         throw OpenAnimaError("no backend is attached to this brain: call setProvider() first");
     }
 
-    std::vector<ChatMessage> request;
-    request.reserve(m_history.size() + 2);
-    if (!m_systemPrompt.empty()) {
-        request.push_back(ChatMessage{Role::System, m_systemPrompt});
-    }
-    request.insert(request.end(), m_history.begin(), m_history.end());
-    request.push_back(ChatMessage{Role::User, prompt});
-
     if (m_worker == nullptr) {
         m_worker = std::make_unique<TurnWorker>();
     }
-    const RequestId turnId = m_worker->start(std::move(request), m_provider);
+    const RequestId turnId = m_worker->start(buildRequest(prompt, {}), m_provider);
 
     // Kept here, on the caller's thread, because the history belongs to it: the
     // turn is written down when its last event is collected, not when it ends.
     m_pendingPrompt = std::move(prompt);
+    m_pendingTurn = false;
+    return turnId;
+}
+
+RequestId NPCBrain::askTurnAsync(std::string prompt) {
+    assert(!prompt.empty() && "askTurnAsync() requires a non-empty prompt");
+
+    if (m_provider == nullptr) {
+        throw OpenAnimaError("no backend is attached to this brain: call setProvider() first");
+    }
+
+    if (m_worker == nullptr) {
+        m_worker = std::make_unique<TurnWorker>();
+    }
+    const RequestId turnId =
+        m_worker->start(buildRequest(prompt, m_catalogue.replyInstruction()), m_provider,
+                        ResponseFormat::jsonSchema(m_catalogue.replySchema()), true);
+
+    m_pendingPrompt = std::move(prompt);
+    m_pendingTurn = true;
     return turnId;
 }
 
@@ -306,12 +386,16 @@ std::optional<Event> NPCBrain::poll(std::chrono::milliseconds timeout) {
     }
 
     // A turn that was made joins the conversation; one that failed leaves it as it
-    // was, the same way a failed ask() does.
-    if (event->kind == EventKind::Finished) {
+    // was, the same way a failed ask() does. A reply turn is written only when the whole
+    // document arrived, because half of it is not a turn the model could read back.
+    const bool whole =
+        !m_pendingTurn || (event->reply.has_value() && event->reply->document.is_object());
+    if (event->kind == EventKind::Finished && whole) {
         m_history.push_back(ChatMessage{Role::User, m_pendingPrompt});
         m_history.push_back(ChatMessage{Role::Assistant, event->completion.text});
     }
     m_pendingPrompt.clear();
+    m_pendingTurn = false;
     m_worker->collect();
     return event;
 }
