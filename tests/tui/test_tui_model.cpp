@@ -240,11 +240,11 @@ TEST_CASE("the wheel moves the conversation and leaves the prompt alone") {
     const std::string draft = model.draft;
 
     (void)press(model, Key::Kind::WheelUp);
-    CHECK(model.scrollOffset == 3);
+    CHECK(model.scrollOffset == 1);
     (void)press(model, Key::Kind::WheelUp);
-    CHECK(model.scrollOffset == 6);
+    CHECK(model.scrollOffset == 2);
     (void)press(model, Key::Kind::WheelDown);
-    CHECK(model.scrollOffset == 3);
+    CHECK(model.scrollOffset == 1);
 
     // A wheel notch is not an arrow: what is typed and what was typed before stay put.
     CHECK(model.draft == draft);

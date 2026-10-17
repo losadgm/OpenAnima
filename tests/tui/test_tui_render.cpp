@@ -80,6 +80,37 @@ std::vector<std::size_t> raisedRows(const RenderResult& rendered) {
     return rows;
 }
 
+/// Whether the cell holds the stroke the scrollbar is drawn with.
+bool isBarCell(const Cell& cell) {
+    return !cell.isBlank() &&
+           std::string(cell.glyph.data(), cell.length) == OpenAnimaTui::Screen::Glyphs::ScrollBar;
+}
+
+/// The rows where the scrollbar is shown at all, read off the last column.
+std::vector<std::size_t> barRows(const RenderResult& rendered) {
+    std::vector<std::size_t> rows;
+    const std::size_t column = rendered.frame.width() - 1;
+    for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
+        if (isBarCell(rendered.frame.at(row, column))) {
+            rows.push_back(row);
+        }
+    }
+    return rows;
+}
+
+/// The rows where the scrollbar shows the thumb, which is the part that is not dimmed.
+std::vector<std::size_t> thumbRows(const RenderResult& rendered) {
+    std::vector<std::size_t> rows;
+    const std::size_t column = rendered.frame.width() - 1;
+    for (std::size_t row = 0; row < rendered.frame.height(); ++row) {
+        const Cell& cell = rendered.frame.at(row, column);
+        if (isBarCell(cell) && !cell.style.dim) {
+            rows.push_back(row);
+        }
+    }
+    return rows;
+}
+
 }  // namespace
 
 TEST_CASE("no row of the screen is wider than the terminal") {
@@ -135,6 +166,32 @@ TEST_CASE("the conversation is a viewport over the turns") {
     const std::string top = readAll(render(model, 40, 8).frame);
     CHECK(top.find("m0") != std::string::npos);
     CHECK(top.find("a4") == std::string::npos);
+}
+
+TEST_CASE("a thin bar on the right shows where the viewport sits") {
+    Model model = longConversation();
+
+    RenderResult rendered = render(model, 40, 12);
+    REQUIRE(rendered.maxScrollOffset > 0);
+
+    // Pinned to the bottom, the thumb ends where the viewport ends.
+    std::vector<std::size_t> track = barRows(rendered);
+    std::vector<std::size_t> thumb = thumbRows(rendered);
+    REQUIRE_FALSE(track.empty());
+    REQUIRE_FALSE(thumb.empty());
+    CHECK(thumb.back() == track.back());
+    CHECK(thumb.front() == thumb.back() - thumb.size() + 1);
+
+    // Scrolled all the way up, it sits at the top instead.
+    for (int step = 0; step < 8; ++step) {
+        (void)press(model, Key::Kind::PageUp);
+    }
+    rendered = render(model, 40, 12);
+    track = barRows(rendered);
+    thumb = thumbRows(rendered);
+    REQUIRE_FALSE(track.empty());
+    REQUIRE_FALSE(thumb.empty());
+    CHECK(thumb.front() == track.front());
 }
 
 TEST_CASE("the hints float over the conversation and the selected one stands out") {

@@ -26,6 +26,9 @@ struct RenderResult {
     Canvas frame;                ///< The cells of the screen.
     std::size_t caretRow{0};     ///< Row the caret belongs in, when a prompt is being typed.
     std::size_t caretColumn{0};  ///< Column the caret belongs in.
+    /// Rows hidden above the viewport when it is scrolled all the way up, which is the
+    /// largest offset the model can hold.
+    std::size_t maxScrollOffset{0};
 };
 
 /// Paints a model into a canvas of a given size.

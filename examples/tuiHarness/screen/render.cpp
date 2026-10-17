@@ -219,6 +219,55 @@ void pickOutSelection(Canvas& frame, const Selection& selection) {
     }
 }
 
+/// The hints the panel shows: a window of the list around the selection, so a command reached
+/// with the arrows is never off the panel.
+/// @param all Every hint that matches what is typed.
+/// @param selected Which one is selected.
+/// @param first Receives the index of the first hint of the window, in the whole list.
+/// @return The hints of the window, in order.
+std::vector<std::string> hintWindow(const std::vector<std::string>& all, std::size_t selected,
+                                    std::size_t& first) {
+    first = 0;
+    if (all.size() <= MaxHints) {
+        return all;
+    }
+    if (selected >= MaxHints) {
+        first = selected - MaxHints + 1;
+    }
+    first = std::min(first, all.size() - MaxHints);
+    return std::vector<std::string>{all.begin() + static_cast<std::ptrdiff_t>(first),
+                                    all.begin() + static_cast<std::ptrdiff_t>(first + MaxHints)};
+}
+
+/// Paints the scrollbar: one column on the right, a picture of where the viewport sits and
+/// nothing else. The track is dim, the thumb is not.
+/// @param frame Canvas to paint on.
+/// @param viewRows Rows the conversation occupies.
+/// @param width Columns available.
+/// @param total Rows the whole conversation takes.
+/// @param start First row of the conversation that is on screen.
+// The rows, the columns and the two counts are named at the only call site there is.
+// NOLINTNEXTLINE(bugprone-easily-swappable-parameters)
+void paintScrollBar(Canvas& frame, std::size_t viewRows, std::size_t width, std::size_t total,
+                    std::size_t start) {
+    if (total <= viewRows || viewRows == 0 || width < 2) {
+        return;
+    }
+
+    const std::size_t column = width - 1;
+    for (std::size_t row = 0; row < viewRows; ++row) {
+        frame.put(row, column, Glyphs::ScrollBar, Palette::muted().withDim());
+    }
+
+    const std::size_t thumb = std::max<std::size_t>(1, viewRows * viewRows / total);
+    const std::size_t travel = viewRows - thumb;
+    const std::size_t range = total - viewRows;
+    const std::size_t firstRow = start * travel / range;
+    for (std::size_t row = 0; row < thumb; ++row) {
+        frame.put(firstRow + row, column, Glyphs::ScrollBar, Palette::muted());
+    }
+}
+
 }  // namespace
 
 RenderResult render(const Model& model, std::size_t width, std::size_t height,
@@ -229,33 +278,31 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
         return result;
     }
 
-    const std::vector<TranscriptRow> transcript = transcriptRows(model, width);
     const DraftLayout prompt = layoutDraft(model.draft, width);
 
     const std::vector<std::string> all = App::hintsFor(model);
     const std::size_t selected = all.empty() ? 0 : std::min(model.hintIndex, all.size() - 1);
-
-    // The panel shows a window of the list, and the window follows the selection, so a
-    // command reached with the arrows is never off the panel.
     std::size_t first = 0;
-    if (all.size() > MaxHints) {
-        first = selected >= MaxHints ? selected - MaxHints + 1 : 0;
-        first = std::min(first, all.size() - MaxHints);
-    }
-    const std::size_t last = std::min(all.size(), first + MaxHints);
-    const std::vector<std::string> hints(all.begin() + static_cast<std::ptrdiff_t>(first),
-                                         all.begin() + static_cast<std::ptrdiff_t>(last));
+    const std::vector<std::string> hints = hintWindow(all, selected, first);
 
     const bool withStatus = height > prompt.rows.size() + hints.size();
     const std::size_t bottomRows = prompt.rows.size() + hints.size() + (withStatus ? 1 : 0);
     const std::size_t viewRows = height > bottomRows ? height - bottomRows : 0;
 
+    // The transcript, and the column the scrollbar takes when the conversation does not fit.
+    // Laying it out again one column narrower is what keeps the bar off the last character.
+    std::vector<TranscriptRow> transcript = transcriptRows(model, width);
+    if (width > 1 && viewRows > 0 && transcript.size() > viewRows) {
+        transcript = transcriptRows(model, width - 1);
+    }
+
     // The viewport of the conversation, scrolled by the model.
     const std::size_t total = transcript.size();
+    const std::size_t range = total > viewRows ? total - viewRows : 0;
+    result.maxScrollOffset = range;
     std::size_t start = 0;
-    if (total > viewRows) {
-        const std::size_t offset = std::min(model.scrollOffset, total - viewRows);
-        start = total - viewRows - offset;
+    if (range > 0) {
+        start = range - std::min(model.scrollOffset, range);
     }
     for (std::size_t row = 0; row < viewRows; ++row) {
         if (row < total) {
@@ -264,6 +311,7 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
             frame.put(row, PrefixWidth, line.body, line.bodyStyle);
         }
     }
+    paintScrollBar(frame, viewRows, width, total, start);
 
     // The hints float over the conversation, on their own panel.
     std::size_t row = viewRows;

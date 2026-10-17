@@ -98,8 +98,10 @@ repeating the name or opening a gap.
 
 - The client owns the screen: it runs in the alternate screen, paints the whole window on a
   change, and hands the terminal back on the way out.
-- The conversation lives in a viewport of its own. Page up and page down move it, and the
-  prompt stays where it is, pinned under the transcript.
+- The conversation lives in a viewport of its own. Page up and page down move it, the wheel
+  moves it a row at a notch, and the prompt stays where it is, pinned under the transcript.
+  A one-column bar on the right shows how much of the conversation is on screen and where in
+  it the viewport sits; it is a picture, and it takes no clicks and no keys.
 - The prompt is the fixed part: the draft is drawn on a panel of its own, with the command in
   its own colour while one is being typed, and the caret never leaves it.
 - The commands that complete what is being typed float above the prompt on a lighter panel,
@@ -123,7 +125,7 @@ repeating the name or opening a gap.
 | Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Left, Right | Moves the cursor in the draft |
 | Ctrl+P, Ctrl+N | Walks the prompts of this scope |
 | Page up, Page down | Scrolls the conversation |
-| Wheel | Scrolls the conversation, three rows a notch |
+| Wheel | Scrolls the conversation, one row a notch |
 | Esc, Ctrl+C | Cancels the turn in flight, keeping what it had produced |
 | Drag over the conversation | Picks out those cells, painted reversed as the pointer moves |
 | Ctrl+C with something picked out | Copies it, and drops the picking |

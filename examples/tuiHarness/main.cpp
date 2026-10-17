@@ -5,6 +5,7 @@
 /// model in, rows out). What is left here is the imperative part: read a key, run the effects
 /// it asked for against the brains, fold the turn's events back into the model, repaint.
 
+#include <algorithm>
 #include <chrono>
 #include <cstdlib>
 #include <iostream>
@@ -219,6 +220,9 @@ int main() {
         if (dirty && drained) {
             const OpenAnimaTui::Screen::RenderResult rendered = OpenAnimaTui::Screen::render(
                 model, terminal->width(), terminal->height(), selection);
+            // The viewport cannot hide more rows than there are. Holding the model to the
+            // real range is what makes the wheel answer at once on the way back down.
+            model.scrollOffset = std::min(model.scrollOffset, rendered.maxScrollOffset);
             writer.setCaret(rendered.caretRow, rendered.caretColumn);
             frame.clear();
             writer.emit(rendered.frame, frame);

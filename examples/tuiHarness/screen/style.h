@@ -92,6 +92,9 @@ inline constexpr std::array<const char*, 10> Spinner = {"\u280B", "\u2819", "\u2
                                                         "\u283C", "\u2834", "\u2826", "\u2827",
                                                         "\u2807", "\u280F"};
 
+/// The stroke the scrollbar on the right is drawn with.
+inline constexpr const char* ScrollBar = "\u2502";
+
 }  // namespace Glyphs
 
 /// The palette of the client, taken from the OpenCode theme.

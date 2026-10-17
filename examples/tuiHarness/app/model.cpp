@@ -15,7 +15,7 @@ constexpr const char* WaitForTurn = "wait for the answer, or cancel it first";
 
 /// Rows one notch of the wheel moves the conversation, which is enough to follow what is being
 /// written without losing the line being read.
-constexpr std::size_t WheelStep = 3;
+constexpr std::size_t WheelStep = 1;
 
 /// Trailing spaces off a submitted line, so a completed command still matches.
 std::string trimRight(std::string text) {
