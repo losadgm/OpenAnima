@@ -181,7 +181,10 @@ word of its own. Picking is only over what was said: the box of the prompt, its 
 marker beside it and the scrollbar on the right are the client's own drawing, so a drag across
 them paints the text and leaves them as they were, and a copy of that same selection holds the
 words without the box and comes out flush with the left edge.
-Any other key drops the picking, so a selection never sits over text that has moved under it.
+Any other key drops the picking, so a selection never sits over text that has been typed over.
+The wheel and the page keys are the exception: they move the conversation, and the picking goes
+with the words it covers, so it stays over what was picked out while it scrolls. A picking
+pushed past the top of the screen is dropped, because nothing of it is left to read.
 While the client runs the mouse is the client's, which is the price of the wheel scrolling the
 conversation; holding shift asks the terminal for its own selection back in most of them. The
 right button is left to the terminal: the client never uses it, so the menu of the editor or of

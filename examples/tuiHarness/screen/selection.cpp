@@ -102,6 +102,21 @@ void Selection::clear() {
     m_active = false;
 }
 
+void Selection::shift(std::ptrdiff_t rows) {
+    if (!m_active) {
+        return;
+    }
+    const std::ptrdiff_t anchor = static_cast<std::ptrdiff_t>(m_anchorRow) + rows;
+    const std::ptrdiff_t cursor = static_cast<std::ptrdiff_t>(m_cursorRow) + rows;
+    if (std::max(anchor, cursor) < 0) {
+        clear();  // It went off the top: there is nothing of it left on the screen.
+        return;
+    }
+    // The rows that left the top are dropped, and the rest keeps covering the same words.
+    m_anchorRow = static_cast<std::size_t>(std::max<std::ptrdiff_t>(anchor, 0));
+    m_cursorRow = static_cast<std::size_t>(std::max<std::ptrdiff_t>(cursor, 0));
+}
+
 bool Selection::active() const {
     return m_active;
 }

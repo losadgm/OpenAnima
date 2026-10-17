@@ -4,7 +4,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <chrono>
 #include <cstddef>
-#include <string>
 
 #include "screen/selection.h"
 #include "screen/style.h"
@@ -107,6 +106,47 @@ TEST_CASE("blank layout around the text is not part of what was selected") {
     selection.begin(0, 13);
     selection.extend(1, 19);
     CHECK(selectedText(frame, selection) == "npc 1   well met");
+}
+
+TEST_CASE("scrolling takes the selection with the words it covers") {
+    Selection selection;
+    selection.begin(1, 4);
+    selection.extend(2, 6);
+
+    // The text moves down a row, so the span does too.
+    selection.shift(1);
+    CHECK(selection.firstRow() == 2);
+    CHECK(selection.lastRow() == 3);
+    CHECK(selection.contains(2, 4));
+    CHECK(selection.contains(3, 6));
+    CHECK_FALSE(selection.contains(1, 4));
+
+    // And back up when the text goes the other way.
+    selection.shift(-1);
+    CHECK(selection.firstRow() == 1);
+    CHECK(selection.lastRow() == 2);
+}
+
+TEST_CASE("a selection pushed off the top is dropped, and one half way keeps the rest") {
+    Selection selection;
+    selection.begin(1, 0);
+    selection.extend(3, 4);
+
+    // One row leaves the top: the span keeps the rows that are still on screen.
+    selection.shift(-1);
+    CHECK(selection.active());
+    CHECK(selection.firstRow() == 0);
+    CHECK(selection.lastRow() == 2);
+
+    // The rest leaves too: there is nothing of it left to pick out.
+    selection.shift(-3);
+    CHECK_FALSE(selection.active());
+}
+
+TEST_CASE("scrolling leaves a selection that is not there alone") {
+    Selection selection;
+    selection.shift(2);
+    CHECK_FALSE(selection.active());
 }
 
 TEST_CASE("clearing a selection leaves nothing picked out") {

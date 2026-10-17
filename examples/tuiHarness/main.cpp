@@ -112,6 +112,13 @@ void insertText(Model& model, const std::string& text, std::size_t scrollStep) {
     }
 }
 
+/// @param kind Key that arrived.
+/// @return Whether it moves the transcript, which takes what was picked out with it.
+bool scrollsTranscript(Key::Kind kind) {
+    return kind == Key::Kind::WheelUp || kind == Key::Kind::WheelDown ||
+           kind == Key::Kind::PageUp || kind == Key::Kind::PageDown;
+}
+
 /// What the pointer has done to the screen: what is picked out, where it is, and what it is
 /// dragging. All of it is the shell's business, so the model never hears about a position.
 struct ScreenState {
@@ -426,10 +433,25 @@ int main() {
                 continue;
             }
             // Anything else is the reader moving on: what was picked out is dropped, so a
-            // selection never sits there over text that has changed under it.
-            state.selection.clear();
+            // selection never sits there over text that has changed under it. The wheel and the
+            // page keys are the exception: they move the conversation, and what was picked out
+            // goes with the words it covers.
+            const bool scrolls = scrollsTranscript(key->kind);
+            if (!scrolls) {
+                state.selection.clear();
+            }
+            const std::size_t offsetBefore = model.scrollOffset;
             runEffects(OpenAnimaTui::App::update(model, *key, terminal->height() / 2), brains,
                        config, turn);
+            if (scrolls) {
+                // The model asks for the rows, and the viewport gives what it has: the picking
+                // follows the rows that were really shown, not the ones that were asked for.
+                const std::size_t offsetAfter =
+                    std::min(model.scrollOffset, state.shape.maxScrollOffset);
+                model.scrollOffset = offsetAfter;
+                state.selection.shift(static_cast<std::ptrdiff_t>(offsetAfter) -
+                                      static_cast<std::ptrdiff_t>(offsetBefore));
+            }
             dirty = true;
         }
 

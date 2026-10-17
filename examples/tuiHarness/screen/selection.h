@@ -35,6 +35,15 @@ public:
     /// Forgets the selection.
     void clear();
 
+    /// Moves the selection with the text as the conversation scrolls.
+    ///
+    /// What is picked out is a span of the screen, and scrolling moves the words under it
+    /// without moving the screen: the span follows the words, so it stays over what was picked
+    /// out. A span pushed past the top of the screen is dropped, because nothing of it is left
+    /// to pick out, and one that is only partly past keeps the part that is still on screen.
+    /// @param rows Rows the text moved down, negative when it moved up.
+    void shift(std::ptrdiff_t rows);
+
     /// @return Whether the mouse is holding something picked out, a single cell included.
     [[nodiscard]] bool active() const;
 
