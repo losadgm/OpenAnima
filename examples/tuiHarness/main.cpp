@@ -52,7 +52,7 @@ void runEffects(const std::vector<Effect>& effects, std::map<std::size_t, NPCBra
             break;
         }
         case EffectKind::Ask:
-            turn = brains.at(effect.npcId).askAsync(effect.text);
+            turn = brains.at(effect.npcId).askTurnAsync(effect.text);
             break;
         case EffectKind::Cancel:
             brains.at(effect.npcId).cancel(turn);
