@@ -51,6 +51,10 @@ place.
 - Wrap the cases in `NOLINTBEGIN(...)`/`NOLINTEND(...)` for the checks the assertions trip,
   and close the block. An unmatched `NOLINTBEGIN` is an error to clang-tidy, and it stops
   suppressing everything below it without saying so.
+- A case name never starts with a slash, however much it names a command. CTest on Windows
+  reads it as one of its own options: the case fails in milliseconds, prints nothing, and the
+  log only shows `***Failed`. Write `the /create command makes the npc` where `/create makes
+  the npc` would read the same.
 - Test the ugly case rather than the happy one: half a message, an empty field, a field
   nobody knows.
 

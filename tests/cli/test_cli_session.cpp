@@ -72,7 +72,7 @@ TEST_CASE("a line with no npc says how to make one", "[cli]") {
     REQUIRE(says(step, "/enter"));
 }
 
-TEST_CASE("/create with no description says how it is written", "[cli]") {
+TEST_CASE("the /create command with no description says how it is written", "[cli]") {
     Session session;
     const Step step = session.interpret("/create");
 
@@ -81,7 +81,7 @@ TEST_CASE("/create with no description says how it is written", "[cli]") {
     REQUIRE_FALSE(session.active().has_value());
 }
 
-TEST_CASE("/create makes the npc and asks the shell for its brain", "[cli]") {
+TEST_CASE("the /create command makes the npc and asks the shell for its brain", "[cli]") {
     Session session;
     const Step step = session.interpret("/create  a blacksmith");
 
@@ -92,7 +92,7 @@ TEST_CASE("/create makes the npc and asks the shell for its brain", "[cli]") {
     REQUIRE(session.active() == 1);
 }
 
-TEST_CASE("/npcs lists what exists and marks the active one", "[cli]") {
+TEST_CASE("the /npcs command lists what exists and marks the active one", "[cli]") {
     Session session;
     REQUIRE(says(session.interpret("/npcs"), "no npcs yet"));
 
@@ -107,7 +107,7 @@ TEST_CASE("/npcs lists what exists and marks the active one", "[cli]") {
     REQUIRE(says(session.interpret("/npcs now"), "usage: /npcs"));
 }
 
-TEST_CASE("/enter checks its argument before touching the active npc", "[cli]") {
+TEST_CASE("the /enter command checks its argument before touching the active npc", "[cli]") {
     Session session;
     session.interpret("/create herrero");
 
@@ -120,7 +120,7 @@ TEST_CASE("/enter checks its argument before touching the active npc", "[cli]") 
     REQUIRE(session.active() == 1);
 }
 
-TEST_CASE("/leave goes back to the lobby once", "[cli]") {
+TEST_CASE("the /leave command goes back to the lobby once", "[cli]") {
     Session session;
     session.interpret("/create herrero");
 
@@ -133,7 +133,7 @@ TEST_CASE("/leave goes back to the lobby once", "[cli]") {
     REQUIRE(says(session.interpret("/leave now"), "usage: /leave"));
 }
 
-TEST_CASE("/clear drops the conversation of the active npc only", "[cli]") {
+TEST_CASE("the /clear command drops the conversation of the active npc only", "[cli]") {
     Session session;
     REQUIRE(says(session.interpret("/clear"), "no npc"));
 
@@ -146,7 +146,7 @@ TEST_CASE("/clear drops the conversation of the active npc only", "[cli]") {
     REQUIRE(says(session.interpret("/clear later"), "usage: /clear"));
 }
 
-TEST_CASE("/raw toggles, and takes on and off", "[cli]") {
+TEST_CASE("the /raw command toggles, and takes on and off", "[cli]") {
     Session session;
     REQUIRE(says(session.interpret("/raw"), "raw json on"));
     REQUIRE(session.raw());
@@ -162,7 +162,7 @@ TEST_CASE("/raw toggles, and takes on and off", "[cli]") {
     REQUIRE_FALSE(session.raw());
 }
 
-TEST_CASE("/help lists every command there is", "[cli]") {
+TEST_CASE("the /help command lists every command there is", "[cli]") {
     Session session;
     const Step step = session.interpret("/help");
 
@@ -173,7 +173,7 @@ TEST_CASE("/help lists every command there is", "[cli]") {
     REQUIRE(says(session.interpret("/help me"), "usage: /help"));
 }
 
-TEST_CASE("/quit leaves, and takes no argument", "[cli]") {
+TEST_CASE("the /quit command leaves, and takes no argument", "[cli]") {
     Session session;
     const Step step = session.interpret("/quit");
 

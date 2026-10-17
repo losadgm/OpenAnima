@@ -362,7 +362,7 @@ TEST_CASE("the clock only runs while a turn is in flight") {
     CHECK(model.startedAt != std::chrono::steady_clock::time_point{});
 }
 
-TEST_CASE("/raw switches between the dialogue and the document") {
+TEST_CASE("the /raw command switches between the dialogue and the document") {
     Model model = modelWithNpc();
     CHECK_FALSE(model.raw);
 
