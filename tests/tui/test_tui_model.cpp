@@ -25,12 +25,22 @@ Key key(const Key::Kind kind) {
     return Key{kind, 0};
 }
 
+Key withControl(const Key::Kind kind) {
+    Key key{kind, 0};
+    key.ctrl = true;
+    return key;
+}
+
 Key character(const char value) {
     return Key{Key::Kind::Character, value};
 }
 
+std::vector<Effect> press(Model& model, const Key& key) {
+    return OpenAnimaTui::App::update(model, key, ScrollStep);
+}
+
 std::vector<Effect> press(Model& model, const Key::Kind kind) {
-    return OpenAnimaTui::App::update(model, key(kind), ScrollStep);
+    return press(model, key(kind));
 }
 
 /// Feeds a draft the way a terminal does: one byte per key, accents included.
@@ -99,7 +109,6 @@ TEST_CASE("a tab is never typed, because the terminal does not draw it as one co
     (void)press(model, Key::Kind::Tab);
     CHECK(model.draft == "abc");
 }
-
 TEST_CASE("tab completes the hint that is selected") {
     Model model;
     type(model, "/c");
@@ -422,6 +431,71 @@ TEST_CASE("a reply is one block, named on the thought that opens it") {
     CHECK(model.messages[count - 1].role == OpenAnimaTui::App::Role::System);
     CHECK(model.messages[count - 1].text.rfind("[emote]", 0) == 0);
     CHECK(model.messages[count - 1].continues);
+}
+
+TEST_CASE("the delete key takes the character after the caret") {
+    Model model;
+    type(model, "abc");
+    (void)press(model, Key::Kind::CtrlA);
+    (void)press(model, Key::Kind::Delete);
+
+    CHECK(model.draft == "bc");
+    CHECK(model.cursor == 0);
+}
+
+TEST_CASE("delete at the end of the draft changes nothing") {
+    Model model;
+    type(model, "abc");
+    (void)press(model, Key::Kind::Delete);
+
+    CHECK(model.draft == "abc");
+    CHECK(model.cursor == 3);
+}
+
+TEST_CASE("control and an arrow moves a word at a time") {
+    Model model;
+    type(model, "the black cat");
+    (void)press(model, Key::Kind::CtrlA);
+
+    (void)press(model, withControl(Key::Kind::ArrowRight));
+    CHECK(model.cursor == 3);
+    (void)press(model, withControl(Key::Kind::ArrowRight));
+    CHECK(model.cursor == 9);
+
+    (void)press(model, withControl(Key::Kind::ArrowLeft));
+    CHECK(model.cursor == 4);
+    (void)press(model, withControl(Key::Kind::ArrowLeft));
+    CHECK(model.cursor == 0);
+}
+
+TEST_CASE("control and backspace takes the word before the caret, and the gap") {
+    Model model;
+    type(model, "the black cat");
+
+    (void)press(model, withControl(Key::Kind::Backspace));
+    CHECK(model.draft == "the black ");
+    CHECK(model.cursor == 10);
+
+    (void)press(model, withControl(Key::Kind::Backspace));
+    CHECK(model.draft == "the ");
+}
+
+TEST_CASE("control and delete takes the word after the caret") {
+    Model model;
+    type(model, "the black cat");
+    (void)press(model, Key::Kind::CtrlA);
+    (void)press(model, withControl(Key::Kind::Delete));
+
+    CHECK(model.draft == " black cat");
+    CHECK(model.cursor == 0);
+}
+
+TEST_CASE("a word goes on through the letters of any script") {
+    Model model;
+    type(model, "el ca\xc3\xb1on");
+    (void)press(model, withControl(Key::Kind::Backspace));
+
+    CHECK(model.draft == "el ");
 }
 
 // NOLINTEND(cppcoreguidelines-avoid-do-while, readability-function-cognitive-complexity)

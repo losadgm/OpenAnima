@@ -253,6 +253,14 @@ private:
     }
 
     /// Maps a cursor sequence to the key it spells.
+    /// @param kind What was pressed.
+    /// @return The key, with control held.
+    [[nodiscard]] static Key controlled(Key::Kind kind) {
+        Key key{kind, static_cast<char>(0)};
+        key.ctrl = true;
+        return key;
+    }
+
     Key sequenceKey(const std::string& sequence) {
         if (sequence == "A") {
             return Key{Key::Kind::ArrowUp, static_cast<char>(0)};
@@ -266,11 +274,25 @@ private:
         if (sequence == "D") {
             return Key{Key::Kind::ArrowLeft, static_cast<char>(0)};
         }
+        if (sequence == "3~") {
+            return Key{Key::Kind::Delete, static_cast<char>(0)};
+        }
         if (sequence == "5~") {
             return Key{Key::Kind::PageUp, static_cast<char>(0)};
         }
         if (sequence == "6~") {
             return Key{Key::Kind::PageDown, static_cast<char>(0)};
+        }
+        // Control held with an arrow or with Delete: `;5` is the modifier part of the sequence,
+        // with one added to the four that mean control.
+        if (sequence == "1;5C") {
+            return controlled(Key::Kind::ArrowRight);
+        }
+        if (sequence == "1;5D") {
+            return controlled(Key::Kind::ArrowLeft);
+        }
+        if (sequence == "3;5~") {
+            return controlled(Key::Kind::Delete);
         }
         // Control and Return together, as the kitty protocol and xterm spell it.
         if (sequence == "13;5u" || sequence == "27;5;13~") {
@@ -392,9 +414,15 @@ private:
         // The modifiers carry a one that has to come off before the bits mean anything: shift is
         // one, alt is two, control is four, the super key is eight.
         const unsigned long bits = mask > 0 ? mask - 1 : 0;
-        const bool shift = (bits & 1UL) != 0;
-        const bool control = (bits & 4UL) != 0;
+        return kittyCode(codepoint, (bits & 1UL) != 0, (bits & 4UL) != 0);
+    }
 
+    /// Maps a code point the enhanced keyboard protocol reported, its modifiers already read.
+    /// @param codepoint Code point of the key.
+    /// @param shift Whether shift was held.
+    /// @param control Whether control was held.
+    /// @return The key it spells.
+    Key kittyCode(unsigned long codepoint, bool shift, bool control) {
         if (codepoint == 13 || codepoint == 10) {
             return Key{(control || shift) ? Key::Kind::CtrlEnter : Key::Kind::Enter,
                        static_cast<char>(0)};
@@ -406,7 +434,8 @@ private:
             return Key{Key::Kind::Escape, static_cast<char>(0)};
         }
         if (codepoint == 127) {
-            return Key{Key::Kind::Backspace, static_cast<char>(0)};
+            return control ? controlled(Key::Kind::Backspace)
+                           : Key{Key::Kind::Backspace, static_cast<char>(0)};
         }
         if (codepoint < 0x20 || codepoint > 0x10FFFF) {
             return Key{Key::Kind::Unknown, static_cast<char>(0)};

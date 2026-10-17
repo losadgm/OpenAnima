@@ -24,6 +24,7 @@ struct Key {
         Enter,         ///< Return.
         CtrlEnter,     ///< Control and Return together: a new line, never a send.
         Backspace,     ///< Delete the character before the cursor.
+        Delete,        ///< Delete the character after the cursor.
         Tab,           ///< The tab key.
         Escape,        ///< Escape.
         ArrowUp,       ///< Cursor up.
@@ -54,6 +55,8 @@ struct Key {
     char character{0};      ///< The character, for Kind::Character.
     std::size_t column{0};  ///< Column of a mouse event, counted from zero.
     std::size_t row{0};     ///< Row of a mouse event, counted from zero.
+    bool ctrl{false};       ///< Whether control was held: an arrow or a delete then moves by
+                            ///< words instead of by characters.
 };
 
 /// One terminal, put in raw mode for as long as it lives.

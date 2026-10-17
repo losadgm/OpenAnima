@@ -123,6 +123,9 @@ repeating the name or opening a gap.
 | Tab | Completes the selected command |
 | Up, Down | Walks the command hints while they are showing, and the prompts of this scope otherwise |
 | Ctrl+A, Ctrl+E, Ctrl+B, Ctrl+F, Left, Right | Moves the cursor in the draft |
+| Ctrl+Left, Ctrl+Right | Moves a word at a time |
+| Backspace, Delete | Deletes the character before or after the cursor |
+| Ctrl+Backspace, Ctrl+Delete | Deletes a word at a time, and the gap around it |
 | Ctrl+P, Ctrl+N | Walks the prompts of this scope |
 | Page up, Page down | Scrolls the conversation |
 | Wheel | Scrolls the conversation, one row a notch |

@@ -1,6 +1,7 @@
 #include "model.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdlib>
 #include <utility>
 
@@ -73,6 +74,53 @@ std::size_t nextCodepoint(const std::string& text, std::size_t position) {
     return next;
 }
 
+/// @param text Draft to look at.
+/// @param position Where a code point starts.
+/// @return Whether that code point belongs to a word: a letter, a digit, an underscore, or a
+///         byte that is not ASCII, which is how an accent or an enye counts.
+bool isWordAt(const std::string& text, std::size_t position) {
+    if (position >= text.size()) {
+        return false;
+    }
+    const auto first = static_cast<unsigned char>(text[position]);
+    if (first >= 0x80U) {
+        return true;
+    }
+    return std::isalnum(first) != 0 || first == '_';
+}
+
+/// Where the word before a position starts. Blanks and whatever is not part of a word are
+/// skipped first, which is what makes control and backspace take the word and the gap before
+/// it rather than one character at a time.
+/// @param text Draft to look at.
+/// @param position Caret, in bytes.
+/// @return The start of that word, or zero when there is nothing before the caret.
+std::size_t previousWord(const std::string& text, std::size_t position) {
+    std::size_t cursor = position;
+    while (cursor > 0 && !isWordAt(text, previousCodepoint(text, cursor))) {
+        cursor = previousCodepoint(text, cursor);
+    }
+    while (cursor > 0 && isWordAt(text, previousCodepoint(text, cursor))) {
+        cursor = previousCodepoint(text, cursor);
+    }
+    return cursor;
+}
+
+/// Where the word after a position ends.
+/// @param text Draft to look at.
+/// @param position Caret, in bytes.
+/// @return The end of that word, or the end of the draft when there is nothing after it.
+std::size_t nextWord(const std::string& text, std::size_t position) {
+    std::size_t cursor = position;
+    while (cursor < text.size() && !isWordAt(text, cursor)) {
+        cursor = nextCodepoint(text, cursor);
+    }
+    while (cursor < text.size() && isWordAt(text, cursor)) {
+        cursor = nextCodepoint(text, cursor);
+    }
+    return cursor;
+}
+
 /// Adds one character, or a newline, at the caret.
 void editInsert(Model& model, char character) {
     model.cursor = std::min(model.cursor, model.draft.size());
@@ -82,13 +130,29 @@ void editInsert(Model& model, char character) {
 }
 
 /// Deletes the character before the caret, whole.
-void editBackspace(Model& model) {
+/// @param model Model to change.
+/// @param wholeWord Whether control was held, which takes the word instead of the character.
+void editBackspace(Model& model, bool wholeWord) {
     if (model.cursor == 0) {
         return;
     }
-    const std::size_t start = previousCodepoint(model.draft, model.cursor);
+    const std::size_t start = wholeWord ? previousWord(model.draft, model.cursor)
+                                        : previousCodepoint(model.draft, model.cursor);
     model.draft.erase(start, model.cursor - start);
     model.cursor = start;
+    model.hintIndex = 0;
+}
+
+/// Deletes the character after the caret, whole.
+/// @param model Model to change.
+/// @param wholeWord Whether control was held, which takes the word instead of the character.
+void editDelete(Model& model, bool wholeWord) {
+    if (model.cursor >= model.draft.size()) {
+        return;
+    }
+    const std::size_t end =
+        wholeWord ? nextWord(model.draft, model.cursor) : nextCodepoint(model.draft, model.cursor);
+    model.draft.erase(model.cursor, end - model.cursor);
     model.hintIndex = 0;
 }
 
@@ -157,6 +221,9 @@ void showHelp(Model& model) {
     note(model, "  enter                 send the line");
     note(model, "  ctrl+enter, ctrl+j, trailing \\   new line instead of sending");
     note(model, "  tab                   complete the selected command");
+    note(model, "  ctrl+a, ctrl+e, left, right   move the caret");
+    note(model, "  ctrl+left, ctrl+right  move a word at a time");
+    note(model, "  backspace, delete      delete a character, or a word with ctrl");
     note(model, "  up, down              walk the command hints, or the prompts of this scope");
     note(model, "  page up, page down    scroll the conversation");
     note(model, "  esc                   cancel the turn in flight");
@@ -294,7 +361,7 @@ void submit(Model& model, std::vector<Effect>& effects) {
         return;
     }
     if (model.draft.back() == '\\') {
-        editBackspace(model);
+        editBackspace(model, false);
         editInsert(model, '\n');
         return;
     }
@@ -369,7 +436,11 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
         break;
 
     case Key::Kind::Backspace:
-        editBackspace(model);
+        editBackspace(model, key.ctrl);
+        break;
+
+    case Key::Kind::Delete:
+        editDelete(model, key.ctrl);
         break;
 
     case Key::Kind::Enter:
@@ -416,12 +487,15 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
 
     case Key::Kind::ArrowLeft:
     case Key::Kind::CtrlB:
-        model.cursor = previousCodepoint(model.draft, model.cursor);
+        // Control and an arrow moves a word at a time, the way it does everywhere else.
+        model.cursor = key.ctrl ? previousWord(model.draft, model.cursor)
+                                : previousCodepoint(model.draft, model.cursor);
         break;
 
     case Key::Kind::ArrowRight:
     case Key::Kind::CtrlF:
-        model.cursor = nextCodepoint(model.draft, model.cursor);
+        model.cursor = key.ctrl ? nextWord(model.draft, model.cursor)
+                                : nextCodepoint(model.draft, model.cursor);
         break;
 
     case Key::Kind::CtrlA:
