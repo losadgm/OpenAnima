@@ -206,11 +206,12 @@ context is what the senses let through.
   - `examples/tuiHarness`, designed in [the harnesses page](harness.html): a full screen with
     a conversation of its own to scroll, a prompt pinned at the bottom with its command
     palette, and a world of NPCs reached by identifier with `/create`, `/enter`, `/npcs` and
-    `/leave`, plus `/raw` to read the document the model wrote. Built over its own terminal layer (Unix termios, Windows console) and split into
-    the pure parts (`app/` for the model and the keys, `screen/` for the rendering) and the
-    shell that runs them. What is left is the client test over a pseudo-terminal inside the
-    suite, and letting several NPCs share one conversation, which needs the library to carry
-    it.
+    `/leave`, plus `/raw` to read the document the model wrote. Built over its own terminal
+    layer (Unix termios, Windows console) and split by what each part is allowed to know:
+    `domain/` for the model and the keys, `presentation/` for the frame, `application/` for
+    the loop and what the pointer does, and `terminal/` for the console. What is left is the
+    client test over a pseudo-terminal inside the suite, and letting several NPCs share one
+    conversation, which needs the library to carry it.
   - It is provisional on purpose: the client is where the shape of the library is tried out,
     so it is expected to be reshaped as the API grows towards what the milestones above ask
     for. What it does today is in the harnesses page; nothing here is frozen until the API is.
