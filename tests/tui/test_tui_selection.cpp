@@ -149,18 +149,19 @@ TEST_CASE("a triple click takes the whole row") {
 }
 
 TEST_CASE("what the client draws for itself is not copied") {
-    Canvas frame{12, 2};
-    frame.put(0, 0, "\u2771 hello", Palette::text());
-    frame.put(1, 0, "note", Palette::text());
+    Canvas frame{12, 3};
+    frame.put(0, 0, "\u250C\u2500\u2510", Palette::muted());
+    frame.put(1, 0, "\u2502 \u2771 hi", Palette::text());
+    frame.put(2, 0, "\u2514\u2500\u2518", Palette::muted());
     frame.put(1, 11, OpenAnimaTui::Screen::Glyphs::ScrollBar, Palette::muted());
 
     Selection all;
     all.begin(0, 0);
-    all.extend(1, 11);
+    all.extend(2, 11);
 
-    // The prompt marker and the scrollbar stay out of it: a selection across them comes out
-    // with the words and nothing else.
-    CHECK(selectedText(frame, all) == " hello\nnote");
+    // The frame, the prompt marker and the scrollbar stay out of it: a selection across them
+    // comes out with the words and nothing else.
+    CHECK(selectedText(frame, all) == "\n  hi\n");
 }
 
 TEST_CASE("presses in the same cell in a row are counted as clicks") {

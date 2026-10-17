@@ -82,9 +82,10 @@ what is happening and what can be pressed.
   /enter
   /npcs
 
+  +---------------------------------------------------------------+
+  | > /c_                                                         |
+  +---------------------------------------------------------------+
         mock   ask something   /help for keys
-
-❱ /c_
 ```
 
 The commands are listed while one is being typed, up to six of them, with the selected one in
@@ -102,17 +103,19 @@ repeating the name or opening a gap.
   moves it a row at a notch, and the prompt stays where it is, pinned under the transcript.
   A one-column bar on the right shows how much of the conversation is on screen and where in
   it the viewport sits; it is a picture, and it takes no clicks and no keys.
-- The prompt is the fixed part: the draft is drawn on a panel of its own, with the command in
-  its own colour while one is being typed, and the caret never leaves it.
-- The commands that complete what is being typed float above the prompt on a lighter panel,
+- The prompt is the fixed part: the draft is drawn inside a frame of its own, with the command
+  in its own colour while one is being typed, and the caret never leaves it. While the line is
+  empty the frame says what can be done from there, which is not the same in the lobby as in a
+  conversation, and the words go as soon as there is something to say.
+- The commands that complete what is being typed float above the frame on a lighter panel,
   with the selected one in the accent colour. The arrows walk them, and tab takes the one that
   is selected.
 - Each role has its own colour: the player in muted gray, the NPC in the accent colour, and
   the thought quietly under the same name, so it reads as the NPC's and not as the client's.
 - The look borrows the OpenCode theme: a purple accent for the prompt marker and the spinner,
   a warm peach for the persona, muted gray for the quiet text, and the same braille spinner.
-- The status line carries the state: which model answered, how long the turn has been running,
-  and the key that stops it.
+- The status line sits under the frame and carries the state: which model answered, how long
+  the turn has been running, and the key that stops it.
 
 ### Keys
 
@@ -137,6 +140,11 @@ repeating the name or opening a gap.
 | Ctrl+C | Copies what is picked out and drops the picking. It never leaves the client, which is what keeps a reach for the copy key from ending the session |
 | Ctrl+V | Types what was copied last |
 | Ctrl+D | Leaves |
+
+Control and backspace travel as the same byte as Ctrl+H on the terminals that do not report the
+chord itself, which is nearly all of them, so the client reads that byte as the word delete: it
+is what pressing the two keys produces there, and Ctrl+H has nothing else to do in a line being
+typed.
 
 A tab is never written into the draft. It counts as one column to the client and as up to
 eight to the terminal, and the two disagreeing is what tore the row apart.

@@ -80,10 +80,12 @@ std::vector<std::size_t> raisedRows(const RenderResult& rendered) {
     return rows;
 }
 
-/// Whether the cell holds the stroke the scrollbar is drawn with.
+/// Whether the cell holds the stroke the scrollbar is drawn with, and nothing else paints it:
+/// the frame around the prompt uses the same stroke, with the panel behind it.
 bool isBarCell(const Cell& cell) {
     return !cell.isBlank() &&
-           std::string(cell.glyph.data(), cell.length) == OpenAnimaTui::Screen::Glyphs::ScrollBar;
+           std::string(cell.glyph.data(), cell.length) == OpenAnimaTui::Screen::Glyphs::ScrollBar &&
+           cell.style.background.kind == Color::Kind::Default;
 }
 
 /// The rows where the scrollbar is shown at all, read off the last column.
@@ -124,26 +126,54 @@ TEST_CASE("no row of the screen is wider than the terminal") {
     }
 }
 
-TEST_CASE("the prompt sits on its own panel, with the caret in it") {
+TEST_CASE("the prompt sits inside a frame, with the caret in it") {
     Model model;
     type(model, "ca\u00f1");
     const RenderResult rendered = render(model, 40, 10);
 
-    const OpenAnimaTui::Screen::Cell& marker = rendered.frame.at(9, 0);
+    // Ten rows: six of conversation, the top border, the prompt, the bottom border, the status.
+    CHECK(readRow(rendered.frame, 6).rfind("\u250C", 0) == 0);
+    CHECK(readRow(rendered.frame, 8).rfind("\u2514", 0) == 0);
+
+    const OpenAnimaTui::Screen::Cell& marker = rendered.frame.at(7, 1);
     CHECK(std::string(marker.glyph.data(), marker.length) == "\u2771");
     CHECK(marker.style.foreground.equals(Palette::accent().foreground));
     CHECK(marker.style.background.equals(Palette::panelColor()));
-    CHECK(rendered.frame.at(9, 1).style.equals(Palette::panel()));
-    CHECK(rendered.caretRow == 9);
-    CHECK(rendered.caretColumn == 2 + 3);
+    CHECK(rendered.frame.at(7, 2).style.equals(Palette::panel()));
+    CHECK(rendered.caretRow == 7);
+    CHECK(rendered.caretColumn == 3 + 3);
+}
+
+TEST_CASE("the status line sits under the frame") {
+    Model model;
+    const RenderResult rendered = render(model, 40, 10);
+
+    CHECK(readRow(rendered.frame, 9).find("no npc") != std::string::npos);
+    CHECK(readRow(rendered.frame, 8).rfind("\u2514", 0) == 0);
+}
+
+TEST_CASE("the empty prompt says what can be done, and stops saying it when typed in") {
+    Model model;
+    CHECK(readAll(render(model, 40, 10).frame).find("/create <description> to make an npc") !=
+          std::string::npos);
+
+    submit(model, "/create a smith");
+    CHECK(readAll(render(model, 40, 10).frame).find("say something, or /help") !=
+          std::string::npos);
+
+    type(model, "hola");
+    const std::string typed = readAll(render(model, 40, 10).frame);
+    CHECK(typed.find("say something") == std::string::npos);
+    CHECK(typed.find("hola") != std::string::npos);
 }
 
 TEST_CASE("a long prompt wraps and the caret follows it down") {
     Model model;
     type(model, std::string(30, 'x'));
     const RenderResult rendered = render(model, 20, 12);
-    CHECK(rendered.caretRow == 11);
-    CHECK(rendered.caretColumn == 2 + (30 - (20 - 2)));
+    // Inside the frame: two columns of frame, two of the marker, sixteen of text.
+    CHECK(rendered.caretRow == 9);
+    CHECK(rendered.caretColumn == 3 + (30 - 16));
 }
 
 TEST_CASE("the conversation is a viewport over the turns") {
@@ -151,19 +181,20 @@ TEST_CASE("the conversation is a viewport over the turns") {
     CHECK(readAll(render(model, 40, 100).frame).find("m0") != std::string::npos);
     CHECK(readAll(render(model, 40, 100).frame).find("a7") != std::string::npos);
 
-    const std::string tail = readAll(render(model, 40, 8).frame);
+    // Ten rows leave six for the conversation: the frame takes three and the status one.
+    const std::string tail = readAll(render(model, 40, 10).frame);
     CHECK(tail.find("m0") == std::string::npos);
     CHECK(tail.find("a7") != std::string::npos);
 
     (void)press(model, Key::Kind::PageUp);
-    const std::string scrolled = readAll(render(model, 40, 8).frame);
+    const std::string scrolled = readAll(render(model, 40, 10).frame);
     CHECK(scrolled.find("m5") != std::string::npos);
     CHECK(scrolled.find("a7") == std::string::npos);
 
     for (int step = 0; step < 6; ++step) {
         (void)press(model, Key::Kind::PageUp);
     }
-    const std::string top = readAll(render(model, 40, 8).frame);
+    const std::string top = readAll(render(model, 40, 10).frame);
     CHECK(top.find("m0") != std::string::npos);
     CHECK(top.find("a4") == std::string::npos);
 }
@@ -302,13 +333,13 @@ TEST_CASE("a character still arriving leaves the prompt clean") {
     type(model, "a");
     type(model, "\xc3");  // The first byte of an enye, with the one after it still on its way.
     RenderResult rendered = render(model, 40, 10);
-    CHECK(readRow(rendered.frame, 9).substr(0, 5) == "\u2771 a");
-    CHECK(rendered.frame.at(9, 3).isBlank());
+    CHECK(readRow(rendered.frame, 7).rfind("\u2502\u2771 a", 0) == 0);
+    CHECK(rendered.frame.at(7, 4).isBlank());
 
     type(model, "\xb1");
     rendered = render(model, 40, 10);
-    CHECK(readRow(rendered.frame, 9).substr(0, 7) == "\u2771 a\u00f1");
-    CHECK(rendered.frame.at(9, 3).length == 2);
+    CHECK(readRow(rendered.frame, 7).find("a\u00f1") != std::string::npos);
+    CHECK(rendered.frame.at(7, 4).length == 2);
 }
 
 TEST_CASE("a turn in flight is shown as the answer arrives") {

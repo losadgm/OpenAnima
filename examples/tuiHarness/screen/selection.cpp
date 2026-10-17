@@ -44,6 +44,14 @@ bool isWordCell(const Cell& cell) {
     return std::isalnum(first) != 0 || first == '_';
 }
 
+/// @param glyph Glyph to look at.
+/// @return Whether it is a stroke of the frame the client draws around the prompt.
+bool isBoxGlyph(std::string_view glyph) {
+    return glyph == Glyphs::BoxTopLeft || glyph == Glyphs::BoxHorizontal ||
+           glyph == Glyphs::BoxTopRight || glyph == Glyphs::BoxVertical ||
+           glyph == Glyphs::BoxBottomLeft || glyph == Glyphs::BoxBottomRight;
+}
+
 /// @param frame Frame that was painted, for the width of its last column.
 /// @param cell Cell to look at.
 /// @param column Column the cell is in.
@@ -53,7 +61,7 @@ bool isFurniture(const Canvas& frame, const Cell& cell, std::size_t column) {
         return false;
     }
     const std::string_view glyph{cell.glyph.data(), cell.length};
-    if (glyph == Glyphs::PromptMarker) {
+    if (glyph == Glyphs::PromptMarker || isBoxGlyph(glyph)) {
         return true;
     }
     return column + 1 == frame.width() && glyph == Glyphs::ScrollBar;

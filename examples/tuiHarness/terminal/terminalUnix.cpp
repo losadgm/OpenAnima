@@ -168,16 +168,10 @@ private:
     /// Turns the first byte of a press into a key, resolving the sequences that begin with
     /// an escape.
     Key decode(unsigned char first) {
-        Key key;
-
         if (first == 0x1B) {
             return decodeEscape();
         }
-
-        key.kind = controlOrCharacter(first);
-        key.character =
-            key.kind == Key::Kind::Character ? static_cast<char>(first) : static_cast<char>(0);
-        return key;
+        return keyOfByte(first);
     }
 
     /// Reads the rest of an escape sequence, or calls the byte an Escape key.
@@ -261,7 +255,17 @@ private:
         return key;
     }
 
-    Key sequenceKey(const std::string& sequence) {
+    Key sequenceKey(const std::string& rawSequence) {
+        // The enhanced protocol can add the kind of event after a colon: `3;5:1~` is a Delete
+        // with control being pressed, which is the same key as `3;5~`.
+        std::string sequence = rawSequence;
+        if (!sequence.empty() && sequence.back() == '~') {
+            const std::size_t colon = sequence.find(':');
+            if (colon != std::string::npos) {
+                sequence.erase(colon, sequence.size() - 1 - colon);
+            }
+        }
+
         if (sequence == "A") {
             return Key{Key::Kind::ArrowUp, static_cast<char>(0)};
         }
@@ -293,6 +297,11 @@ private:
         }
         if (sequence == "3;5~") {
             return controlled(Key::Kind::Delete);
+        }
+        // Control and backspace as xterm spells it when it reports the key itself: 8 is the
+        // code point of the byte the classic encoding sends for it.
+        if (sequence == "27;5;8~" || sequence == "27;5;127~") {
+            return controlled(Key::Kind::Backspace);
         }
         // Control and Return together, as the kitty protocol and xterm spell it.
         if (sequence == "13;5u" || sequence == "27;5;13~") {
@@ -445,8 +454,7 @@ private:
             const auto lowercase =
                 static_cast<unsigned long>(std::tolower(static_cast<unsigned char>(codepoint)));
             if (lowercase >= 'a' && lowercase <= 'z') {
-                return Key{controlOrCharacter(static_cast<unsigned char>(lowercase - 'a' + 1)),
-                           static_cast<char>(0)};
+                return keyOfByte(static_cast<unsigned char>(lowercase - 'a' + 1));
             }
             return Key{Key::Kind::Unknown, static_cast<char>(0)};
         }
@@ -532,43 +540,49 @@ private:
     }
 
     /// Maps a control or printable byte to its key kind.
-    static Key::Kind controlOrCharacter(unsigned char first) {
+    /// @param first Byte that arrived.
+    /// @return The key it is, a printable one included.
+    static Key keyOfByte(unsigned char first) {
         // Everything above ASCII is a byte of a character the terminal sent as UTF-8, which is
         // what an accent, a tilde and an enye are. Dropping it is how typing in Spanish stopped
         // at the keyboard.
         if (first >= 0x20 && first != 0x7F) {
-            return Key::Kind::Character;
+            return Key{Key::Kind::Character, static_cast<char>(first)};
         }
         switch (first) {
         case 0x0D:  // Return.
-            return Key::Kind::Enter;
+            return Key{Key::Kind::Enter, static_cast<char>(0)};
         case 0x0A:  // Ctrl+J, the newline without the return.
-            return Key::Kind::CtrlJ;
+            return Key{Key::Kind::CtrlJ, static_cast<char>(0)};
         case 0x09:  // Tab.
-            return Key::Kind::Tab;
+            return Key{Key::Kind::Tab, static_cast<char>(0)};
         case 0x7F:  // Backspace (Del on some terminals).
-        case 0x08:  // Ctrl+H.
-            return Key::Kind::Backspace;
+            return Key{Key::Kind::Backspace, static_cast<char>(0)};
+        // 0x08 is Ctrl+H by the book, and it is what most terminals send when control and
+        // backspace are pressed together: the two chords are the same byte, and in a line being
+        // typed the useful reading of it is the one that takes a word.
+        case 0x08:
+            return controlled(Key::Kind::Backspace);
         case 0x03:
-            return Key::Kind::CtrlC;
+            return Key{Key::Kind::CtrlC, static_cast<char>(0)};
         case 0x04:
-            return Key::Kind::CtrlD;
+            return Key{Key::Kind::CtrlD, static_cast<char>(0)};
         case 0x01:
-            return Key::Kind::CtrlA;
+            return Key{Key::Kind::CtrlA, static_cast<char>(0)};
         case 0x02:
-            return Key::Kind::CtrlB;
+            return Key{Key::Kind::CtrlB, static_cast<char>(0)};
         case 0x05:
-            return Key::Kind::CtrlE;
+            return Key{Key::Kind::CtrlE, static_cast<char>(0)};
         case 0x06:
-            return Key::Kind::CtrlF;
+            return Key{Key::Kind::CtrlF, static_cast<char>(0)};
         case 0x0E:
-            return Key::Kind::CtrlN;
+            return Key{Key::Kind::CtrlN, static_cast<char>(0)};
         case 0x10:
-            return Key::Kind::CtrlP;
+            return Key{Key::Kind::CtrlP, static_cast<char>(0)};
         case 0x16:
-            return Key::Kind::CtrlV;
+            return Key{Key::Kind::CtrlV, static_cast<char>(0)};
         default:
-            return Key::Kind::Unknown;
+            return Key{Key::Kind::Unknown, static_cast<char>(0)};
         }
     }
 

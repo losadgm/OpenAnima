@@ -21,6 +21,7 @@ namespace {
 using App::Message;
 using App::Model;
 using App::Role;
+using Metrics::BoxWidth;
 using Metrics::HintIndent;
 using Metrics::MaxHints;
 using Metrics::PrefixWidth;
@@ -268,6 +269,72 @@ void paintScrollBar(Canvas& frame, std::size_t viewRows, std::size_t width, std:
     }
 }
 
+/// Paints one horizontal border of the frame around the prompt.
+/// @param frame Canvas to paint on.
+/// @param row Row to paint.
+/// @param width Columns available.
+/// @param top Whether it is the upper border.
+void paintBoxBorder(Canvas& frame, std::size_t row, std::size_t width, bool top) {
+    const Style border = Palette::muted().withBackground(Palette::panelColor());
+    frame.fill(row, 0, width, Palette::panel());
+    frame.put(row, 0, top ? Glyphs::BoxTopLeft : Glyphs::BoxBottomLeft, border);
+    for (std::size_t column = 1; column + 1 < width; ++column) {
+        frame.put(row, column, Glyphs::BoxHorizontal, border);
+    }
+    frame.put(row, width - 1, top ? Glyphs::BoxTopRight : Glyphs::BoxBottomRight, border);
+}
+
+/// What the empty prompt says: what can be done from here, which is not the same in the lobby
+/// as in a conversation.
+/// @param model Model to read.
+/// @return The text, which the prompt draws in the quiet colour.
+std::string placeholderOf(const Model& model) {
+    return model.world.active.has_value() ? std::string{"say something, or /help"}
+                                          : std::string{"/create <description> to make an npc"};
+}
+
+/// Paints the prompt inside the frame that holds it, the frame's top border included.
+/// @param frame Canvas to paint on.
+/// @param model Model to read the draft and the placeholder from.
+/// @param prompt The draft as it was laid out.
+/// @param firstRow Row the top border goes on.
+/// @param width Columns available.
+void paintPrompt(Canvas& frame, const Model& model, const DraftLayout& prompt, std::size_t firstRow,
+                 std::size_t width) {
+    const std::size_t textColumn = BoxWidth + PromptWidth;
+    const std::size_t commandLength = commandTokenLength(model.draft);
+    const Style border = Palette::muted().withBackground(Palette::panelColor());
+
+    paintBoxBorder(frame, firstRow, width, true);
+    std::size_t row = firstRow + 1;
+    for (std::size_t index = 0; index < prompt.rows.size(); ++index) {
+        frame.fill(row, 0, width, Palette::panel());
+        frame.put(row, 0, Glyphs::BoxVertical, border);
+        if (index == 0) {
+            frame.put(row, BoxWidth, Glyphs::PromptMarker,
+                      Palette::accent().withBackground(Palette::panelColor()));
+        }
+
+        const std::size_t rangeStart = prompt.ranges[index].first;
+        const std::string& text = prompt.rows[index];
+        const std::size_t token =
+            commandLength > rangeStart ? std::min(commandLength - rangeStart, text.size()) : 0;
+        if (token > 0) {
+            frame.put(row, textColumn, std::string_view{text}.substr(0, token),
+                      Palette::accent().withBackground(Palette::panelColor()));
+        }
+        frame.put(row, textColumn + token, std::string_view{text}.substr(token),
+                  Palette::text().withBackground(Palette::panelColor()));
+        if (index == 0 && model.draft.empty()) {
+            frame.put(row, textColumn, placeholderOf(model),
+                      Palette::muted().withBackground(Palette::panelColor()));
+        }
+        frame.put(row, width - 1, Glyphs::BoxVertical, border);
+        ++row;
+    }
+    paintBoxBorder(frame, row, width, false);
+}
+
 }  // namespace
 
 RenderResult render(const Model& model, std::size_t width, std::size_t height,
@@ -278,15 +345,20 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
         return result;
     }
 
-    const DraftLayout prompt = layoutDraft(model.draft, width);
+    // The prompt has a frame of its own, so the line being typed is not read as one more row of
+    // the conversation, and the line inside it is laid out to the width the frame leaves.
+    const std::size_t inside = width > (2 * BoxWidth) ? width - (2 * BoxWidth) : 1;
+    const DraftLayout prompt = layoutDraft(model.draft, inside);
 
     const std::vector<std::string> all = App::hintsFor(model);
     const std::size_t selected = all.empty() ? 0 : std::min(model.hintIndex, all.size() - 1);
     std::size_t first = 0;
     const std::vector<std::string> hints = hintWindow(all, selected, first);
 
-    const bool withStatus = height > prompt.rows.size() + hints.size();
-    const std::size_t bottomRows = prompt.rows.size() + hints.size() + (withStatus ? 1 : 0);
+    // The frame takes two rows of its own, and the status row goes under it.
+    const std::size_t boxRows = prompt.rows.size() + 2;
+    const bool withStatus = height > boxRows + hints.size();
+    const std::size_t bottomRows = boxRows + hints.size() + (withStatus ? 1 : 0);
     const std::size_t viewRows = height > bottomRows ? height - bottomRows : 0;
 
     // The transcript, and the column the scrollbar takes when the conversation does not fit.
@@ -324,38 +396,18 @@ RenderResult render(const Model& model, std::size_t width, std::size_t height,
         ++row;
     }
 
+    // The prompt, framed, which is the part that stays put while the conversation moves.
+    paintPrompt(frame, model, prompt, row, width);
+    row += prompt.rows.size() + 2;
+
     if (withStatus) {
         frame.fill(row, 0, width, Palette::panel());
         frame.put(row, 0, statusRow(model), Palette::muted().withBackground(Palette::panelColor()));
-        ++row;
-    }
-
-    // The prompt, which is the part that stays put while the conversation moves.
-    const std::size_t commandLength = commandTokenLength(model.draft);
-    for (std::size_t index = 0; index < prompt.rows.size(); ++index) {
-        frame.fill(row, 0, width, Palette::panel());
-        const std::size_t column = PromptWidth;
-        if (index == 0) {
-            frame.put(row, 0, Glyphs::PromptMarker,
-                      Palette::accent().withBackground(Palette::panelColor()));
-        }
-
-        const std::size_t rangeStart = prompt.ranges[index].first;
-        const std::string& text = prompt.rows[index];
-        const std::size_t token =
-            commandLength > rangeStart ? std::min(commandLength - rangeStart, text.size()) : 0;
-        if (token > 0) {
-            frame.put(row, column, std::string_view{text}.substr(0, token),
-                      Palette::accent().withBackground(Palette::panelColor()));
-        }
-        frame.put(row, column + token, std::string_view{text}.substr(token),
-                  Palette::text().withBackground(Palette::panelColor()));
-        ++row;
     }
 
     const auto position = prompt.positions.at(std::min(model.cursor, model.draft.size()));
-    result.caretRow = viewRows + hints.size() + (withStatus ? 1 : 0) + position.first;
-    result.caretColumn = PromptWidth + position.second;
+    result.caretRow = viewRows + hints.size() + 1 + position.first;
+    result.caretColumn = BoxWidth + PromptWidth + position.second;
 
     pickOutSelection(frame, selection);
     return result;
