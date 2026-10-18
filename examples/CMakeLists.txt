@@ -39,6 +39,7 @@ add_executable(open_anima_tui
     tuiHarness/application/session.cpp
     tuiHarness/domain/commands.cpp
     tuiHarness/domain/model.cpp
+    tuiHarness/domain/texts.cpp
     tuiHarness/presentation/canvas.cpp
     tuiHarness/presentation/cell.cpp
     tuiHarness/presentation/diff.cpp
@@ -54,7 +55,8 @@ add_executable(open_anima_tui
 target_include_directories(open_anima_tui
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
-        ${CMAKE_CURRENT_SOURCE_DIR}/tuiHarness)
+        ${CMAKE_CURRENT_SOURCE_DIR}/tuiHarness
+        ${CMAKE_BINARY_DIR}/examples/generated)
 
 target_link_libraries(open_anima_tui
     PRIVATE

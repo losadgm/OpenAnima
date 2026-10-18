@@ -22,6 +22,7 @@ add_executable(open_anima_tests
     ../examples/cliHarness/session.cpp
     ../examples/tuiHarness/domain/commands.cpp
     ../examples/tuiHarness/domain/model.cpp
+    ../examples/tuiHarness/domain/texts.cpp
     ../examples/tuiHarness/presentation/canvas.cpp
     ../examples/tuiHarness/presentation/cell.cpp
     ../examples/tuiHarness/presentation/diff.cpp
@@ -43,7 +44,8 @@ target_include_directories(open_anima_tests
         ${CMAKE_CURRENT_SOURCE_DIR}
         ${CMAKE_CURRENT_SOURCE_DIR}/../src
         ${CMAKE_CURRENT_SOURCE_DIR}/../examples
-        ${CMAKE_CURRENT_SOURCE_DIR}/../examples/tuiHarness)
+        ${CMAKE_CURRENT_SOURCE_DIR}/../examples/tuiHarness
+        ${CMAKE_BINARY_DIR}/examples/generated)
 
 target_link_libraries(open_anima_tests
     PRIVATE

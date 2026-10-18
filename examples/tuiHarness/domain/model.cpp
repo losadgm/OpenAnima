@@ -6,13 +6,11 @@
 #include <utility>
 
 #include "commands.h"
+#include "domain/texts.h"
 
 namespace OpenAnimaTui::Domain {
 
 namespace {
-
-constexpr const char* CreateUsage = "usage: /create <description>";
-constexpr const char* WaitForTurn = "wait for the answer, or cancel it first";
 
 /// Rows one notch of the wheel moves the conversation, which is enough to follow what is being
 /// written without losing the line being read.
@@ -51,7 +49,7 @@ bool blockedByTurn(Model& model) {
     if (!model.busy) {
         return false;
     }
-    note(model, WaitForTurn);
+    note(model, texts().waitForTurn);
     return true;
 }
 
@@ -226,28 +224,9 @@ void switchTo(Model& model, std::optional<std::size_t> npcId) {
 
 /// Writes the keys and the commands into the transcript, as muted notes.
 void showHelp(Model& model) {
-    note(model, "keys:");
-    note(model, "  enter                 send the line");
-    note(model, "  ctrl+enter, ctrl+j, trailing \\   new line instead of sending");
-    note(model, "  tab                   complete the selected command");
-    note(model, "  ctrl+a, ctrl+e, left, right   move the caret");
-    note(model, "  ctrl+left, ctrl+right  move a word at a time");
-    note(model, "  backspace, delete      delete a character, or a word with ctrl");
-    note(model, "  up, down              walk the command hints, or the prompts of this scope");
-    note(model, "  page up, page down    scroll the conversation");
-    note(model, "  esc                   cancel the turn in flight");
-    note(model, "  ctrl+c                copy what is picked out");
-    note(model, "  ctrl+v                type what was copied last");
-    note(model, "  ctrl+d                leave");
-    note(model, "commands:");
-    note(model, "  /create <description> make an npc and talk to it");
-    note(model, "  /enter <id>           talk to another npc");
-    note(model, "  /npcs                 list the npcs");
-    note(model, "  /leave                leave the conversation");
-    note(model, "  /clear                drop the active conversation, keep the persona");
-    note(model, "  /raw [on|off]         show every turn as the JSON the model wrote");
-    note(model, "  /help                 this list");
-    note(model, "  /quit                 leave");
+    for (const std::string& line : texts().help) {
+        note(model, line);
+    }
 }
 
 /// Makes an npc and starts talking to it.
@@ -259,7 +238,7 @@ void createNpc(Model& model, const std::string& persona, std::vector<Effect>& ef
     model.world.npcs.emplace(npcId, Npc{persona, {}, {}});
     switchTo(model, npcId);
     effects.push_back({EffectKind::CreateNpc, npcId, persona});
-    note(model, "created npc " + std::to_string(npcId) + ": " + persona);
+    note(model, fill(texts().createdNpc, {{"id", std::to_string(npcId)}, {"persona", persona}}));
 }
 
 /// Reads the id out of a command and starts talking to that npc.
@@ -271,7 +250,7 @@ void enterNpc(Model& model, const std::string& idText) {
     const unsigned long long npcId = std::strtoull(idText.c_str(), &end, 10);
     if (end == idText.c_str() || *end != '\0' ||
         model.world.npcs.find(npcId) == model.world.npcs.end()) {
-        note(model, "no such npc   /npcs to list them");
+        note(model, texts().noSuchNpc);
         return;
     }
     switchTo(model, static_cast<std::size_t>(npcId));
@@ -280,13 +259,15 @@ void enterNpc(Model& model, const std::string& idText) {
 /// Lists the npcs, and which one is being talked to.
 void listNpcs(Model& model) {
     if (model.world.npcs.empty()) {
-        note(model, "no npcs yet   /create to make one");
+        note(model, texts().noNpcs);
         return;
     }
-    note(model, "npcs:");
+    note(model, texts().npcListTitle);
     for (const auto& [npcId, npc] : model.world.npcs) {
-        note(model, "  npc " + std::to_string(npcId) +
-                        (model.world.active == npcId ? "  <-- here" : "") + ": " + npc.persona);
+        note(model, fill(texts().npcLine,
+                         {{"id", std::to_string(npcId)},
+                          {"here", model.world.active == npcId ? texts().npcHere : std::string{}},
+                          {"persona", npc.persona}}));
     }
 }
 
@@ -295,7 +276,7 @@ void runCommand(Model& model, const std::string& rawDraft, std::vector<Effect>& 
     const std::string draft = trimRight(rawDraft);
 
     if (draft == "/create") {
-        note(model, CreateUsage);
+        note(model, texts().createUsage);
         return;
     }
     if (draft.rfind("/create ", 0) == 0) {
@@ -309,7 +290,7 @@ void runCommand(Model& model, const std::string& rawDraft, std::vector<Effect>& 
     }
 
     if (draft == "/enter") {
-        note(model, "usage: /enter <id>");
+        note(model, texts().enterUsage);
         return;
     }
     if (draft.rfind("/enter ", 0) == 0) {
@@ -322,34 +303,34 @@ void runCommand(Model& model, const std::string& rawDraft, std::vector<Effect>& 
             return;
         }
         switchTo(model, std::nullopt);
-        note(model, "left the conversation");
+        note(model, texts().leftConversation);
         return;
     }
 
     if (draft == "/clear") {
         if (!model.world.active.has_value()) {
-            note(model, "no npc to clear");
+            note(model, texts().noNpcToClear);
             return;
         }
         model.messages.clear();
         effects.push_back({EffectKind::ClearHistory, *model.world.active, {}});
-        note(model, "conversation dropped, the persona stays");
+        note(model, texts().conversationDropped);
         return;
     }
 
     if (draft == "/raw") {
         model.raw = !model.raw;
-        note(model, std::string{"raw json "} + (model.raw ? "on" : "off"));
+        note(model, model.raw ? texts().rawOn : texts().rawOff);
         return;
     }
     if (draft.rfind("/raw ", 0) == 0) {
         const std::string argument = draft.substr(5);
         if (argument != "on" && argument != "off") {
-            note(model, "usage: /raw [on|off]");
+            note(model, texts().rawUsage);
             return;
         }
         model.raw = argument == "on";
-        note(model, std::string{"raw json "} + (model.raw ? "on" : "off"));
+        note(model, model.raw ? texts().rawOn : texts().rawOff);
         return;
     }
 
@@ -390,7 +371,7 @@ void submit(Model& model, std::vector<Effect>& effects) {
     }
 
     if (!model.world.active.has_value()) {
-        note(model, "no npc   /create to make one, /enter to pick one");
+        note(model, texts().noNpc);
         model.draft.clear();
         model.cursor = 0;
         return;
@@ -584,12 +565,13 @@ std::vector<Effect> update(Model& model, const Key& key, std::size_t scrollStep)
 /// @param model Model to write into.
 /// @param event Finished event of the turn.
 void noteRawTurn(Model& model, const Event& event) {
-    const std::string speaker = model.world.active.has_value()
-                                    ? "npc " + std::to_string(*model.world.active)
-                                    : std::string{"npc"};
+    const std::string speaker =
+        model.world.active.has_value()
+            ? fill(texts().npcName, {{"id", std::to_string(*model.world.active)}})
+            : texts().npcNameLobby;
     model.messages.push_back({Role::Speaker, speaker + ":"});
     if (!event.reply.has_value() || event.reply->document.is_null()) {
-        note(model, "(no document: the turn was stopped before it was whole)");
+        note(model, texts().noDocument);
         return;
     }
     note(model, event.reply->document.dump(2));
@@ -620,9 +602,6 @@ void noteTurn(Model& model, const Event& event) {
             opened = true;
         }
     }
-    if (event.completion.finishReason == OpenAnima::Core::FinishReason::Cancelled) {
-        note(model, "(cancelled, what it had is kept)");
-    }
 }
 
 bool applyEvent(Model& model, const Event& event) {
@@ -651,7 +630,7 @@ bool applyEvent(Model& model, const Event& event) {
     case OpenAnima::Core::EventKind::Failed:
         model.busy = false;
         model.answer.clear();
-        note(model, "the turn failed: " + event.error);
+        note(model, fill(texts().turnFailed, {{"error", event.error}}));
         return true;
     }
     return false;
