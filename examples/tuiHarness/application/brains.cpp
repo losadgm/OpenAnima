@@ -9,13 +9,6 @@
 
 namespace OpenAnimaTui::Application {
 
-namespace {
-
-constexpr const char* PersonaPrefix = "You are ";
-constexpr const char* PersonaSuffix = ". Answer in character.";
-
-}  // namespace
-
 Brains::Brains(OpenAnima::Provider::RestProviderConfig config) : m_config{std::move(config)} {}
 
 void Brains::run(const std::vector<Domain::Effect>& effects) {
@@ -23,7 +16,7 @@ void Brains::run(const std::vector<Domain::Effect>& effects) {
         switch (effect.kind) {
         case Domain::EffectKind::CreateNpc: {
             OpenAnima::Core::NPCBrain brain = OpenAnima::makeNpc(m_config);
-            brain.setSystemPrompt(PersonaPrefix + effect.text + PersonaSuffix);
+            brain.setSystemPrompt(effect.text);
             m_brains.insert_or_assign(effect.npcId, std::move(brain));
             break;
         }
