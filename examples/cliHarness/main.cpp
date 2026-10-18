@@ -134,7 +134,7 @@ void printTurnEnd(const Event& event, bool raw) {
     }
 
     if (event.completion.finishReason == FinishReason::Cancelled) {
-        std::cout << "(turn stopped, what it said was kept)\n";
+        std::cout << "(turn cancelled, left out of the conversation)\n";
     } else if (event.completion.finishReason == FinishReason::Length) {
         std::cout << "(the reply hit the token limit)\n";
     } else if (event.completion.finishReason == FinishReason::ContentFilter) {
