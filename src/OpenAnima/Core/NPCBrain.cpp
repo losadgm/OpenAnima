@@ -287,9 +287,12 @@ Completion NPCBrain::ask(const std::string& prompt, const Provider::Call& call) 
         throw OpenAnimaError("no backend is attached to this brain: call setProvider() first");
     }
 
-    // The answer is fetched before the history is modified, so a failed call leaves the
-    // conversation exactly as it was and the client can retry the same turn.
+    // The answer is fetched before the history is modified, so a failed or cancelled call
+    // leaves the conversation exactly as it was and the client can retry the same turn.
     const Completion answer = m_provider->complete(buildRequest(prompt, {}), call);
+    if (answer.finishReason == FinishReason::Cancelled) {
+        return answer;
+    }
 
     m_history.push_back(ChatMessage{Role::User, prompt});
     m_history.push_back(ChatMessage{Role::Assistant, answer.text});
@@ -320,6 +323,9 @@ NpcReply NPCBrain::askTurn(const std::string& prompt, const Provider::DeltaSink&
     const Completion answer =
         m_provider->complete(buildRequest(prompt, m_catalogue.replyInstruction()), call);
     const NpcReply reply = readReply(answer, stream.text());
+    if (answer.finishReason == FinishReason::Cancelled) {
+        return reply;
+    }
 
     m_history.push_back(ChatMessage{Role::User, prompt});
     m_history.push_back(ChatMessage{Role::Assistant, answer.text});
@@ -383,12 +389,14 @@ std::optional<Event> NPCBrain::poll(std::chrono::milliseconds timeout) {
         return event;
     }
 
-    // A turn that was made joins the conversation; one that failed leaves it as it
-    // was, the same way a failed ask() does. A reply turn is written only when the whole
-    // document arrived, because half of it is not a turn the model could read back.
+    // A turn that ran to the end joins the conversation; one that failed or was cancelled
+    // leaves it as it was, the same way the synchronous calls do, whatever kind of turn it
+    // is. A reply turn is written only when the whole document arrived, because half of it
+    // is not a turn the model could read back.
+    const bool cancelled = event->completion.finishReason == FinishReason::Cancelled;
     const bool whole = !m_pending.has_value() || !m_pending->reply ||
                        (event->reply.has_value() && event->reply->document.is_object());
-    if (event->kind == EventKind::Finished && whole && m_pending.has_value()) {
+    if (event->kind == EventKind::Finished && !cancelled && whole && m_pending.has_value()) {
         m_history.push_back(ChatMessage{Role::User, m_pending->prompt});
         m_history.push_back(ChatMessage{Role::Assistant, event->completion.text});
     }

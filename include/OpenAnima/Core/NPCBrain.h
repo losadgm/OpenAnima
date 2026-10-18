@@ -73,8 +73,8 @@ public:
 
     /// Sends a prompt and reports the answer while it is being produced.
     /// The history is touched the same way ask() touches it, and only once the call
-    /// has succeeded, so a caller that drew half an answer and then failed still has
-    /// the conversation it had before.
+    /// has succeeded and was not cancelled, so a caller that drew half an answer and
+    /// then failed or stopped still has the conversation it had before.
     /// @param prompt Text produced by the player or by the client application.
     /// @param call Where the pieces of the answer go, and how the call can be
     ///        abandoned half way.
@@ -117,8 +117,8 @@ public:
     ///
     /// Its events are the ones of askAsync(), with one difference: a Delta carries the
     /// dialogue as it is written, not the JSON that is being written, and the Finished
-    /// event carries the reply. A turn cut before the document was whole leaves the
-    /// history as it was.
+    /// event carries the reply. A cancelled turn leaves the history as it was, as a raw
+    /// turn does.
     /// @param prompt Text produced by the player or by the client application.
     /// @return The id that names this turn in the events that follow.
     /// @throws OpenAnimaError when no backend is attached, or when a turn is
@@ -140,17 +140,19 @@ public:
     /// Asks a turn in flight to stop before the answer is complete.
     ///
     /// What the backend had produced by then arrives as the turn's Finished
-    /// event, and the answer is marked as cancelled. An id that is not the turn
-    /// in flight is ignored, so a client can call this with an id it collected
-    /// long ago without checking it first.
+    /// event, and the answer is marked as cancelled. The turn is not written into
+    /// the conversation, whatever kind of turn it was: only one that ran to the
+    /// end is. An id that is not the turn in flight is ignored, so a client can
+    /// call this with an id it collected long ago without checking it first.
     /// @param turnId Turn to stop, as returned by askAsync().
     void cancel(RequestId turnId);
 
     /// Collects the next event of a turn, waiting for one to appear.
     ///
     /// Call it until it hands back a Finished or a Failed event: that is what
-    /// ends the turn, writes it into the history and frees the brain for the
-    /// next one.
+    /// ends the turn and frees the brain for the next one. A turn that ran to the
+    /// end is then written into the history; one that failed or was cancelled
+    /// leaves it as it was.
     /// @param timeout Longest wait for an event. Zero collects what is already
     ///        waiting and returns at once.
     /// @return The event, or nothing when none arrived in time.

@@ -95,8 +95,9 @@ variables of the contract in it: `reasoning`, `dialogue` and `actions`. That is 
   that produced them.
 - The document is the assistant message of the conversation, so the NPC reads its own
   reasoning on the next turn without a second place to keep it in.
-- Cancelling keeps one meaning: it stops the call, keeps what the dialogue had said, and
-  leaves the conversation as it was.
+- Cancelling keeps one meaning, raw turn or reply: it stops the call, reports the dialogue it
+  had reached, and leaves the conversation as it was. What the client draws of that cut answer
+  is its own choice.
 
 A round is a request inside a turn. Rounds are what a deeper turn needs, and a round earns its
 cost when it brings something new back: memory, the world, another NPC. Reasoning again over
