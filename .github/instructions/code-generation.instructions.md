@@ -1,6 +1,6 @@
 ---
 name: 'Code generation'
-description: 'Use when writing, changing or reviewing C++ code in this project: where a file goes, how it is named, how it is documented, when to assert and when to throw, and the checks a change passes before it is called done.'
+description: 'Use when writing, changing or reviewing C++ code in this project: where a file goes, how it is named, how it is documented, where the words live in data/, when to assert and when to throw, and the checks a change passes before it is called done.'
 applyTo: '**/*.h, **/*.hpp, **/*.cpp, **/*.cxx'
 ---
 
@@ -20,6 +20,19 @@ place.
   `OpenAnima/Core/NPCBrain.h` is implemented by `OpenAnima/Core/NPCBrain.cpp`.
 - A header that is an implementation detail lives in `src/` with the same shape and is not
   installed, the way `src/OpenAnima/Provider/SseReader.h` is.
+
+## Where the words go
+
+- Text the code says or sends lives in `data/`, not in C++: `prompts.json` and
+  `reply-schema.json` for what the library asks a model, `tui-texts.json` for what the
+  terminal client shows. CMake embeds each file in the target, so nothing opens them at run
+  time.
+- A new sentence, label, note, prompt or description is a key in the json. A literal string in
+  the code is only for what a programmer reads: assertion messages and exception text.
+- A text that carries a value has a placeholder, such as `{id}` or `{error}`, filled with the
+  `fill()` helper of the file it lives in.
+- The json travels with the code that reads it: a key added, renamed or dropped is changed in
+  both places in the same commit, and a key nobody reads any more is deleted.
 
 ## Naming
 
