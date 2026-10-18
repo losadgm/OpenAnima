@@ -310,6 +310,15 @@ Completion RestProvider::complete(const std::vector<ChatMessage>& messages, cons
     }
 
     const HttpResponse response = m_transport->post(request);
+    // A transfer cut because the caller abandoned it reports no answer instead of one, and that
+    // is the cancellation, not a failure of the server. An answer that arrived in spite of the
+    // check is kept: the caller may have stopped a moment after the last token.
+    if (call.keepGoing && !call.keepGoing() &&
+        (response.statusCode < 200 || response.statusCode >= 300)) {
+        Completion completion;
+        completion.finishReason = FinishReason::Cancelled;
+        return completion;
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
         throw ProviderError("provider answered with HTTP " + std::to_string(response.statusCode) +
                                 ": " + snippet(response.body),
@@ -348,16 +357,23 @@ Completion RestProvider::readStream(const HttpRequest& request, const Call& call
 
     m_transport->post(request, observer);
 
+    // A caller that stopped the call gets what had been produced by then, marked for what it
+    // is, and that is not a failure of the provider: when the connection goes away because the
+    // caller abandoned it, the transport reports that, not an answer from the server. An answer
+    // the server had already finished is left alone: the check can turn false a moment after
+    // the last token arrives.
+    const bool cancelled = call.keepGoing && !call.keepGoing();
+    if (cancelled && completion.finishReason == FinishReason::Unknown) {
+        completion.finishReason = FinishReason::Cancelled;
+    }
+    if (completion.finishReason == FinishReason::Cancelled) {
+        return completion;
+    }
+
     if (statusCode < 200 || statusCode >= 300) {
         throw ProviderError("provider answered with HTTP " + std::to_string(statusCode) + ": " +
                                 snippet(errorBody),
                             statusCode);
-    }
-    // A caller that stopped the call gets what had been produced by then, marked for what
-    // it is. An answer the server had already finished is left alone: the check can turn
-    // false a moment after the last token arrives.
-    if (completion.finishReason == FinishReason::Unknown && call.keepGoing && !call.keepGoing()) {
-        completion.finishReason = FinishReason::Cancelled;
     }
     readJsonAnswer(completion, call.format);
     return completion;

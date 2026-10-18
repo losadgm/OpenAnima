@@ -34,8 +34,8 @@ contract defines it.
 - The session speaks the vocabulary of the console client: `/create`, `/enter`, `/npcs`,
   `/leave`, `/clear`, `/raw`, `/help` and `/quit`. Given an argument it does not take, each
   answers with its usage.
-- `ctrl-c` stops the turn in flight and keeps what it had said; twice, and it leaves. `ctrl-d`
-  leaves too.
+- `ctrl-c` stops the turn in flight, whose last words stay on screen; twice, and it leaves.
+  `ctrl-d` leaves too.
 - When stdin is not a terminal there is no banner and no prompt, so a session can be piped.
 
 The settings are read by `examples/common/apiSettings`, shared with the terminal client under
@@ -43,7 +43,7 @@ its own prefix, and the loader for `.env` is `examples/common/dotenv`. The clien
 reference for the asynchronous turn: `askTurnAsync()` with `poll()`, `cancel()` wired to
 ctrl-c, and the whole document available when the turn is over. The dialogue is written once
 the turn is finished rather than while it arrives, so that the reasoning keeps its place above
-the words it leads to; nothing else is lost, because the answer is kept whole either way.
+the words it leads to, and the answer is printed whole either way.
 
 ## tuiHarness
 
@@ -157,7 +157,7 @@ repeating the name or opening a gap.
 | Drag a scrollbar | Scrolls to where the thumb is put, following the button |
 | Hover a hint or a scrollbar | Lights it up: the hint goes lilac, bold and underlined, the thumb of the bar goes lilac and bold |
 | Click a hint | Writes it into the draft, the same as tab with the selected one |
-| Esc | Cancels the turn in flight, keeping what it had produced |
+| Esc | Cancels the turn in flight: the transcript keeps a short note and nothing of the answer |
 | Drag over the conversation | Picks out those cells, painted reversed as the pointer moves, and moves the conversation on when it is held against an edge of the viewport |
 | Press and release on one cell | Picks out that one character |
 | Double click | Picks out the word under the pointer |
@@ -288,9 +288,10 @@ for the answer, and says so.
   looks the same as the last one costs nothing, and an answer arriving word by word costs a
   handful of bytes per word instead of the whole screen: measured at 56 bytes a frame against
   the 3360 a full repaint would take.
-- **The draw loop is driven by the events of a turn.** `askAsync()` and `poll()` already hand
-  the text over as it arrives, so the screen changes when something happens and the loop never
-  blocks. `cancel()` is what the interrupting keys ask for, through an effect. While a frame is
+- **The draw loop is driven by the events of a turn.** `askTurnAsync()` and `poll()` already
+  hand the dialogue over as it arrives, so the screen changes when something happens and the
+  loop never blocks. `cancel()` is what the interrupting keys ask for, through an effect.
+  While a frame is
   still on its way, the model keeps advancing and no new frame is composed: the next one drawn
   is the latest state, not the one after the one nobody has seen.
 - **The world lives in the shell.** Each NPC is a `NPCBrain` with a persona and its own

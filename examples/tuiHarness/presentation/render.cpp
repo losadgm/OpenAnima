@@ -11,6 +11,7 @@
 
 #include "canvas.h"
 #include "cell.h"
+#include "domain/texts.h"
 #include "selection.h"
 #include "style.h"
 #include "text.h"
@@ -174,7 +175,7 @@ void appendTurn(std::vector<TranscriptRow>& rows, const Message& message, const 
     const bool fromUser = message.role == Role::User;
     std::string speaker;
     if (!message.continues) {
-        speaker = fromUser ? "you" : npc;
+        speaker = fromUser ? Domain::texts().speakerYou : npc;
     }
     const Style nameStyle = fromUser ? Palette::muted() : Palette::primary();
     const Style bodyStyle = message.role == Role::Thought ? Palette::muted() : Palette::text();
@@ -188,7 +189,9 @@ void appendTurn(std::vector<TranscriptRow>& rows, const Message& message, const 
 std::vector<TranscriptRow> transcriptRows(const Model& model, std::size_t width) {
     const std::size_t bodyWidth = width > PrefixWidth ? width - PrefixWidth : 1;
     const std::string npc =
-        model.world.active.has_value() ? "npc " + std::to_string(*model.world.active) : "npc";
+        model.world.active.has_value()
+            ? Domain::fill(Domain::texts().npcName, {{"id", std::to_string(*model.world.active)}})
+            : Domain::texts().npcNameLobby;
 
     std::vector<TranscriptRow> rows;
     for (const Message& message : model.messages) {
@@ -215,19 +218,21 @@ std::vector<TranscriptRow> transcriptRows(const Model& model, std::size_t width)
 /// @param model Model to show.
 /// @return The row, painted later.
 std::string statusRow(const Model& model) {
+    const Domain::Texts& words = Domain::texts();
     if (model.busy) {
         const std::size_t tenths = Domain::elapsedTenths(model);
         const std::size_t frame = tenths % Glyphs::Spinner.size();
-        const std::string tail = model.cancelling ? "   cancelling" : "   esc to cancel";
-        return Glyphs::Spinner.at(frame) + std::string{" working "} + std::to_string(tenths / 10) +
-               "." + std::to_string(tenths % 10) + "s" + tail;
+        const std::string tail =
+            model.cancelling ? words.statusCancellingTail : words.statusCancelTail;
+        const std::string seconds = std::to_string(tenths / 10) + "." + std::to_string(tenths % 10);
+        return Glyphs::Spinner.at(frame) + Domain::fill(words.statusBusy, {{"tenths", seconds}}) +
+               tail;
     }
-    const char* hint = model.world.active.has_value()
-                           ? "ask something   /help for keys"
-                           : "no npc   /create to make one   /help for keys";
-    const std::string mode = model.raw ? "   raw" : "";
+    const std::string& hint =
+        model.world.active.has_value() ? words.statusHintActive : words.statusHintLobby;
+    const std::string mode = model.raw ? words.rawLabel : std::string{};
     if (model.modelName.empty()) {
-        return std::string{hint} + mode;
+        return hint + mode;
     }
     return model.modelName + "   " + hint + mode;
 }
@@ -350,8 +355,8 @@ void paintBoxBorder(Canvas& frame, std::size_t row, std::size_t width, bool top)
 /// @param model Model to read.
 /// @return The text, which the prompt draws in the quiet colour.
 std::string placeholderOf(const Model& model) {
-    return model.world.active.has_value() ? std::string{"say something, or /help"}
-                                          : std::string{"/create <description> to make an npc"};
+    return model.world.active.has_value() ? Domain::texts().placeholderActive
+                                          : Domain::texts().placeholderLobby;
 }
 
 /// The window of the draft the panel shows.

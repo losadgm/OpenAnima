@@ -161,6 +161,17 @@ endfunction()
 # -----------------------------------------------------------------------------
 #  Targets
 # -----------------------------------------------------------------------------
+# The words the terminal client says are configuration too: they live in data/tui-texts.json
+# and are embedded as they are, so the client never opens a file at run time. The json is a
+# configure dependency, so editing it and building again is enough.
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/data/tui-texts.json OPENANIMA_TUI_TEXTS_JSON)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+             ${CMAKE_CURRENT_SOURCE_DIR}/data/tui-texts.json)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/examples/tuiHarness/domain/TuiTextsData.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/examples/generated/domain/TuiTextsData.h
+    @ONLY)
+
 add_subdirectory(src)
 
 if(OPENANIMA_BUILD_EXAMPLES)

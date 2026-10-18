@@ -1,0 +1,6 @@
+{
+    "instruction": "Answer with one json object and nothing else, with these keys in this order:\n\n1. \"reasoning\": {reasoning}\n2. \"dialogue\": {dialogue}\n3. \"actions\": {actions}\n",
+    "noActions": "\nYou cannot take actions.\n",
+    "actionsIntro": "\nThe actions you may take are:\n",
+    "actionLine": "- {name}: {description}\n"
+}

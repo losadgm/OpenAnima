@@ -10,6 +10,7 @@
 #include "OpenAnima/Core/Event.h"
 
 #include "domain/model.h"
+#include "domain/texts.h"
 
 namespace {
 
@@ -421,7 +422,30 @@ TEST_CASE("raw mode names the npc that answered") {
     CHECK(model.messages.back().text.find("\"dialogue\"") != std::string::npos);
 }
 
-TEST_CASE("raw mode says so when there is no document to show") {
+TEST_CASE("a cancelled turn leaves its note and nothing it had written") {
+    Model model = modelWithNpc();
+    (void)submit(model, "hello");
+
+    // The dialogue had started to arrive.
+    OpenAnima::Core::Event piece;
+    piece.kind = OpenAnima::Core::EventKind::Delta;
+    piece.text = "Good ";
+    (void)OpenAnimaTui::Domain::applyEvent(model, piece);
+
+    OpenAnima::Core::Event over = finished();
+    over.completion.finishReason = OpenAnima::Core::FinishReason::Cancelled;
+    over.reply = OpenAnima::Core::NpcReply{};
+    (void)OpenAnimaTui::Domain::applyEvent(model, over);
+
+    CHECK_FALSE(model.busy);
+    CHECK(model.answer.empty());
+    CHECK(model.messages.back().text == OpenAnimaTui::Domain::texts().cancelled);
+    for (const Message& message : model.messages) {
+        CHECK(message.text.find("Good ") == std::string::npos);
+    }
+}
+
+TEST_CASE("a cancelled turn writes the same in raw mode and out of it") {
     Model model = modelWithNpc();
     (void)submit(model, "/raw on");
     (void)submit(model, "hello");
@@ -431,8 +455,10 @@ TEST_CASE("raw mode says so when there is no document to show") {
     over.reply = OpenAnima::Core::NpcReply{};
     (void)OpenAnimaTui::Domain::applyEvent(model, over);
 
-    CHECK_FALSE(model.busy);
-    CHECK(model.messages.back().text.find("no document") != std::string::npos);
+    CHECK(model.messages.back().text == OpenAnimaTui::Domain::texts().cancelled);
+    for (const Message& message : model.messages) {
+        CHECK(message.role != OpenAnimaTui::Domain::Role::Speaker);
+    }
 }
 
 TEST_CASE("a panel of the prompt scrolled away from the caret stays until a key writes") {

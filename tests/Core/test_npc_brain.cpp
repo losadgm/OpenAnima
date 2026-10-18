@@ -98,6 +98,23 @@ TEST_CASE("NPCBrain::ask leaves the history untouched when the call fails", "[np
     CHECK(brain.history().empty());
 }
 
+TEST_CASE("NPCBrain::ask leaves a cancelled call out of the history", "[npcbrain]") {
+    auto provider = std::make_shared<FakeProvider>();
+    provider->deltas = {"half", " a", " thought"};
+    NPCBrain brain{provider};
+
+    int checks = 0;
+    OpenAnima::Provider::Call call;
+    call.onDelta = [](std::string_view /*piece*/) {};
+    call.keepGoing = [&checks] { return ++checks < 2; };  // Stops after the first piece.
+
+    const OpenAnima::Core::Completion answer = brain.ask("think", call);
+
+    CHECK(answer.finishReason == FinishReason::Cancelled);
+    CHECK(answer.text == "half");
+    CHECK(brain.history().empty());
+}
+
 TEST_CASE("NPCBrain::ask reports a missing backend", "[npcbrain]") {
     NPCBrain brain;
 
@@ -228,10 +245,8 @@ TEST_CASE("NPCBrain::askAsync stops a turn the caller abandons", "[npcbrain]") {
     CHECK(events[0].completion.finishReason == FinishReason::Cancelled);
     CHECK(events[0].completion.text == "half");
 
-    // What the player got to read is part of the conversation, cut short as it is.
-    REQUIRE(brain.history().size() == 2);
-    CHECK(brain.history()[0].content == "think");
-    CHECK(brain.history()[1].content == "half");
+    // The turn was cut, so it joins the conversation neither as a prompt nor as an answer.
+    CHECK(brain.history().empty());
 }
 
 TEST_CASE("NPCBrain::cancel ignores a turn that is not the one in flight", "[npcbrain]") {

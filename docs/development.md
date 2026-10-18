@@ -46,6 +46,7 @@ examples/cliHarness/  a runnable client: takes its settings from flags and .env,
                       prompt, prints the turn in the order of the reply contract
 examples/common/      shared by both clients: the loader for `.env`
 examples/tuiHarness/  the terminal client: full screen, transcript, mouse and clipboard
+data/                  the words and the contract: prompts, reply schema and client texts
 docs/                  these pages, the Doxyfile template and the site template
 .github/scripts/       helpers used by the pipeline, including the site builder
 .github/instructions/  the conventions of this repository, for editor tooling
@@ -53,6 +54,14 @@ docs/                  these pages, the Doxyfile template and the site template
 
 A header and its implementation share a path: `OpenAnima/Core/NPCBrain.h` is implemented by
 `OpenAnima/Core/NPCBrain.cpp` under `src/`.
+
+`data/` holds the words and the contract: `prompts.json` for the instruction the library sends,
+`reply-schema.json` for the schema the answer is asked for in, and `tui-texts.json` for what the
+terminal client says. CMake embeds each one in the target that uses it, so none of them opens a
+file at run time: editing the json and building again is the whole workflow. The library reads
+them in `ActionCatalogue`, where the schema is embedded as it is and the instruction takes the
+description of every property from it, so a property is described once. The client reads its
+texts once through `Domain::texts()`, where a `{name}` in a text is filled with `Domain::fill()`.
 
 ## Conventions
 
@@ -72,6 +81,42 @@ links `Threads::Threads` publicly, so a consumer that links `OpenAnima::OpenAnim
 without asking. Nothing else starts a thread: the synchronous calls, the provider and the
 transport work on the thread that called them, and the conversation is written on that thread
 when the events of a turn are collected.
+
+## Turns and their rounds
+
+A turn is the exchange the conversation adds up as one: the prompt, and the reply the model
+answers it with. Today a turn is one request, and the reply is one document with the three
+variables of the contract in it: `reasoning`, `dialogue` and `actions`. That is deliberate.
+
+- A local model pays twice for every call: the context is sent again, and its prefill is paid
+  again on the same tokens. Two calls a turn is twice the time a turn takes on the machine the
+  project targets, and it doubles the VRAM an NPC holds while it answers.
+- The three variables come out of one sample, so the words cannot disagree with the thought
+  that produced them.
+- The document is the assistant message of the conversation, so the NPC reads its own
+  reasoning on the next turn without a second place to keep it in.
+- Cancelling keeps one meaning, raw turn or reply: it stops the call, reports the dialogue it
+  had reached, and leaves the conversation as it was. What the client draws of that cut answer
+  is its own choice.
+
+A round is a request inside a turn. Rounds are what a deeper turn needs, and a round earns its
+cost when it brings something new back: memory, the world, another NPC. Reasoning again over
+the same context only reorders what is already there. The plan is in "Beyond the MVP" of the
+roadmap, and the invariants it has to respect are these.
+
+- Intermediary rounds are not turns. They do not enter the history, and only the last reply is
+  kept. The bookkeeping of the turn in flight is `NPCBrain::PendingTurn`, and `poll()` is the
+  only place that writes a turn into the conversation.
+- An observation comes back as a `Role::Tool` message after the document of the round that
+  asked for it, and the next round reads the conversation it had plus those two messages.
+- Only the last round streams. A delta of an intermediary round is a fragment of JSON and not
+  dialogue, and letting it through would paint the document on the client.
+- A turn still has one cancellation. Stopping between rounds drops all of them, and the
+  dialogue rescued from a cut turn is the one of the last round.
+
+What is missing to turn any of that on is the source of the observations, which is the world of
+`v0.5.0`, and the stop condition: a number of rounds, a word from the model or a judge. Until
+those exist a turn has one round, and the client sees no difference.
 
 ## Documentation
 

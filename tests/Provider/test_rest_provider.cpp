@@ -420,6 +420,21 @@ TEST_CASE("RestProvider marks an answer the caller abandoned", "[provider]") {
     CHECK(pieces[0] == "first");
 }
 
+TEST_CASE("RestProvider does not call an abandoned call a failure", "[provider]") {
+    auto transport = std::make_shared<FakeHttpTransport>();
+    // A transfer cut before the headers is what a real transport reports as status zero and
+    // nothing in the body.
+    transport->response = {0, ""};
+    transport->chunks = {""};
+    RestProvider provider{localConfig(), transport};
+
+    const Completion completion =
+        provider.complete(oneTurn("hi"), Call{{}, [] { return false; }, {}});
+
+    CHECK(completion.finishReason == FinishReason::Cancelled);
+    CHECK(completion.text.empty());
+}
+
 TEST_CASE("RestProvider asks for a JSON object when one is wanted", "[provider]") {
     auto transport = std::make_shared<FakeHttpTransport>();
     transport->response = {200, completionBody(R"({"reasoning":"why","dialogue":"hello"})")};

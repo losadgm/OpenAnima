@@ -1,28 +1,64 @@
 #include "OpenAnima/Core/ActionCatalogue.h"
 
 #include <cassert>
+#include <cstddef>
+#include <initializer_list>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <utility>
+
+#include "OpenAnima/Core/PromptsData.h"
+#include "OpenAnima/Core/ReplySchemaData.h"
 
 namespace OpenAnima::Core {
 namespace {
 
-/// What the model reads about the inner voice. Written once because it goes to two places:
-/// the description of the schema, and the instruction that a provider ignoring the schema
-/// still reads. Two copies would drift apart, and say different things about one field.
-constexpr const char* ReasoningField =
-    "Your private thoughts before you answer, in character and in the first person. One or two "
-    "sentences. Nothing here is said out loud.";
+/// The words the contract is asked in, read once from the json the build embedded.
+/// @return The whole document.
+const nlohmann::json& prompts() {
+    static const nlohmann::json document = nlohmann::json::parse(PromptsData::Json);
+    return document;
+}
 
-/// What the model reads about the spoken part. Written once, as ReasoningField is.
-constexpr const char* DialogueField =
-    "What you say out loud, in character. An empty string when you say nothing.";
+/// The reply contract, read once from the json the build embedded.
+/// @return The whole document.
+const nlohmann::json& schemaData() {
+    static const nlohmann::json document = nlohmann::json::parse(ReplySchemaData::Json);
+    return document;
+}
 
-/// What the model reads about the actions. Written once, as ReasoningField is.
-constexpr const char* ActionsField =
-    "What you ask the host to do, as a list. Every entry is an object with \"name\" and "
-    "\"arguments\". Empty when you do nothing.";
+/// @param document The prompts.
+/// @param key Name of the text.
+/// @return The text.
+std::string prompt(std::string_view key) {
+    return prompts().at(std::string{key}).get<std::string>();
+}
+
+/// Replaces one placeholder in a text, leaving it alone when it is not there.
+/// @param text Text to change.
+/// @param name Name of the placeholder, without its braces.
+/// @param value What replaces it.
+void replaceOnce(std::string& text, std::string_view name, const std::string& value) {
+    const std::string placeholder = "{" + std::string{name} + "}";
+    const std::size_t pos = text.find(placeholder);
+    if (pos != std::string::npos) {
+        text.replace(pos, placeholder.size(), value);
+    }
+}
+
+/// Fills the placeholders of a text.
+/// @param pattern Text with placeholders such as `{name}`.
+/// @param values Each placeholder and what replaces it.
+/// @return The text with every placeholder replaced.
+std::string fill(std::string_view pattern,
+                 std::initializer_list<std::pair<std::string_view, std::string>> values) {
+    std::string text{pattern};
+    for (const auto& [name, value] : values) {
+        replaceOnce(text, name, value);
+    }
+    return text;
+}
 
 /// The arguments of an action that takes none.
 /// @return A schema that accepts an object with nothing in it.
@@ -32,25 +68,38 @@ nlohmann::json emptyArguments() {
                           {"additionalProperties", false}};
 }
 
+/// One entry of the reply schema's list of actions.
+/// @param spec Action to describe.
+/// @return The alternative the model picks by name.
+nlohmann::json alternative(const ActionSpec& spec) {
+    const nlohmann::json arguments = spec.arguments.is_object() ? spec.arguments : emptyArguments();
+    return nlohmann::json{
+        {"type", "object"},
+        {"description", spec.description},
+        {"properties",
+         nlohmann::json{{"name", nlohmann::json{{"const", spec.name}}}, {"arguments", arguments}}},
+        {"required", nlohmann::json::array({"name", "arguments"})},
+        {"additionalProperties", false}};
+}
+
 }  // namespace
 
 ActionCatalogue ActionCatalogue::base() {
     ActionCatalogue catalogue;
-    catalogue.m_actions = {
-        ActionSpec{"wait", "Do nothing this turn.", nlohmann::json{}},
-        ActionSpec{"end_conversation", "End the conversation with the player.", nlohmann::json{}},
-        ActionSpec{
-            "emote", "Show a gesture or an expression, such as a nod or a shrug.",
-            nlohmann::json{
-                {"type", "object"},
-                {"properties",
-                 nlohmann::json{
-                     {"kind", nlohmann::json{{"type", "string"},
-                                             {"description", "The gesture or expression, such as a "
-                                                             "nod or a shrug."}}}}},
-                {"required", nlohmann::json::array({"kind"})},
-                {"additionalProperties", false}}},
-    };
+    for (const nlohmann::json& entry :
+         schemaData().at("properties").at("actions").at("items").at("oneOf")) {
+        const nlohmann::json& arguments = entry.at("properties").at("arguments");
+
+        ActionSpec spec;
+        spec.name = entry.at("properties").at("name").at("const").get<std::string>();
+        spec.description = entry.at("description").get<std::string>();
+        // An action with nothing to pass leaves the field empty, and the schema built from
+        // the specification then closes its arguments on an empty object.
+        if (arguments.contains("properties") && !arguments.at("properties").empty()) {
+            spec.arguments = arguments;
+        }
+        catalogue.add(std::move(spec));
+    }
     return catalogue;
 }
 
@@ -67,57 +116,43 @@ void ActionCatalogue::add(ActionSpec spec) {
 }
 
 nlohmann::json ActionCatalogue::replySchema() const {
-    nlohmann::json actions = nlohmann::json{{"type", "array"}, {"description", ActionsField}};
+    nlohmann::json schema = schemaData();
+    nlohmann::json& actions = schema.at("properties").at("actions");
+
     if (m_actions.empty()) {
         // No action is allowed, and the schema says so without an empty "oneOf", which
         // is not a schema every provider accepts.
+        actions.erase("items");
         actions["maxItems"] = 0;
-    } else {
-        nlohmann::json alternatives = nlohmann::json::array();
-        for (const ActionSpec& action : m_actions) {
-            const nlohmann::json arguments =
-                action.arguments.is_object() ? action.arguments : emptyArguments();
-            alternatives.push_back(nlohmann::json{
-                {"type", "object"},
-                {"properties", nlohmann::json{{"name", nlohmann::json{{"const", action.name}}},
-                                              {"arguments", arguments}}},
-                {"required", nlohmann::json::array({"name", "arguments"})},
-                {"additionalProperties", false}});
-        }
-        actions["items"] = nlohmann::json{{"oneOf", std::move(alternatives)}};
+        return schema;
     }
 
-    return nlohmann::json{
-        {"type", "object"},
-        {"properties",
-         nlohmann::json{
-             {"reasoning", nlohmann::json{{"type", "string"}, {"description", ReasoningField}}},
-             {"dialogue", nlohmann::json{{"type", "string"}, {"description", DialogueField}}},
-             {"actions", std::move(actions)}}},
-        {"required", nlohmann::json::array({"reasoning", "dialogue", "actions"})},
-        {"additionalProperties", false}};
+    nlohmann::json alternatives = nlohmann::json::array();
+    for (const ActionSpec& action : m_actions) {
+        alternatives.push_back(alternative(action));
+    }
+    actions["items"] = nlohmann::json{{"oneOf", std::move(alternatives)}};
+    return schema;
 }
 
 std::string ActionCatalogue::replyInstruction() const {
+    const nlohmann::json& properties = schemaData().at("properties");
+
     std::string instruction =
-        "Answer with one json object and nothing else, with these keys in this order:\n"
-        "\n"
-        "1. \"reasoning\": ";
-    instruction += ReasoningField;
-    instruction += "\n2. \"dialogue\": ";
-    instruction += DialogueField;
-    instruction += "\n3. \"actions\": ";
-    instruction += ActionsField;
-    instruction += '\n';
+        fill(prompt("instruction"),
+             {{"reasoning", properties.at("reasoning").at("description").get<std::string>()},
+              {"dialogue", properties.at("dialogue").at("description").get<std::string>()},
+              {"actions", properties.at("actions").at("description").get<std::string>()}});
 
     if (m_actions.empty()) {
-        instruction += "\nYou cannot take actions.\n";
+        instruction += prompt("noActions");
         return instruction;
     }
 
-    instruction += "\nThe actions you may take are:\n";
+    instruction += prompt("actionsIntro");
     for (const ActionSpec& action : m_actions) {
-        instruction += "- " + action.name + ": " + action.description + "\n";
+        instruction += fill(prompt("actionLine"),
+                            {{"name", action.name}, {"description", action.description}});
     }
     return instruction;
 }

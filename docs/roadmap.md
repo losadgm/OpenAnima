@@ -82,10 +82,11 @@ context is what the senses let through.
     cannot escape into libcurl: the failure is raised once the handle has been released.
 - [x] Asynchronous core.
   - `NPCBrain::askAsync()` hands a turn to a thread of its own and reports it as events:
-    `poll()` collects them, `cancel()` stops a turn and keeps the text it had produced, and
+    `poll()` collects them, `cancel()` stops a turn and reports what it had produced, and
     `isBusy()` says whether one is still open. The conversation is written on the caller's
     thread, when the last event of the turn is collected, so a client that draws an answer
-    still owns the order the turns are written in.
+    still owns the order the turns are written in. A turn that was cancelled is not written:
+    the conversation stays as it was.
 
 ## v0.3.0 - Strict parsing (data structuring)
 
@@ -96,11 +97,12 @@ context is what the senses let through.
     rather than something the caller discovers later. The contract of an NPC's own answer is
     the next point.
 - [x] Isolate the output variables: `reasoning`, `dialogue`, `actions`.
-  - `askTurn()` and `askTurnAsync()` ask the answer in a schema built from an
-    `ActionCatalogue`, read it back as an `NpcReply` and keep the whole document in the
-    history. The contract also travels in the instruction sent with the prompt, so a provider
-    that ignores the schema still answers in it, and the dialogue is read out of the document
-    while it arrives, so a sink paints words rather than JSON.
+  - `askTurn()` and `askTurnAsync()` ask the answer in the schema kept in
+    `data/reply-schema.json`, with the actions of an `ActionCatalogue` filled in, read it back
+    as an `NpcReply` and keep the whole document in the history. The contract also travels in
+    the instruction sent with the prompt, so a provider that ignores the schema still answers
+    in it, and the dialogue is read out of the document while it arrives, so a sink paints
+    words rather than JSON.
 - [ ] Reject malformed answers and fall back.
   - The validation half is in place: `ParseError` and `ProviderError` reject anything that
     cannot be read or that the provider refused, and the error carries the HTTP status. The

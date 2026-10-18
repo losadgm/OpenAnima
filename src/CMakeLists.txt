@@ -29,6 +29,31 @@ target_include_directories(OpenAnima
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR})
 
+# The prompts are configuration, not code: they live in data/prompts.json and travel embedded
+# as they are, so the library never opens a file at run time. Editing the json and building
+# again is all it takes: the files are configure dependencies, so the build reconfigures.
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/../data/prompts.json OPENANIMA_PROMPTS_JSON)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+             ${CMAKE_CURRENT_SOURCE_DIR}/../data/prompts.json)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/OpenAnima/Core/PromptsData.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/OpenAnima/Core/PromptsData.h
+    @ONLY)
+
+# The reply schema follows the same rule: data/reply-schema.json is the contract as it will be
+# asked for, embedded as it is.
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/../data/reply-schema.json OPENANIMA_REPLY_SCHEMA_JSON)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+             ${CMAKE_CURRENT_SOURCE_DIR}/../data/reply-schema.json)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/OpenAnima/Core/ReplySchemaData.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/OpenAnima/Core/ReplySchemaData.h
+    @ONLY)
+
+target_include_directories(OpenAnima
+    PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/generated)
+
 target_include_directories(OpenAnima
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>

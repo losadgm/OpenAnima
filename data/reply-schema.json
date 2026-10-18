@@ -1,0 +1,92 @@
+{
+    "type": "object",
+    "properties": {
+        "reasoning": {
+            "type": "string",
+            "description": "Your private thoughts before you answer, in character and in the first person. One or two sentences. Nothing here is said out loud."
+        },
+        "dialogue": {
+            "type": "string",
+            "description": "What you say out loud, in character. An empty string when you say nothing."
+        },
+        "actions": {
+            "type": "array",
+            "description": "What you ask the host to do, as a list. Every entry is an object with \"name\" and \"arguments\". Empty when you do nothing.",
+            "items": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "description": "Do nothing this turn.",
+                        "properties": {
+                            "name": {
+                                "const": "wait"
+                            },
+                            "arguments": {
+                                "type": "object",
+                                "properties": {},
+                                "additionalProperties": false
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "arguments"
+                        ],
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "description": "End the conversation with the player.",
+                        "properties": {
+                            "name": {
+                                "const": "end_conversation"
+                            },
+                            "arguments": {
+                                "type": "object",
+                                "properties": {},
+                                "additionalProperties": false
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "arguments"
+                        ],
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "description": "Show a gesture or an expression, such as a nod or a shrug.",
+                        "properties": {
+                            "name": {
+                                "const": "emote"
+                            },
+                            "arguments": {
+                                "type": "object",
+                                "properties": {
+                                    "kind": {
+                                        "type": "string",
+                                        "description": "The gesture or expression, such as a nod or a shrug."
+                                    }
+                                },
+                                "required": [
+                                    "kind"
+                                ],
+                                "additionalProperties": false
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "arguments"
+                        ],
+                        "additionalProperties": false
+                    }
+                ]
+            }
+        }
+    },
+    "required": [
+        "reasoning",
+        "dialogue",
+        "actions"
+    ],
+    "additionalProperties": false
+}
