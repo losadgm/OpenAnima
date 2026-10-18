@@ -54,7 +54,6 @@ const Texts& texts() {
             text(document, "noNpc"),
             text(document, "turnFailed"),
             text(document, "cancelled"),
-            text(document, "noDocument"),
             text(document, "npcName"),
             text(document, "npcNameLobby"),
             text(document, "speakerYou"),

@@ -35,7 +35,6 @@ struct Texts {
     std::string noNpc;                 ///< Note for a line with nobody to answer it.
     std::string turnFailed;            ///< `{error}`.
     std::string cancelled;             ///< Note that closes a cancelled turn.
-    std::string noDocument;            ///< Note for a raw turn that has no document.
     std::string npcName;               ///< `{id}`.
     std::string npcNameLobby;          ///< Name of the npc outside a conversation.
     std::string speakerYou;            ///< Name the player is shown under.

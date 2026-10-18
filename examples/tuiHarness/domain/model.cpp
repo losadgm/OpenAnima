@@ -571,7 +571,9 @@ void noteRawTurn(Model& model, const Event& event) {
             : texts().npcNameLobby;
     model.messages.push_back({Role::Speaker, speaker + ":"});
     if (!event.reply.has_value() || event.reply->document.is_null()) {
-        note(model, texts().noDocument);
+        // A turn without a document was stopped before it was whole, so the note that
+        // closes a cancelled turn is the only thing there is to show.
+        note(model, texts().cancelled);
         return;
     }
     note(model, event.reply->document.dump(2));
