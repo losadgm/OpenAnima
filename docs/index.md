@@ -34,7 +34,8 @@ The conversation is one of three channels an NPC uses:
   not know the field is still checked: an answer that is not the JSON that was asked for is a
   `ParseError`.
 - A reply in three variables: `askTurn()` asks for `reasoning`, `dialogue` and `actions` in one
-  document, built from an `ActionCatalogue`, and returns them as `Core::NpcReply`. The dialogue
+  document, asked for in the schema kept in `data/reply-schema.json` and with the actions of an
+  `ActionCatalogue` filled in, and returns them as `Core::NpcReply`. The dialogue
   is reported while it is written and the whole document is kept as the turn, so the NPC reads
   its own thoughts back.
 - One provider interface, `OpenAnima::Provider::IProvider`, and a REST implementation for the
@@ -107,9 +108,9 @@ for (;;) {
 }
 ```
 
-Stopping a turn mid-answer is `brain.cancel(turn)`. The stream ends, whatever the model had
-produced by then is kept, and the turn arrives as a `Finished` event marked
-`FinishReason::Cancelled`.
+Stopping a turn mid-answer is `brain.cancel(turn)`. The call stops, whatever the model had
+produced arrives with the `Finished` event marked `FinishReason::Cancelled`, and the
+conversation is left as it was.
 
 What comes with it:
 
@@ -119,9 +120,9 @@ What comes with it:
   is written when the last event of the turn has been collected. A client that draws an answer
   decides when the turn becomes part of the conversation, which is also what keeps the turns
   in the order the player saw them.
-- A turn that failed leaves the conversation as it was, the same way a failed `ask()` does. One
-  that was cancelled keeps what had been produced, so the agent remembers what the player
-  actually read.
+- A turn that failed or was cancelled leaves the conversation as it was, the same way a failed
+  `ask()` does: nothing of a turn nobody finished is written, and the next prompt goes with the
+  context the player had before it.
 - What `timeoutSeconds` bounds is the silence, not the whole exchange: a model that thinks for a
   minute is fine, one that goes quiet for a minute is not.
 - A heartbeat from the server, a `data` field with nothing after it, is dropped. A chunk that

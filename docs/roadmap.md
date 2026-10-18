@@ -96,11 +96,12 @@ context is what the senses let through.
     rather than something the caller discovers later. The contract of an NPC's own answer is
     the next point.
 - [x] Isolate the output variables: `reasoning`, `dialogue`, `actions`.
-  - `askTurn()` and `askTurnAsync()` ask the answer in a schema built from an
-    `ActionCatalogue`, read it back as an `NpcReply` and keep the whole document in the
-    history. The contract also travels in the instruction sent with the prompt, so a provider
-    that ignores the schema still answers in it, and the dialogue is read out of the document
-    while it arrives, so a sink paints words rather than JSON.
+  - `askTurn()` and `askTurnAsync()` ask the answer in the schema kept in
+    `data/reply-schema.json`, with the actions of an `ActionCatalogue` filled in, read it back
+    as an `NpcReply` and keep the whole document in the history. The contract also travels in
+    the instruction sent with the prompt, so a provider that ignores the schema still answers
+    in it, and the dialogue is read out of the document while it arrives, so a sink paints
+    words rather than JSON.
 - [ ] Reject malformed answers and fall back.
   - The validation half is in place: `ParseError` and `ProviderError` reject anything that
     cannot be read or that the provider refused, and the error carries the HTTP status. The

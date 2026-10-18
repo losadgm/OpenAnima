@@ -23,10 +23,10 @@ place.
 
 ## Where the words go
 
-- Text the code says or sends lives in `data/`, not in C++: `prompts.json` and
+- Text the code says or sends belongs to `data/`, not to C++: `prompts.json` and
   `reply-schema.json` for what the library asks a model, `tui-texts.json` for what the
   terminal client shows. CMake embeds each file in the target, so nothing opens them at run
-  time.
+  time. The command line harness still carries its own text and is the one left to move.
 - A new sentence, label, note, prompt or description is a key in the json. A literal string in
   the code is only for what a programmer reads: assertion messages and exception text.
 - A text that carries a value has a placeholder, such as `{id}` or `{error}`, filled with the

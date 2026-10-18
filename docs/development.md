@@ -46,7 +46,7 @@ examples/cliHarness/  a runnable client: takes its settings from flags and .env,
                       prompt, prints the turn in the order of the reply contract
 examples/common/      shared by both clients: the loader for `.env`
 examples/tuiHarness/  the terminal client: full screen, transcript, mouse and clipboard
-data/                  the words and the contract: the prompts, the reply schema and the client texts
+data/                  the words and the contract: prompts, reply schema and client texts
 docs/                  these pages, the Doxyfile template and the site template
 .github/scripts/       helpers used by the pipeline, including the site builder
 .github/instructions/  the conventions of this repository, for editor tooling
