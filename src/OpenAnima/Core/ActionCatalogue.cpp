@@ -1,28 +1,56 @@
 #include "OpenAnima/Core/ActionCatalogue.h"
 
 #include <cassert>
+#include <cstddef>
+#include <initializer_list>
 #include <nlohmann/json.hpp>
 #include <string>
+#include <string_view>
 #include <utility>
+
+#include "OpenAnima/Core/PromptsData.h"
 
 namespace OpenAnima::Core {
 namespace {
 
-/// What the model reads about the inner voice. Written once because it goes to two places:
-/// the description of the schema, and the instruction that a provider ignoring the schema
-/// still reads. Two copies would drift apart, and say different things about one field.
-constexpr const char* ReasoningField =
-    "Your private thoughts before you answer, in character and in the first person. One or two "
-    "sentences. Nothing here is said out loud.";
+/// The words the contract is asked in, read once from the json the build embedded.
+/// @return The whole document.
+const nlohmann::json& prompts() {
+    static const nlohmann::json document = nlohmann::json::parse(PromptsData::Json);
+    return document;
+}
 
-/// What the model reads about the spoken part. Written once, as ReasoningField is.
-constexpr const char* DialogueField =
-    "What you say out loud, in character. An empty string when you say nothing.";
+/// @param document The prompts.
+/// @param key Name of the text.
+/// @return The text.
+std::string prompt(std::string_view key) {
+    return prompts().at(std::string{key}).get<std::string>();
+}
 
-/// What the model reads about the actions. Written once, as ReasoningField is.
-constexpr const char* ActionsField =
-    "What you ask the host to do, as a list. Every entry is an object with \"name\" and "
-    "\"arguments\". Empty when you do nothing.";
+/// Replaces one placeholder in a text, leaving it alone when it is not there.
+/// @param text Text to change.
+/// @param name Name of the placeholder, without its braces.
+/// @param value What replaces it.
+void replaceOnce(std::string& text, std::string_view name, const std::string& value) {
+    const std::string placeholder = "{" + std::string{name} + "}";
+    const std::size_t pos = text.find(placeholder);
+    if (pos != std::string::npos) {
+        text.replace(pos, placeholder.size(), value);
+    }
+}
+
+/// Fills the placeholders of a text.
+/// @param pattern Text with placeholders such as `{name}`.
+/// @param values Each placeholder and what replaces it.
+/// @return The text with every placeholder replaced.
+std::string fill(std::string_view pattern,
+                 std::initializer_list<std::pair<std::string_view, std::string>> values) {
+    std::string text{pattern};
+    for (const auto& [name, value] : values) {
+        replaceOnce(text, name, value);
+    }
+    return text;
+}
 
 /// The arguments of an action that takes none.
 /// @return A schema that accepts an object with nothing in it.
@@ -35,21 +63,22 @@ nlohmann::json emptyArguments() {
 }  // namespace
 
 ActionCatalogue ActionCatalogue::base() {
+    const nlohmann::json& words = prompts().at("catalogue");
+
     ActionCatalogue catalogue;
     catalogue.m_actions = {
-        ActionSpec{"wait", "Do nothing this turn.", nlohmann::json{}},
-        ActionSpec{"end_conversation", "End the conversation with the player.", nlohmann::json{}},
-        ActionSpec{
-            "emote", "Show a gesture or an expression, such as a nod or a shrug.",
-            nlohmann::json{
-                {"type", "object"},
-                {"properties",
-                 nlohmann::json{
-                     {"kind", nlohmann::json{{"type", "string"},
-                                             {"description", "The gesture or expression, such as a "
-                                                             "nod or a shrug."}}}}},
-                {"required", nlohmann::json::array({"kind"})},
-                {"additionalProperties", false}}},
+        ActionSpec{"wait", words.at("wait").at("description"), nlohmann::json{}},
+        ActionSpec{"end_conversation", words.at("end_conversation").at("description"),
+                   nlohmann::json{}},
+        ActionSpec{"emote", words.at("emote").at("description"),
+                   nlohmann::json{
+                       {"type", "object"},
+                       {"properties",
+                        nlohmann::json{{"kind", nlohmann::json{{"type", "string"},
+                                                               {"description",
+                                                                words.at("emote").at("kind")}}}}},
+                       {"required", nlohmann::json::array({"kind"})},
+                       {"additionalProperties", false}}},
     };
     return catalogue;
 }
@@ -67,7 +96,10 @@ void ActionCatalogue::add(ActionSpec spec) {
 }
 
 nlohmann::json ActionCatalogue::replySchema() const {
-    nlohmann::json actions = nlohmann::json{{"type", "array"}, {"description", ActionsField}};
+    const nlohmann::json& words = prompts();
+
+    nlohmann::json actions =
+        nlohmann::json{{"type", "array"}, {"description", words.at("actions")}};
     if (m_actions.empty()) {
         // No action is allowed, and the schema says so without an empty "oneOf", which
         // is not a schema every provider accepts.
@@ -90,34 +122,29 @@ nlohmann::json ActionCatalogue::replySchema() const {
     return nlohmann::json{
         {"type", "object"},
         {"properties",
-         nlohmann::json{
-             {"reasoning", nlohmann::json{{"type", "string"}, {"description", ReasoningField}}},
-             {"dialogue", nlohmann::json{{"type", "string"}, {"description", DialogueField}}},
-             {"actions", std::move(actions)}}},
+         nlohmann::json{{"reasoning", nlohmann::json{{"type", "string"},
+                                                     {"description", words.at("reasoning")}}},
+                        {"dialogue",
+                         nlohmann::json{{"type", "string"}, {"description", words.at("dialogue")}}},
+                        {"actions", std::move(actions)}}},
         {"required", nlohmann::json::array({"reasoning", "dialogue", "actions"})},
         {"additionalProperties", false}};
 }
 
 std::string ActionCatalogue::replyInstruction() const {
-    std::string instruction =
-        "Answer with one json object and nothing else, with these keys in this order:\n"
-        "\n"
-        "1. \"reasoning\": ";
-    instruction += ReasoningField;
-    instruction += "\n2. \"dialogue\": ";
-    instruction += DialogueField;
-    instruction += "\n3. \"actions\": ";
-    instruction += ActionsField;
-    instruction += '\n';
+    std::string instruction = fill(prompt("instruction"), {{"reasoning", prompt("reasoning")},
+                                                           {"dialogue", prompt("dialogue")},
+                                                           {"actions", prompt("actions")}});
 
     if (m_actions.empty()) {
-        instruction += "\nYou cannot take actions.\n";
+        instruction += prompt("noActions");
         return instruction;
     }
 
-    instruction += "\nThe actions you may take are:\n";
+    instruction += prompt("actionsIntro");
     for (const ActionSpec& action : m_actions) {
-        instruction += "- " + action.name + ": " + action.description + "\n";
+        instruction += fill(prompt("actionLine"),
+                            {{"name", action.name}, {"description", action.description}});
     }
     return instruction;
 }

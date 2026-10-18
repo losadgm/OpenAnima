@@ -46,6 +46,7 @@ examples/cliHarness/  a runnable client: takes its settings from flags and .env,
                       prompt, prints the turn in the order of the reply contract
 examples/common/      shared by both clients: the loader for `.env`
 examples/tuiHarness/  the terminal client: full screen, transcript, mouse and clipboard
+data/                  the words: prompts.json for the library, tui-texts.json for the client
 docs/                  these pages, the Doxyfile template and the site template
 .github/scripts/       helpers used by the pipeline, including the site builder
 .github/instructions/  the conventions of this repository, for editor tooling
@@ -53,6 +54,12 @@ docs/                  these pages, the Doxyfile template and the site template
 
 A header and its implementation share a path: `OpenAnima/Core/NPCBrain.h` is implemented by
 `OpenAnima/Core/NPCBrain.cpp` under `src/`.
+
+`data/` holds the words: `prompts.json` for what the library asks the model, and
+`tui-texts.json` for what the terminal client says. CMake embeds each one in the target that
+uses it, so neither opens a file at run time: editing the json and building again is the whole
+workflow. The library reads its prompts in `ActionCatalogue`, and the client reads its texts
+once through `Domain::texts()`, where a `{name}` in a text is filled with `Domain::fill()`.
 
 ## Conventions
 

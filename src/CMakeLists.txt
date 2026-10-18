@@ -29,6 +29,19 @@ target_include_directories(OpenAnima
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR})
 
+# The prompts are configuration, not code: they live in data/prompts.json and travel embedded
+# as they are, so the library never opens a file at run time. Editing the json and building
+# again is all it takes; the configure step is repeated because configure_file depends on it.
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/../data/prompts.json OPENANIMA_PROMPTS_JSON)
+configure_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/OpenAnima/Core/PromptsData.h.in
+    ${CMAKE_CURRENT_BINARY_DIR}/generated/OpenAnima/Core/PromptsData.h
+    @ONLY)
+
+target_include_directories(OpenAnima
+    PRIVATE
+        ${CMAKE_CURRENT_BINARY_DIR}/generated)
+
 target_include_directories(OpenAnima
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/../include>
