@@ -82,10 +82,11 @@ context is what the senses let through.
     cannot escape into libcurl: the failure is raised once the handle has been released.
 - [x] Asynchronous core.
   - `NPCBrain::askAsync()` hands a turn to a thread of its own and reports it as events:
-    `poll()` collects them, `cancel()` stops a turn and keeps the text it had produced, and
+    `poll()` collects them, `cancel()` stops a turn and reports what it had produced, and
     `isBusy()` says whether one is still open. The conversation is written on the caller's
     thread, when the last event of the turn is collected, so a client that draws an answer
-    still owns the order the turns are written in.
+    still owns the order the turns are written in. A turn that was cancelled is not written:
+    the conversation stays as it was.
 
 ## v0.3.0 - Strict parsing (data structuring)
 
