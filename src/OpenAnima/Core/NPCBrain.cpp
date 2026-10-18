@@ -340,8 +340,7 @@ RequestId NPCBrain::askAsync(std::string prompt) {
 
     // Kept here, on the caller's thread, because the history belongs to it: the
     // turn is written down when its last event is collected, not when it ends.
-    m_pendingPrompt = std::move(prompt);
-    m_pendingTurn = false;
+    m_pending = PendingTurn{std::move(prompt), false};
     return turnId;
 }
 
@@ -359,8 +358,7 @@ RequestId NPCBrain::askTurnAsync(std::string prompt) {
         m_worker->start(buildRequest(prompt, m_catalogue.replyInstruction()), m_provider,
                         ResponseFormat::jsonSchema(m_catalogue.replySchema()), true);
 
-    m_pendingPrompt = std::move(prompt);
-    m_pendingTurn = true;
+    m_pending = PendingTurn{std::move(prompt), true};
     return turnId;
 }
 
@@ -388,14 +386,13 @@ std::optional<Event> NPCBrain::poll(std::chrono::milliseconds timeout) {
     // A turn that was made joins the conversation; one that failed leaves it as it
     // was, the same way a failed ask() does. A reply turn is written only when the whole
     // document arrived, because half of it is not a turn the model could read back.
-    const bool whole =
-        !m_pendingTurn || (event->reply.has_value() && event->reply->document.is_object());
-    if (event->kind == EventKind::Finished && whole) {
-        m_history.push_back(ChatMessage{Role::User, m_pendingPrompt});
+    const bool whole = !m_pending.has_value() || !m_pending->reply ||
+                       (event->reply.has_value() && event->reply->document.is_object());
+    if (event->kind == EventKind::Finished && whole && m_pending.has_value()) {
+        m_history.push_back(ChatMessage{Role::User, m_pending->prompt});
         m_history.push_back(ChatMessage{Role::Assistant, event->completion.text});
     }
-    m_pendingPrompt.clear();
-    m_pendingTurn = false;
+    m_pending.reset();
     m_worker->collect();
     return event;
 }

@@ -188,8 +188,20 @@ private:
     std::shared_ptr<OpenAnima::Provider::IProvider> m_provider;  ///< Backend for every request.
     std::string m_systemPrompt;            ///< Instruction leading every request.
     std::unique_ptr<TurnWorker> m_worker;  ///< Runs the async turns, created on first use.
-    std::string m_pendingPrompt;  ///< Prompt of the turn in flight, waiting for its answer.
-    bool m_pendingTurn{false};    ///< Whether the turn in flight asks for a reply.
+
+    /// The turn that has been asked for and not collected yet.
+    ///
+    /// It is written into the conversation only when it is over and whole, and what it is
+    /// worth writing is decided in one place: the prompt the player typed, as it was, not with
+    /// the instruction that shaped it. The rounds of a future turn lean on this: an
+    /// intermediary round is not a turn, it does not enter the history, and only the last
+    /// reply is kept.
+    struct PendingTurn {
+        std::string prompt;  ///< What the player said, as it will be read back later.
+        bool reply{false};   ///< Whether the turn asks for a reply document.
+    };
+
+    std::optional<PendingTurn> m_pending;  ///< Turn in flight, waiting for its answer.
     ActionCatalogue m_catalogue{ActionCatalogue::base()};  ///< Actions this NPC may take.
 };
 

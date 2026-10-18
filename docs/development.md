@@ -73,6 +73,41 @@ without asking. Nothing else starts a thread: the synchronous calls, the provide
 transport work on the thread that called them, and the conversation is written on that thread
 when the events of a turn are collected.
 
+## Turns and their rounds
+
+A turn is the exchange the conversation adds up as one: the prompt, and the reply the model
+answers it with. Today a turn is one request, and the reply is one document with the three
+variables of the contract in it: `reasoning`, `dialogue` and `actions`. That is deliberate.
+
+- A local model pays twice for every call: the context is sent again, and its prefill is paid
+  again on the same tokens. Two calls a turn is twice the time a turn takes on the machine the
+  project targets, and it doubles the VRAM an NPC holds while it answers.
+- The three variables come out of one sample, so the words cannot disagree with the thought
+  that produced them.
+- The document is the assistant message of the conversation, so the NPC reads its own
+  reasoning on the next turn without a second place to keep it in.
+- Cancelling keeps one meaning: it stops the call, keeps what the dialogue had said, and
+  leaves the conversation as it was.
+
+A round is a request inside a turn. Rounds are what a deeper turn needs, and a round earns its
+cost when it brings something new back: memory, the world, another NPC. Reasoning again over
+the same context only reorders what is already there. The plan is in "Beyond the MVP" of the
+roadmap, and the invariants it has to respect are these.
+
+- Intermediary rounds are not turns. They do not enter the history, and only the last reply is
+  kept. The bookkeeping of the turn in flight is `NPCBrain::PendingTurn`, and `poll()` is the
+  only place that writes a turn into the conversation.
+- An observation comes back as a `Role::Tool` message after the document of the round that
+  asked for it, and the next round reads the conversation it had plus those two messages.
+- Only the last round streams. A delta of an intermediary round is a fragment of JSON and not
+  dialogue, and letting it through would paint the document on the client.
+- A turn still has one cancellation. Stopping between rounds drops all of them, and the
+  dialogue rescued from a cut turn is the one of the last round.
+
+What is missing to turn any of that on is the source of the observations, which is the world of
+`v0.5.0`, and the stop condition: a number of rounds, a word from the model or a judge. Until
+those exist a turn has one round, and the client sees no difference.
+
 ## Documentation
 
 There is one source of truth per thing:
