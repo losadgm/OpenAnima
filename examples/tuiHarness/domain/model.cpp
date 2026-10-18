@@ -619,6 +619,13 @@ bool applyEvent(Model& model, const Event& event) {
     case OpenAnima::Core::EventKind::Finished: {
         model.busy = false;
         model.cancelling = false;
+        // A cancelled turn leaves nothing of what it had written, in raw mode and out of it:
+        // the partial answer is dropped and the note is the only thing that stays.
+        if (event.completion.finishReason == OpenAnima::Core::FinishReason::Cancelled) {
+            model.answer.clear();
+            note(model, texts().cancelled);
+            return true;
+        }
         if (model.raw) {
             noteRawTurn(model, event);
         } else {
