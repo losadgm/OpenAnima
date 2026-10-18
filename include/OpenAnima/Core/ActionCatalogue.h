@@ -23,7 +23,7 @@ struct ActionSpec {
 /// still reads.
 class ActionCatalogue {
 public:
-    /// @return The catalogue every NPC starts with: wait, end_conversation and emote.
+    /// @return The catalogue the reply schema describes: wait, end_conversation and emote.
     [[nodiscard]] static ActionCatalogue base();
 
     /// Adds an action, or replaces the one that already has its name.

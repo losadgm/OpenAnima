@@ -41,9 +41,12 @@ TEST_CASE("ActionCatalogue builds a reply schema with every key required", "[cat
     CHECK(alternatives[1]["properties"]["name"]["const"] == "end_conversation");
     CHECK(alternatives[2]["properties"]["name"]["const"] == "emote");
     CHECK(alternatives[2]["properties"]["arguments"]["properties"]["kind"]["type"] == "string");
+    CHECK(alternatives[2]["properties"]["arguments"]["required"][0] == "kind");
+    CHECK(alternatives[2]["properties"]["arguments"]["additionalProperties"] == false);
     CHECK(alternatives[0]["properties"]["arguments"]["type"] == "object");
     CHECK(alternatives[0]["required"][0] == "name");
     CHECK(alternatives[0]["additionalProperties"] == false);
+    CHECK_FALSE(alternatives[2]["description"].get<std::string>().empty());
 }
 
 TEST_CASE("ActionCatalogue replaces an action that has its name", "[catalogue]") {

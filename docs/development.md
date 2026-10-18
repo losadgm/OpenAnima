@@ -46,7 +46,7 @@ examples/cliHarness/  a runnable client: takes its settings from flags and .env,
                       prompt, prints the turn in the order of the reply contract
 examples/common/      shared by both clients: the loader for `.env`
 examples/tuiHarness/  the terminal client: full screen, transcript, mouse and clipboard
-data/                  the words: prompts.json for the library, tui-texts.json for the client
+data/                  the words and the contract: the prompts, the reply schema and the client texts
 docs/                  these pages, the Doxyfile template and the site template
 .github/scripts/       helpers used by the pipeline, including the site builder
 .github/instructions/  the conventions of this repository, for editor tooling
@@ -55,11 +55,13 @@ docs/                  these pages, the Doxyfile template and the site template
 A header and its implementation share a path: `OpenAnima/Core/NPCBrain.h` is implemented by
 `OpenAnima/Core/NPCBrain.cpp` under `src/`.
 
-`data/` holds the words: `prompts.json` for what the library asks the model, and
-`tui-texts.json` for what the terminal client says. CMake embeds each one in the target that
-uses it, so neither opens a file at run time: editing the json and building again is the whole
-workflow. The library reads its prompts in `ActionCatalogue`, and the client reads its texts
-once through `Domain::texts()`, where a `{name}` in a text is filled with `Domain::fill()`.
+`data/` holds the words and the contract: `prompts.json` for the instruction the library sends,
+`reply-schema.json` for the schema the answer is asked for in, and `tui-texts.json` for what the
+terminal client says. CMake embeds each one in the target that uses it, so none of them opens a
+file at run time: editing the json and building again is the whole workflow. The library reads
+them in `ActionCatalogue`, where the schema is embedded as it is and the instruction takes the
+description of every property from it, so a property is described once. The client reads its
+texts once through `Domain::texts()`, where a `{name}` in a text is filled with `Domain::fill()`.
 
 ## Conventions
 

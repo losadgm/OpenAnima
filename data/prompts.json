@@ -1,21 +1,6 @@
 {
-    "reasoning": "Your private thoughts before you answer, in character and in the first person. One or two sentences. Nothing here is said out loud.",
-    "dialogue": "What you say out loud, in character. An empty string when you say nothing.",
-    "actions": "What you ask the host to do, as a list. Every entry is an object with \"name\" and \"arguments\". Empty when you do nothing.",
     "instruction": "Answer with one json object and nothing else, with these keys in this order:\n\n1. \"reasoning\": {reasoning}\n2. \"dialogue\": {dialogue}\n3. \"actions\": {actions}\n",
     "noActions": "\nYou cannot take actions.\n",
     "actionsIntro": "\nThe actions you may take are:\n",
-    "actionLine": "- {name}: {description}\n",
-    "catalogue": {
-        "wait": {
-            "description": "Do nothing this turn."
-        },
-        "end_conversation": {
-            "description": "End the conversation with the player."
-        },
-        "emote": {
-            "description": "Show a gesture or an expression, such as a nod or a shrug.",
-            "kind": "The gesture or expression, such as a nod or a shrug."
-        }
-    }
+    "actionLine": "- {name}: {description}\n"
 }

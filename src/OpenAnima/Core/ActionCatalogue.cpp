@@ -9,6 +9,7 @@
 #include <utility>
 
 #include "OpenAnima/Core/PromptsData.h"
+#include "OpenAnima/Core/ReplySchemaData.h"
 
 namespace OpenAnima::Core {
 namespace {
@@ -17,6 +18,13 @@ namespace {
 /// @return The whole document.
 const nlohmann::json& prompts() {
     static const nlohmann::json document = nlohmann::json::parse(PromptsData::Json);
+    return document;
+}
+
+/// The reply contract, read once from the json the build embedded.
+/// @return The whole document.
+const nlohmann::json& schemaData() {
+    static const nlohmann::json document = nlohmann::json::parse(ReplySchemaData::Json);
     return document;
 }
 
@@ -60,26 +68,38 @@ nlohmann::json emptyArguments() {
                           {"additionalProperties", false}};
 }
 
+/// One entry of the reply schema's list of actions.
+/// @param spec Action to describe.
+/// @return The alternative the model picks by name.
+nlohmann::json alternative(const ActionSpec& spec) {
+    const nlohmann::json arguments = spec.arguments.is_object() ? spec.arguments : emptyArguments();
+    return nlohmann::json{
+        {"type", "object"},
+        {"description", spec.description},
+        {"properties",
+         nlohmann::json{{"name", nlohmann::json{{"const", spec.name}}}, {"arguments", arguments}}},
+        {"required", nlohmann::json::array({"name", "arguments"})},
+        {"additionalProperties", false}};
+}
+
 }  // namespace
 
 ActionCatalogue ActionCatalogue::base() {
-    const nlohmann::json& words = prompts().at("catalogue");
-
     ActionCatalogue catalogue;
-    catalogue.m_actions = {
-        ActionSpec{"wait", words.at("wait").at("description"), nlohmann::json{}},
-        ActionSpec{"end_conversation", words.at("end_conversation").at("description"),
-                   nlohmann::json{}},
-        ActionSpec{"emote", words.at("emote").at("description"),
-                   nlohmann::json{
-                       {"type", "object"},
-                       {"properties",
-                        nlohmann::json{{"kind", nlohmann::json{{"type", "string"},
-                                                               {"description",
-                                                                words.at("emote").at("kind")}}}}},
-                       {"required", nlohmann::json::array({"kind"})},
-                       {"additionalProperties", false}}},
-    };
+    for (const nlohmann::json& entry :
+         schemaData().at("properties").at("actions").at("items").at("oneOf")) {
+        const nlohmann::json& arguments = entry.at("properties").at("arguments");
+
+        ActionSpec spec;
+        spec.name = entry.at("properties").at("name").at("const").get<std::string>();
+        spec.description = entry.at("description").get<std::string>();
+        // An action with nothing to pass leaves the field empty, and the schema built from
+        // the specification then closes its arguments on an empty object.
+        if (arguments.contains("properties") && !arguments.at("properties").empty()) {
+            spec.arguments = arguments;
+        }
+        catalogue.add(std::move(spec));
+    }
     return catalogue;
 }
 
@@ -96,45 +116,33 @@ void ActionCatalogue::add(ActionSpec spec) {
 }
 
 nlohmann::json ActionCatalogue::replySchema() const {
-    const nlohmann::json& words = prompts();
+    nlohmann::json schema = schemaData();
+    nlohmann::json& actions = schema.at("properties").at("actions");
 
-    nlohmann::json actions =
-        nlohmann::json{{"type", "array"}, {"description", words.at("actions")}};
     if (m_actions.empty()) {
         // No action is allowed, and the schema says so without an empty "oneOf", which
         // is not a schema every provider accepts.
+        actions.erase("items");
         actions["maxItems"] = 0;
-    } else {
-        nlohmann::json alternatives = nlohmann::json::array();
-        for (const ActionSpec& action : m_actions) {
-            const nlohmann::json arguments =
-                action.arguments.is_object() ? action.arguments : emptyArguments();
-            alternatives.push_back(nlohmann::json{
-                {"type", "object"},
-                {"properties", nlohmann::json{{"name", nlohmann::json{{"const", action.name}}},
-                                              {"arguments", arguments}}},
-                {"required", nlohmann::json::array({"name", "arguments"})},
-                {"additionalProperties", false}});
-        }
-        actions["items"] = nlohmann::json{{"oneOf", std::move(alternatives)}};
+        return schema;
     }
 
-    return nlohmann::json{
-        {"type", "object"},
-        {"properties",
-         nlohmann::json{{"reasoning", nlohmann::json{{"type", "string"},
-                                                     {"description", words.at("reasoning")}}},
-                        {"dialogue",
-                         nlohmann::json{{"type", "string"}, {"description", words.at("dialogue")}}},
-                        {"actions", std::move(actions)}}},
-        {"required", nlohmann::json::array({"reasoning", "dialogue", "actions"})},
-        {"additionalProperties", false}};
+    nlohmann::json alternatives = nlohmann::json::array();
+    for (const ActionSpec& action : m_actions) {
+        alternatives.push_back(alternative(action));
+    }
+    actions["items"] = nlohmann::json{{"oneOf", std::move(alternatives)}};
+    return schema;
 }
 
 std::string ActionCatalogue::replyInstruction() const {
-    std::string instruction = fill(prompt("instruction"), {{"reasoning", prompt("reasoning")},
-                                                           {"dialogue", prompt("dialogue")},
-                                                           {"actions", prompt("actions")}});
+    const nlohmann::json& properties = schemaData().at("properties");
+
+    std::string instruction =
+        fill(prompt("instruction"),
+             {{"reasoning", properties.at("reasoning").at("description").get<std::string>()},
+              {"dialogue", properties.at("dialogue").at("description").get<std::string>()},
+              {"actions", properties.at("actions").at("description").get<std::string>()}});
 
     if (m_actions.empty()) {
         instruction += prompt("noActions");
